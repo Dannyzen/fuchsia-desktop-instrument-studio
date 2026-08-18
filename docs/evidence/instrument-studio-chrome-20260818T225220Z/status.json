@@ -1,0 +1,39 @@
+{
+  "stamp": "20260818T225220Z",
+  "built_merkle": "375af6ce3bb59b918b4156b6e5560015aea09f8ddb6f968098d5f6cc92428827",
+  "live_merkle": "375af6ce3bb59b918b4156b6e5560015aea09f8ddb6f968098d5f6cc92428827",
+  "running": {
+    "browser": true,
+    "terminal": true,
+    "files": true,
+    "settings": true
+  },
+  "inspect": "core/session-manager/session:session/tiling_wm:\n  metadata:\n    name = root\n    component_url = tiling_wm#meta/tiling_wm.cm\n    timestamp = 35943432174\n  payload:\n    root:\n      fuchsia.inspect.Health:\n        start_timestamp_nanos = 1347019921\n        status = OK\n      tiling_wm:\n        last_present_context = WindowManagerSetOrder\n        order = chx-terminal-20260818T225220Z,chx-settings-20260818T225220Z,chx-files-20260818T225220Z,chx-browser-20260818T225220Z\n        present_count = 3\n        tile_count = 4\n        config:\n          active_border_px = 3\n          gap_px = 12\n          wrap_focus = true\n        focus:\n          confirmed = chx-terminal-20260818T225220Z\n          selected = chx-terminal-20260818T225220Z\n\n",
+  "chrome_log": "Error parsing option '--since' with value 'boot': invalid date string: expected week day or month name\n\n",
+  "screenshots": [
+    "/srv/bigs-runtime/workspaces/projects/fuchsia-desktop-mvp/artifacts/instrument-studio-chrome-fix-20260818T225220Z/screenshots/screenshot.png"
+  ],
+  "feedback": {
+    "ready": true,
+    "wm": {
+      "available": true,
+      "tile_count": 4,
+      "order": [
+        "chx-terminal-20260818T225220Z",
+        "chx-settings-20260818T225220Z",
+        "chx-files-20260818T225220Z",
+        "chx-browser-20260818T225220Z"
+      ],
+      "selected_focus": "chx-terminal-20260818T225220Z",
+      "confirmed_focus": "chx-terminal-20260818T225220Z",
+      "gap_px": 12,
+      "active_border_px": 3,
+      "wrap_focus": true,
+      "present_count": 3,
+      "last_present_context": "WindowManagerSetOrder"
+    },
+    "next": [
+      "Diagnostics match the foundation contract; implement shared desktop_ui kit screens next."
+    ]
+  }
+}

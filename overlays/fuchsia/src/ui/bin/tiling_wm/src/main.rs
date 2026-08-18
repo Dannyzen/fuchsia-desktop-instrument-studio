@@ -25,9 +25,12 @@ use rand::distr::{Alphanumeric, SampleString};
 use rand::rng;
 use std::collections::HashMap;
 
+mod chrome;
 mod observability;
 mod policy;
 
+use chrome::ShellChrome;
+use desktop_ui::{ChromeRegion, InstrumentStudioLayout};
 use observability::WmObservability;
 use policy::{LayoutConfig, Size, WindowPolicy, compute_layout};
 
@@ -116,6 +119,7 @@ pub struct TilingWm {
     tiles: HashMap<TileId, ChildView>,
     policy: WindowPolicy,
     observability: WmObservability,
+    chrome: ShellChrome,
 }
 
 impl Drop for TilingWm {
@@ -526,6 +530,7 @@ impl TilingWm {
         let layout_info = parent_viewport_watcher.get_layout().await?;
         Self::watch_layout(parent_viewport_watcher, internal_sender.clone());
 
+        let chrome = ShellChrome::create(&flatland, &mut id_generator, &root_transform_id)?;
         Ok(TilingWm {
             internal_sender,
             flatland,
@@ -537,6 +542,7 @@ impl TilingWm {
             tiles: HashMap::new(),
             policy: WindowPolicy::new(layout_config).map_err(anyhow::Error::msg)?,
             observability: WmObservability::attach(component::inspector().root(), &layout_config),
+            chrome,
         })
     }
 
@@ -565,9 +571,14 @@ impl TilingWm {
 
     fn layout_tiles(&mut self) -> Result<(), Error> {
         let logical_size = self.layout_info.logical_size.context("missing root logical size")?;
+        let shell = InstrumentStudioLayout::new(logical_size.width, logical_size.height)
+            .map_err(anyhow::Error::msg)?;
+        self.chrome.layout(&self.flatland, &shell)?;
+
+        let stage = shell.region_rect(ChromeRegion::TiledStage);
         let order: Vec<String> = self.policy.order().into_iter().map(str::to_string).collect();
         let slots = compute_layout(
-            Size { width: logical_size.width, height: logical_size.height },
+            Size { width: stage.width, height: stage.height },
             order.len(),
             self.layout_config,
         )
@@ -591,14 +602,17 @@ impl TilingWm {
             self.flatland
                 .set_translation(
                     &view.border_transform_id,
-                    &fidl_fuchsia_math::Vec_ { x: slot.x as i32, y: slot.y as i32 },
+                    &fidl_fuchsia_math::Vec_ {
+                        x: (stage.x + slot.x) as i32,
+                        y: (stage.y + slot.y) as i32,
+                    },
                 )
                 .context("translate tile group")?;
 
             let inset = slot.content_inset;
             let viewport_size = fidl_fuchsia_math::SizeU {
-                width: slot.width - inset * 2,
-                height: slot.height - inset * 2,
+                width: slot.width.saturating_sub(inset * 2).max(1),
+                height: slot.height.saturating_sub(inset * 2).max(1),
             };
             self.flatland
                 .set_viewport_properties(
@@ -616,8 +630,19 @@ impl TilingWm {
                 )
                 .context("translate inset viewport")?;
         }
+        info!(
+            "TILING_WM_CHROME stage={}x{}+{}+{} strip_h={} rail_w={} inspector_h={}",
+            stage.width,
+            stage.height,
+            stage.x,
+            stage.y,
+            shell.theme.panel_height_px,
+            shell.theme.rail_width_px,
+            shell.theme.inspector_height_px
+        );
         Ok(())
     }
+
 
     fn watch_layout(
         proxy: ui_comp::ParentViewportWatcherProxy,

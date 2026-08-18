@@ -52,6 +52,8 @@ We are building **Instrument Studio** first:
 
 ![Live emulator four-app stage](design/screenshots/04-emulator-four-app-live.png)
 
+![Live emulator with Instrument Studio chrome](design/screenshots/05-emulator-chrome-live.png)
+
 Interactive sketches live under `design/sketches/`.
 
 ## Local rebuild

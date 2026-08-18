@@ -36,13 +36,23 @@ pub struct Rect {
 
 impl InstrumentStudioLayout {
     pub fn new(width: u32, height: u32) -> Result<Self, String> {
-        if width < 800 || height < 600 {
-            return Err(format!("instrument studio needs at least 800x600, got {width}x{height}"));
+        // Emulator FEMU often boots portrait (e.g. 720x1200). Keep chrome usable there.
+        if width < 640 || height < 480 {
+            return Err(format!("instrument studio needs at least 640x480, got {width}x{height}"));
+        }
+        let mut theme = INSTRUMENT_STUDIO_THEME;
+        // Shrink chrome on narrow/short displays so the stage remains usable.
+        if width < 900 {
+            theme.rail_width_px = theme.rail_width_px.min(56);
+        }
+        if height < 900 {
+            theme.panel_height_px = theme.panel_height_px.min(40);
+            theme.inspector_height_px = theme.inspector_height_px.min(120);
         }
         Ok(Self {
             width,
             height,
-            theme: INSTRUMENT_STUDIO_THEME,
+            theme,
             active_workspace: WorkspaceId(1),
             workspaces: vec![WorkspaceId(1), WorkspaceId(2), WorkspaceId(3)],
         })

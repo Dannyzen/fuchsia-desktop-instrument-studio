@@ -1,16 +1,21 @@
 # Live diagnostics status
 
-Last proven run: `20260818T220823Z`
+Last proven run: chrome `20260818T225220Z`
 
 ```json
 {
-  "live_merkle": "7aa36e023bd2fad95be596ca001df1d70e428eb7996e0384c6e52028ded36745",
+  "live_merkle": "375af6ce3bb59b918b4156b6e5560015aea09f8ddb6f968098d5f6cc92428827",
   "inspect_available": true,
   "tile_count": 4,
   "confirmed_focus": "terminal",
-  "gap_px": 12,
-  "active_border_px": 3,
+  "chrome_regions_visible": true,
+  "regions": [
+    "workspace_strip",
+    "launcher_rail",
+    "inspector",
+    "tiled_stage"
+  ],
   "ready_for_ui_iteration": true,
-  "remaining": "Instrument Studio chrome (workspace strip, launcher rail, inspector)"
+  "remaining": "labels/icons/inspector text density inside chrome regions"
 }
 ```

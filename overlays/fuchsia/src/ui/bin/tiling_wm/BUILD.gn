@@ -27,6 +27,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
+    "//src/fuchsia-desktop/desktop_ui",
     "//src/lib/ui/fuchsia-scenic",
     "//src/lib/ui/fidl_fuchsia_ui_views_ext:lib",
     "//third_party/rust_crates:anyhow",
@@ -36,6 +37,7 @@ rustc_binary("bin") {
   ]
 
   sources = [
+    "src/chrome.rs",
     "src/main.rs",
     "src/observability.rs",
     "src/policy.rs",

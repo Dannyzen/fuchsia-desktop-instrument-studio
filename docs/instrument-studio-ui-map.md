@@ -39,3 +39,15 @@ Turn the Instrument Studio sketch into a native Fuchsia shell using shared
 ./scripts/collect-desktop-diagnostics.sh ./artifacts/diagnostics-run
 jq .evaluation ./artifacts/diagnostics-run/design-feedback.json
 ```
+
+
+## Live implementation note (2026-08-18)
+
+Shell chrome is drawn by `tiling_wm` using `desktop_ui::InstrumentStudioLayout`:
+
+- workspace strip + cyan underline
+- launcher rail + violet edge
+- inspector bar + cyan top edge
+- tiled stage is inset into the remaining rectangle
+
+Evidence: `docs/evidence/instrument-studio-chrome-20260818T225220Z/`.
