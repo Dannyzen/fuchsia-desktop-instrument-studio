@@ -1,0 +1,23 @@
+core/session-manager/session:session/tiling_wm:
+  metadata:
+    name = root
+    component_url = tiling_wm#meta/tiling_wm.cm
+    timestamp = 28613565628
+  payload:
+    root:
+      fuchsia.inspect.Health:
+        start_timestamp_nanos = 1446160516
+        status = OK
+      tiling_wm:
+        last_present_context = WindowManagerSetOrder
+        order = den-terminal-20260818T230716Z,den-settings-20260818T230716Z,den-files-20260818T230716Z,den-browser-20260818T230716Z
+        present_count = 3
+        tile_count = 4
+        config:
+          active_border_px = 3
+          gap_px = 12
+          wrap_focus = true
+        focus:
+          confirmed = den-terminal-20260818T230716Z
+          selected = den-terminal-20260818T230716Z
+

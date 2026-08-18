@@ -51,3 +51,14 @@ Shell chrome is drawn by `tiling_wm` using `desktop_ui::InstrumentStudioLayout`:
 - tiled stage is inset into the remaining rectangle
 
 Evidence: `docs/evidence/instrument-studio-chrome-20260818T225220Z/`.
+
+
+## Density pass (2026-08-18)
+
+Chrome now includes geometric product density:
+
+- brand block + workspace pills + status chip
+- 4 launcher marks with active highlight
+- 4 inspector cards with state-bound meter bars
+
+Evidence: `docs/evidence/instrument-studio-density-20260818T230716Z/`.

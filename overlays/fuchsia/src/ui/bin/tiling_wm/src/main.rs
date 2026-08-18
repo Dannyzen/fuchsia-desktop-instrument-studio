@@ -29,7 +29,7 @@ mod chrome;
 mod observability;
 mod policy;
 
-use chrome::ShellChrome;
+use chrome::{ChromeState, ShellChrome};
 use desktop_ui::{ChromeRegion, InstrumentStudioLayout};
 use observability::WmObservability;
 use policy::{LayoutConfig, Size, WindowPolicy, compute_layout};
@@ -573,7 +573,15 @@ impl TilingWm {
         let logical_size = self.layout_info.logical_size.context("missing root logical size")?;
         let shell = InstrumentStudioLayout::new(logical_size.width, logical_size.height)
             .map_err(anyhow::Error::msg)?;
-        self.chrome.layout(&self.flatland, &shell)?;
+        let chrome_state = ChromeState {
+            tile_count: self.policy.order().len() as u32,
+            confirmed_focus: self.policy.confirmed_focus_id().unwrap_or("").to_string(),
+            order: self.policy.order().into_iter().map(str::to_string).collect(),
+            gap_px: self.layout_config.gap_px,
+            active_border_px: self.layout_config.active_border_px,
+            present_count: self.observability.present_count_value,
+        };
+        self.chrome.layout(&self.flatland, &shell, &chrome_state)?;
 
         let stage = shell.region_rect(ChromeRegion::TiledStage);
         let order: Vec<String> = self.policy.order().into_iter().map(str::to_string).collect();

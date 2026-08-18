@@ -1,0 +1,40 @@
+{
+  "stamp": "20260818T230716Z",
+  "build": 0,
+  "tests": 0,
+  "built_merkle": "8e5dafcf765fbf546c234b370ddbd9e9f1e5c23f5e3adbaced79bb512d8e6e05",
+  "live_merkle": "8e5dafcf765fbf546c234b370ddbd9e9f1e5c23f5e3adbaced79bb512d8e6e05",
+  "running": {
+    "browser": true,
+    "terminal": true,
+    "files": true,
+    "settings": true
+  },
+  "feedback": {
+    "ready": true,
+    "wm": {
+      "available": true,
+      "tile_count": 4,
+      "order": [
+        "den-terminal-20260818T230716Z",
+        "den-settings-20260818T230716Z",
+        "den-files-20260818T230716Z",
+        "den-browser-20260818T230716Z"
+      ],
+      "selected_focus": "den-terminal-20260818T230716Z",
+      "confirmed_focus": "den-terminal-20260818T230716Z",
+      "gap_px": 12,
+      "active_border_px": 3,
+      "wrap_focus": true,
+      "present_count": 3,
+      "last_present_context": "WindowManagerSetOrder"
+    },
+    "next": [
+      "Diagnostics match the foundation contract; implement shared desktop_ui kit screens next."
+    ]
+  },
+  "inspect": "core/session-manager/session:session/tiling_wm:\n  metadata:\n    name = root\n    component_url = tiling_wm#meta/tiling_wm.cm\n    timestamp = 28613565628\n  payload:\n    root:\n      fuchsia.inspect.Health:\n        start_timestamp_nanos = 1446160516\n        status = OK\n      tiling_wm:\n        last_present_context = WindowManagerSetOrder\n        order = den-terminal-20260818T230716Z,den-settings-20260818T230716Z,den-files-20260818T230716Z,den-browser-20260818T230716Z\n        present_count = 3\n        tile_count = 4\n        config:\n          active_border_px = 3\n          gap_px = 12\n          wrap_focus = true\n        focus:\n          confirmed = den-terminal-20260818T230716Z\n          selected = den-terminal-20260818T230716Z\n\n",
+  "screenshots": [
+    "/srv/bigs-runtime/workspaces/projects/fuchsia-desktop-mvp/artifacts/instrument-studio-density-20260818T230716Z/screenshots/screenshot.png"
+  ]
+}

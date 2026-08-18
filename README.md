@@ -54,6 +54,8 @@ We are building **Instrument Studio** first:
 
 ![Live emulator with Instrument Studio chrome](design/screenshots/05-emulator-chrome-live.png)
 
+![Live emulator density pass](design/screenshots/06-emulator-density-live.png)
+
 Interactive sketches live under `design/sketches/`.
 
 ## Local rebuild

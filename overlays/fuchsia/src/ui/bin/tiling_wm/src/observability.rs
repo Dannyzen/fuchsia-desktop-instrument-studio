@@ -27,7 +27,7 @@ pub struct WmObservability {
     order: StringProperty,
     present_count: UintProperty,
     last_present_context: StringProperty,
-    present_count_value: u64,
+    pub present_count_value: u64,
 }
 
 impl WmObservability {
