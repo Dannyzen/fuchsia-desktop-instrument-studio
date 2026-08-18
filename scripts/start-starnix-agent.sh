@@ -7,7 +7,7 @@ ffx=(/workspace/sdk/packages/tools/x64/ffx --isolate-dir /workspace/state/ffx)
 
 [[ $(hostname) == bigs ]]
 : # public package: set PROJECT_ROOT explicitly when needed
-[[ -f "$project/state/agent-linux/id_ed25519" ]]
+[[ -n "${AGENT_SSH_KEY:-}" && -f "${AGENT_SSH_KEY}" ]]
 : > "$project/state/agent-linux/known_hosts"
 chmod 600 "$project/state/agent-linux/known_hosts"
 
@@ -18,7 +18,7 @@ podman exec "$container" "${ffx[@]}" component run -r   core/starnix_runner/play
 podman exec "$container" python3 /workspace/scripts/starnix-agent-forward.py
 
 for _ in $(seq 1 60); do
-  if podman exec "$container" ssh       -F none -p 17000 -i ${AGENT_SSH_KEY:?set AGENT_SSH_KEY to your local private key path}       -o BatchMode=yes -o IdentitiesOnly=yes       -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=${AGENT_KNOWN_HOSTS:-${PROJECT_ROOT:-.}/state/agent-linux/known_hosts}       -o ConnectTimeout=1 root@127.0.0.1 true >/dev/null 2>&1; then
+  if podman exec "$container" ssh       -F none -p 17000 -i ${AGENT_SSH_KEY:?set AGENT_SSH_KEY}       -o BatchMode=yes -o IdentitiesOnly=yes       -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=${AGENT_KNOWN_HOSTS:-${PROJECT_ROOT:-.}/state/agent-linux/known_hosts}       -o ConnectTimeout=1 root@127.0.0.1 true >/dev/null 2>&1; then
     printf '%s
 ' 'FUCHSIA_AGENT_LINUX_READY'
     exit 0

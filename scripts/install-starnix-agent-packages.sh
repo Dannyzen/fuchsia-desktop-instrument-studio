@@ -34,7 +34,7 @@ PYLOCK
 "$project/scripts/starnix-agent-exec.sh" "install -d -m 700 /tmp/agent-apks"
 container_paths=()
 for name in "${files[@]}"; do container_paths+=("/workspace/cache/alpine-v3.19/$name"); done
-podman exec "$container" scp -F none -P 17000   -i ${AGENT_SSH_KEY:?set AGENT_SSH_KEY to your local private key path}   -o BatchMode=yes -o IdentitiesOnly=yes   -o StrictHostKeyChecking=yes   -o UserKnownHostsFile=${AGENT_KNOWN_HOSTS:-${PROJECT_ROOT:-.}/state/agent-linux/known_hosts}   "${container_paths[@]}" root@127.0.0.1:/tmp/agent-apks/
+podman exec "$container" scp -F none -P 17000   -i ${AGENT_SSH_KEY:?set AGENT_SSH_KEY}   -o BatchMode=yes -o IdentitiesOnly=yes   -o StrictHostKeyChecking=yes   -o UserKnownHostsFile=${AGENT_KNOWN_HOSTS:-${PROJECT_ROOT:-.}/state/agent-linux/known_hosts}   "${container_paths[@]}" root@127.0.0.1:/tmp/agent-apks/
 python3 - "$lock" <<'PYHASH' | "$project/scripts/starnix-agent-exec.sh" "sha256sum -c -"
 from pathlib import Path
 import json,sys
