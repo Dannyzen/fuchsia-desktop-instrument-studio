@@ -1,0 +1,76 @@
+{
+  "stamp": "20260818T220823Z",
+  "built_merkle": "7aa36e023bd2fad95be596ca001df1d70e428eb7996e0384c6e52028ded36745",
+  "running": {
+    "browser": true,
+    "terminal": true,
+    "files": true,
+    "settings": true
+  },
+  "inspect": "core/session-manager/session:session/tiling_wm:\n  metadata:\n    name = root\n    component_url = tiling_wm#meta/tiling_wm.cm\n    timestamp = 28746340901\n  payload:\n    root:\n      fuchsia.inspect.Health:\n        start_timestamp_nanos = 1378025391\n        status = OK\n      tiling_wm:\n        last_present_context = WindowManagerSetOrder\n        order = fix-terminal-20260818T220823Z,fix-settings-20260818T220823Z,fix-files-20260818T220823Z,fix-browser-20260818T220823Z\n        present_count = 3\n        tile_count = 4\n        config:\n          active_border_px = 3\n          gap_px = 12\n          wrap_focus = true\n        focus:\n          confirmed = fix-terminal-20260818T220823Z\n          selected = fix-terminal-20260818T220823Z\n\n",
+  "show": "                 Moniker:  core/session-manager/session:session/tiling_wm\n                     URL:  tiling_wm#meta/tiling_wm.cm\n             Environment:  session-env\n             Instance ID:  None\n         Component State:  Resolved\n            Resolved URL:  tiling_wm#meta/tiling_wm.cm\n                  Runner:  elf\n  Namespace Capabilities:  /svc/fuchsia.inspect.InspectSink\n                           /svc/fuchsia.logger.LogSink\n                           /svc/fuchsia.session.scene.Manager\n                           /svc/fuchsia.ui.composition.Flatland\n                           /svc/fuchsia.ui.focus.FocusChainListenerRegistry\n    Exposed Capabilities:  fuchsia.element.GraphicalPresenter\n                           fuchsia.session.window.Manager\n             Merkle root:  7aa36e023bd2fad95be596ca001df1d70e428eb7996e0384c6e52028ded36745\n           Configuration:  active_border_px -> Uint32(3)\n                           gap_px           -> Uint32(12)\n                           wrap_focus       -> Bool(true)\n        Manifest Sources:  src/ui/bin/tiling_wm/meta/tiling_wm.cml\n                           sdk/lib/inspect/client.shard.cml\n                           sdk/lib/inspect/offer.shard.cml\n                           sdk/lib/inspect/use.shard.cml\n                           sdk/lib/syslog/client.shard.cml\n                           sdk/lib/syslog/offer.shard.cml\n                           sdk/lib/syslog/use.shard.cml\n         Execution State:  Running\n            Start reason:  Instance is an eager child\n   Outgoing Capabilities:  fuchsia.element.GraphicalPresenter\n                           fuchsia.session.window.Manager\n                 Runtime:  ELF\n           Running since:  2026-08-18 22:09:02.780473937 UTC\n                  Job ID:  27997\n              Process ID:  28361\n\n",
+  "screenshots": [
+    "/srv/bigs-runtime/workspaces/projects/fuchsia-desktop-mvp/artifacts/instrument-studio-fix-20260818T220823Z/screenshots/screenshot.png"
+  ],
+  "feedback": {
+    "ready": true,
+    "wm": {
+      "available": true,
+      "tile_count": 4,
+      "order": [
+        "fix-terminal-20260818T220823Z",
+        "fix-settings-20260818T220823Z",
+        "fix-files-20260818T220823Z",
+        "fix-browser-20260818T220823Z"
+      ],
+      "selected_focus": "fix-terminal-20260818T220823Z",
+      "confirmed_focus": "fix-terminal-20260818T220823Z",
+      "gap_px": 12,
+      "active_border_px": 3,
+      "wrap_focus": true,
+      "present_count": 3,
+      "last_present_context": "WindowManagerSetOrder"
+    },
+    "next": [
+      "Diagnostics match the foundation contract; implement shared desktop_ui kit screens next."
+    ],
+    "checks": [
+      {
+        "name": "inspect_available",
+        "ok": true,
+        "detail": "tiling_wm inspect hierarchy present"
+      },
+      {
+        "name": "has_tiles",
+        "ok": true,
+        "detail": "tile_count=4"
+      },
+      {
+        "name": "instrument_studio_grid_ready",
+        "ok": true,
+        "detail": "design sketch assumes a 2x2 app grid when four apps are launched"
+      },
+      {
+        "name": "confirmed_focus_visible_when_present",
+        "ok": true,
+        "detail": "selected='fix-terminal-20260818T220823Z' confirmed='fix-terminal-20260818T220823Z'"
+      },
+      {
+        "name": "confirmed_focus_non_empty_for_active_desktop",
+        "ok": true,
+        "detail": "active desktop should expose confirmed focus or recent TILING_WM_ACTIVE marker"
+      },
+      {
+        "name": "gap_default_or_set",
+        "ok": true,
+        "detail": "gap_px=12"
+      },
+      {
+        "name": "active_border_default_or_set",
+        "ok": true,
+        "detail": "active_border_px=3"
+      }
+    ]
+  },
+  "live_merkle": "7aa36e023bd2fad95be596ca001df1d70e428eb7996e0384c6e52028ded36745"
+}

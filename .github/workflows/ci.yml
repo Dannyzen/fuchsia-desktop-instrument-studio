@@ -20,6 +20,8 @@ jobs:
           test -d overlays/fuchsia/src/ui/bin/tiling_wm
           test -d overlays/fuchsia/src/fuchsia-desktop
           test -f design/screenshots/01-instrument-studio.png
+          test -f design/screenshots/04-emulator-four-app-live.png
+          test -f docs/evidence/instrument-studio-20260818T220823Z/vision-comparison.md
           test -f design/sketches/01-instrument-studio/index.html
           test -f overlays/fuchsia/src/ui/bin/tiling_wm/src/observability.rs
           test -f scripts/collect-desktop-diagnostics.sh

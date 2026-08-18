@@ -50,6 +50,8 @@ We are building **Instrument Studio** first:
 
 ![Spatial Overview open](design/screenshots/03-spatial-overview-open.png)
 
+![Live emulator four-app stage](design/screenshots/04-emulator-four-app-live.png)
+
 Interactive sketches live under `design/sketches/`.
 
 ## Local rebuild
@@ -139,6 +141,14 @@ cat ./artifacts/diagnostics-run/design-feedback.json
 ```
 
 See `docs/observability-feedback-loop.md` for the Inspect tree and design checks.
+
+## Live demo evidence
+
+Rebuild proof + vision notes:
+
+- `docs/evidence/instrument-studio-20260818T220823Z/`
+- Live Inspect: 4 tiles, confirmed focus, gap/border config
+- Remaining gap: Instrument Studio chrome (strip/rail/inspector)
 
 ## Status
 

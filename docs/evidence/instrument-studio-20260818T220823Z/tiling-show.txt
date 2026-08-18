@@ -1,0 +1,34 @@
+                 Moniker:  core/session-manager/session:session/tiling_wm
+                     URL:  tiling_wm#meta/tiling_wm.cm
+             Environment:  session-env
+             Instance ID:  None
+         Component State:  Resolved
+            Resolved URL:  tiling_wm#meta/tiling_wm.cm
+                  Runner:  elf
+  Namespace Capabilities:  /svc/fuchsia.inspect.InspectSink
+                           /svc/fuchsia.logger.LogSink
+                           /svc/fuchsia.session.scene.Manager
+                           /svc/fuchsia.ui.composition.Flatland
+                           /svc/fuchsia.ui.focus.FocusChainListenerRegistry
+    Exposed Capabilities:  fuchsia.element.GraphicalPresenter
+                           fuchsia.session.window.Manager
+             Merkle root:  7aa36e023bd2fad95be596ca001df1d70e428eb7996e0384c6e52028ded36745
+           Configuration:  active_border_px -> Uint32(3)
+                           gap_px           -> Uint32(12)
+                           wrap_focus       -> Bool(true)
+        Manifest Sources:  src/ui/bin/tiling_wm/meta/tiling_wm.cml
+                           sdk/lib/inspect/client.shard.cml
+                           sdk/lib/inspect/offer.shard.cml
+                           sdk/lib/inspect/use.shard.cml
+                           sdk/lib/syslog/client.shard.cml
+                           sdk/lib/syslog/offer.shard.cml
+                           sdk/lib/syslog/use.shard.cml
+         Execution State:  Running
+            Start reason:  Instance is an eager child
+   Outgoing Capabilities:  fuchsia.element.GraphicalPresenter
+                           fuchsia.session.window.Manager
+                 Runtime:  ELF
+           Running since:  2026-08-18 22:09:02.780473937 UTC
+                  Job ID:  27997
+              Process ID:  28361
+

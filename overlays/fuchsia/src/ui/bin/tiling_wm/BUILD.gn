@@ -85,8 +85,6 @@ rustc_binary("driver_bin") {
     "//sdk/fidl/fuchsia.session.window:fuchsia.session.window_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
-    "//src/lib/diagnostics/inspect/runtime/rust",
-    "//src/lib/diagnostics/inspect/rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:log",
   ]
