@@ -23,6 +23,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/ui/carnelian",
+    "//src/fuchsia-desktop/desktop_ui",
     "//src/lib/ui/fuchsia-framebuffer",
     "//src/lib/ui/fuchsia-scenic",
     "//third_party/rust_crates:anyhow",

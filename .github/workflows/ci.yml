@@ -25,6 +25,10 @@ jobs:
           test -f scripts/collect-desktop-diagnostics.sh
           test -f scripts/design-feedback-report.py
           test -f docs/observability-feedback-loop.md
+          test -f docs/instrument-studio-ui-map.md
+          test -f overlays/fuchsia/src/fuchsia-desktop/desktop_ui/src/lib.rs
+          test -f overlays/fuchsia/src/fuchsia-desktop/desktop_ui/src/tokens.rs
+          test -f overlays/fuchsia/src/fuchsia-desktop/desktop_ui/src/chrome.rs
           test ! -e overlays/fuchsia/src/fuchsia-desktop/agent-linux/authorized_keys
           test ! -e state
           test ! -e source
@@ -39,6 +43,8 @@ jobs:
       - name: Python compile
         run: |
           python3 -m py_compile scripts/*.py
+      - name: Instrument Studio desktop_ui host contract
+        run: python3 scripts/test-desktop-ui-host.py
       - name: Design feedback empty fixture
         run: |
           mkdir -p /tmp/df-empty

@@ -10,6 +10,7 @@ use fidl_fuchsia_ui_composition as flatland;
 use fidl_fuchsia_ui_views as views;
 use fuchsia_component::{client::connect_to_protocol, server::ServiceFs};
 use futures::{StreamExt, TryStreamExt};
+use desktop_ui::{ColorRgba as UiColor, INSTRUMENT_STUDIO_THEME};
 use log::{info, warn};
 
 mod text_surface;
@@ -18,17 +19,25 @@ use text_surface::{TextStyle, TextSurface};
 const BACKGROUND: flatland::ColorRgba =
     flatland::ColorRgba { red: 0.035, green: 0.039, blue: 0.047, alpha: 1.0 };
 const PANEL: flatland::ColorRgba =
-    flatland::ColorRgba { red: 0.102, green: 0.110, blue: 0.129, alpha: 1.0 };
+    flatland::ColorRgba { red: 0.10, green: 0.12, blue: 0.16, alpha: 1.0 };
 const SURFACE: flatland::ColorRgba =
     flatland::ColorRgba { red: 0.176, green: 0.188, blue: 0.216, alpha: 1.0 };
 const SURFACE_ACTIVE: flatland::ColorRgba =
     flatland::ColorRgba { red: 0.235, green: 0.251, blue: 0.286, alpha: 1.0 };
 const ACCENT: flatland::ColorRgba =
-    flatland::ColorRgba { red: 0.357, green: 0.784, blue: 0.839, alpha: 1.0 };
+    flatland::ColorRgba { red: 0.0, green: 0.82, blue: 1.0, alpha: 1.0 };
 const GREEN: flatland::ColorRgba =
-    flatland::ColorRgba { red: 0.357, green: 0.745, blue: 0.467, alpha: 1.0 };
+    flatland::ColorRgba { red: 0.30, green: 0.85, blue: 0.55, alpha: 1.0 };
 const ORANGE: flatland::ColorRgba =
     flatland::ColorRgba { red: 0.925, green: 0.545, blue: 0.267, alpha: 1.0 };
+
+fn assert_theme_alignment() {
+    let t = INSTRUMENT_STUDIO_THEME;
+    // Keep panel consts synchronized with desktop_ui tokens.
+    let _ = UiColor::new(t.confirmed_focus.red, t.confirmed_focus.green, t.confirmed_focus.blue, 1.0);
+    assert!((ACCENT.green - t.confirmed_focus.green).abs() < 0.001);
+    assert!((PANEL.green - t.panel_elevated.green).abs() < 0.001);
+}
 
 fn create_rect(
     flatland: &flatland::FlatlandProxy,
@@ -266,6 +275,7 @@ async fn serve_view_provider(mut stream: ViewProviderRequestStream) -> Result<()
 
 #[fuchsia::main(logging = true)]
 async fn main() -> Result<(), Error> {
+    assert_theme_alignment();
     let mut fs = ServiceFs::new_local();
     fs.dir("svc").add_fidl_service(|stream: ViewProviderRequestStream| stream);
     fs.take_and_serve_directory_handle().context("serve ViewProvider")?;

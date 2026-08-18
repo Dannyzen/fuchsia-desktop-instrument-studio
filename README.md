@@ -118,6 +118,17 @@ docs/                 # architecture + donor roadmap
 versions.env          # pins
 ```
 
+## Instrument Studio UI path
+
+Shared native UI contracts live in `overlays/fuchsia/src/fuchsia-desktop/desktop_ui`.
+Region/token mapping: `docs/instrument-studio-ui-map.md`.
+
+Host contract test:
+
+```bash
+python3 scripts/test-desktop-ui-host.py
+```
+
 ## Observability feedback loop
 
 Instrument Studio development uses Fuchsia diagnostics as the feedback channel:
