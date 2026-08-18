@@ -1,0 +1,14 @@
+// Copyright 2026 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    program: {
+        runner: "starnix_container",
+        binary: "/bin/sh",
+        args: [
+            "-c",
+            "set +e; {pkg_path}/data/framebuffer-demo; rc=$?; echo $rc > /tmp/framebuffer-demo.status; sleep 300",
+        ],
+        uid: "0",
+    },
+}

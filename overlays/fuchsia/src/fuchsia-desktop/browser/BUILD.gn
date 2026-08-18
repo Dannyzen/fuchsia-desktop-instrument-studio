@@ -1,0 +1,79 @@
+# Copyright 2026 The Fuchsia Desktop Authors.
+# Use of this source code is governed by a BSD-style license.
+
+import("//build/bazel/export_fuchsia_package_to_bazel.gni")
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+rustc_binary("bin") {
+  name = "fuchsia_browser"
+  edition = "2024"
+  sources = [
+    "src/main.rs",
+    "src/text_surface.rs",
+  ]
+  inputs = [ "//prebuilt/third_party/fonts/robotoslab/RobotoSlab-Regular.ttf" ]
+  deps = [
+    ":config",
+    "//sdk/fidl/fuchsia.images2:fuchsia.images2_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.math:fuchsia.math_rust",
+    "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_rust",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
+    "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_rust",
+    "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_rust",
+    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
+    "//sdk/fidl/fuchsia.web:fuchsia.web_rust",
+    "//sdk/rust/zx",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-fs",
+    "//src/lib/ui/carnelian",
+    "//src/lib/ui/fuchsia-framebuffer",
+    "//src/lib/ui/fuchsia-scenic",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:euclid",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
+  ]
+}
+
+fuchsia_component_manifest("manifest") {
+  component_name = "fuchsia_browser"
+  manifest = "meta/fuchsia_browser.cml"
+}
+
+fuchsia_structured_config_rust_lib("config") {
+  cm_label = ":manifest"
+}
+
+fuchsia_component("component") {
+  cm_label = ":manifest"
+  deps = [ ":bin" ]
+}
+
+fuchsia_structured_config_values("default_config") {
+  cm_label = ":manifest"
+  values = {
+    html = "https://example.com/"
+    use_vulkan = false
+  }
+}
+
+fuchsia_package("package") {
+  package_name = "fuchsia_browser"
+  deps = [
+    ":component",
+    ":default_config",
+  ]
+}
+
+export_fuchsia_package_to_bazel("package_bazel") {
+  package = ":package"
+  visibility = [
+    "//products/workbench:*",
+    "//src/fuchsia-desktop/browser:*",
+  ]
+}

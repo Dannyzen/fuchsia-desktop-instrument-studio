@@ -1,0 +1,12 @@
+// Copyright 2026 The Fuchsia Desktop Authors.
+// Use of this source code is governed by a BSD-style license.
+{
+    platform_capabilities: {
+        session: [
+            {
+                capability: "fuchsia.kernel.VmexResource",
+                target_monikers: [ "browser_elements:**" ],
+            },
+        ],
+    },
+}

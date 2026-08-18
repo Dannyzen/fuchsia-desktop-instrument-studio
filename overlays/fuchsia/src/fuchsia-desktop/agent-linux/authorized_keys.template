@@ -1,0 +1,3 @@
+# Replace with your SSH public key for the optional Starnix agent path.
+# Example:
+# ssh-ed25519 AAAA... comment

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fuchsia Desktop — Command Palette First</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #050507;
+    --panel: #0b0c10;
+    --elev: #12141a;
+    --line: rgba(255,255,255,0.08);
+    --text: #f7f8f8;
+    --muted: #8a8f98;
+    --faint: #62666d;
+    --accent: #7170ff;
+    --accent-2: #5e6ad2;
+    --cyan: #5eead4;
+    --radius: 14px;
+    --font: "Inter", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    background: radial-gradient(900px 500px at 50% -10%, rgba(113,112,255,0.18), transparent 55%), var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 28px;
+  }
+  .frame {
+    max-width: 1180px; margin: 0 auto; border: 1px solid var(--line); border-radius: 20px;
+    overflow: hidden; background: var(--panel); box-shadow: 0 30px 80px rgba(0,0,0,0.55);
+  }
+  .bar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 18px; border-bottom: 1px solid var(--line);
+  }
+  .left, .right { display: flex; gap: 10px; align-items: center; color: var(--muted); font-size: 13px; }
+  .logo {
+    width: 24px; height: 24px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), #a78bfa);
+  }
+  .search-trigger {
+    border: 1px solid var(--line); background: rgba(255,255,255,0.03); color: var(--muted);
+    border-radius: 12px; padding: 10px 14px; min-width: 360px; display: flex; justify-content: space-between;
+    cursor: pointer;
+  }
+  .search-trigger span { color: var(--faint); font-family: var(--mono); font-size: 12px; }
+  .workspace {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 16px; min-height: 640px;
+    background:
+      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px) 0 0 / 28px 28px,
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px) 0 0 / 28px 28px,
+      #08090d;
+  }
+  .card {
+    border: 1px solid var(--line); border-radius: 16px; background: var(--elev); overflow: hidden;
+    display: flex; flex-direction: column; min-height: 280px; cursor: pointer; transition: .15s ease;
+  }
+  .card.active { border-color: rgba(113,112,255,0.7); box-shadow: 0 0 0 1px rgba(113,112,255,0.25), 0 0 0 5px rgba(113,112,255,0.08); }
+  .card header {
+    display: flex; justify-content: space-between; align-items: center; padding: 12px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px; font-weight: 600;
+  }
+  .body { padding: 16px; flex: 1; color: var(--muted); font-size: 13px; line-height: 1.55; }
+  .body h2 { color: var(--text); font-size: 20px; letter-spacing: -0.03em; margin-bottom: 8px; }
+  .stack { display: grid; gap: 8px; }
+  .item {
+    border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: rgba(255,255,255,0.02);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .item strong { color: var(--text); font-weight: 500; }
+  .kbd {
+    font-family: var(--mono); font-size: 11px; border: 1px solid var(--line); border-bottom-width: 2px;
+    border-radius: 6px; padding: 2px 6px; color: var(--text); background: rgba(255,255,255,0.03);
+  }
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.62); display: none; align-items: flex-start; justify-content: center;
+    padding-top: 12vh; backdrop-filter: blur(8px); z-index: 20;
+  }
+  .overlay.open { display: flex; }
+  .palette {
+    width: min(720px, calc(100vw - 40px)); background: #12141b; border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 18px; box-shadow: 0 30px 100px rgba(0,0,0,0.65); overflow: hidden;
+  }
+  .palette input {
+    width: 100%; border: 0; outline: none; background: transparent; color: var(--text);
+    font: inherit; font-size: 18px; padding: 18px 20px; border-bottom: 1px solid var(--line);
+  }
+  .results { max-height: 420px; overflow: auto; padding: 8px; }
+  .result {
+    display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; align-items: center;
+    padding: 12px 12px; border-radius: 12px; cursor: pointer; color: var(--muted);
+  }
+  .result.active, .result:hover { background: rgba(113,112,255,0.14); color: var(--text); }
+  .result .title { font-size: 14px; font-weight: 500; color: inherit; }
+  .result .desc { font-size: 12px; color: var(--faint); margin-top: 2px; }
+  .hintbar {
+    display: flex; justify-content: space-between; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line);
+    color: var(--faint); font-size: 12px;
+  }
+  .footer {
+    max-width: 1180px; margin: 18px auto 0; color: var(--muted); font-size: 13px; line-height: 1.55;
+  }
+  .badge {
+    font-family: var(--mono); font-size: 10px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 8px; color: var(--muted);
+  }
+  .term {
+    font-family: var(--mono); font-size: 12px; background: #07080c; border: 1px solid var(--line);
+    border-radius: 12px; padding: 12px; color: #d0d6e0; min-height: 150px;
+  }
+  .term .ok { color: var(--cyan); }
+</style>
+</head>
+<body>
+  <div class="frame">
+    <div class="bar">
+      <div class="left"><div class="logo"></div><strong style="color:var(--text)">Fuchsia Shell</strong><span class="badge">keyboard-first</span></div>
+      <button class="search-trigger" id="openPalette">
+        <span style="color:var(--muted)">Run a command, jump a window, change a setting…</span>
+        <span>Ctrl K</span>
+      </button>
+      <div class="right"><span>Build</span><span>·</span><span>4 tiles</span><span>·</span><span>confirmed focus</span></div>
+    </div>
+    <div class="workspace">
+      <article class="card active" data-name="Settings">
+        <header><span>Settings</span><span class="badge">live</span></header>
+        <div class="body">
+          <h2>Window Manager</h2>
+          <div class="stack">
+            <div class="item"><div><strong>Focus left</strong><div class="desc">Navigate tiles</div></div><span><span class="kbd">Ctrl</span> <span class="kbd">H</span></span></div>
+            <div class="item"><div><strong>Move tile left</strong><div class="desc">Reorder policy</div></div><span><span class="kbd">Ctrl</span> <span class="kbd">Shift</span> <span class="kbd">H</span></span></div>
+            <div class="item"><div><strong>Toggle gaps</strong><div class="desc">Smart fullscreen</div></div><span><span class="kbd">Ctrl</span> <span class="kbd">G</span></span></div>
+          </div>
+        </div>
+      </article>
+      <article class="card" data-name="Browser">
+        <header><span>Browser</span><span class="badge">webengine</span></header>
+        <div class="body">
+          <h2>Native chrome</h2>
+          <p>Command palette can focus the address bar, reopen closed tabs, or pin the current page as a workspace tile without leaving the keyboard.</p>
+        </div>
+      </article>
+      <article class="card" data-name="Files">
+        <header><span>Files</span><span class="badge">/projects</span></header>
+        <div class="body">
+          <h2>Jump anywhere</h2>
+          <div class="stack">
+            <div class="item"><strong>donor-roadmap.md</strong><span class="badge">recent</span></div>
+            <div class="item"><strong>release-receipt.json</strong><span class="badge">exact</span></div>
+            <div class="item"><strong>artifacts/</strong><span class="badge">dir</span></div>
+          </div>
+        </div>
+      </article>
+      <article class="card" data-name="Terminal" style="grid-column: span 2;">
+        <header><span>Terminal</span><span class="badge">starnix</span></header>
+        <div class="body">
+          <div class="term">
+            <div>$ fx test tiling-wm-tests</div>
+            <div class="ok">PASSED 15 / 15</div>
+            <div>$ verify-tiling-wm-lifecycle.sh</div>
+            <div class="ok">ACTIVE_CLEARED then successor confirmed</div>
+            <div>$ _</div>
+          </div>
+        </div>
+      </article>
+      <article class="card" data-name="Palette Help">
+        <header><span>Why this variant</span><span class="badge">idea</span></header>
+        <div class="body">
+          <h2>Commands over chrome</h2>
+          <p>Less permanent UI chrome. The palette becomes the main way to focus, move, launch, query settings, and jump files. Excellent once global shortcut policy exists.</p>
+        </div>
+      </article>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <div class="palette" role="dialog" aria-modal="true">
+      <input id="query" placeholder="Type a command or destination" autocomplete="off" />
+      <div class="results" id="results"></div>
+      <div class="hintbar">
+        <div><span class="kbd">↑</span> <span class="kbd">↓</span> select · <span class="kbd">Enter</span> run · <span class="kbd">Esc</span> close</div>
+        <div>No production test-input protocol · native routes only</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <strong style="color:var(--text)">Variant 2 — Command Palette First.</strong> The desktop stays quieter. Power comes from a single searchable command surface for focus, move, launch, settings, and files. Best when keyboard flow matters more than always-visible controls.
+  </div>
+
+  <script>
+    const commands = [
+      { icon: '◐', title: 'Focus Settings', desc: 'Confirm focus on the Settings tile', run: () => focusCard('Settings') },
+      { icon: '↔', title: 'Move focused tile left', desc: 'Deterministic reorder through Manager policy', run: () => flash('Moved focused tile left') },
+      { icon: '⬚', title: 'Open overview', desc: 'Project current workspace without a second state model', run: () => flash('Overview projection') },
+      { icon: '⚙', title: 'Set outer gap to 12', desc: 'Live validated WM setting', run: () => flash('Outer gap = 12') },
+      { icon: '📄', title: 'Open donor-roadmap.md', desc: 'Files jump', run: () => focusCard('Files') },
+      { icon: '◎', title: 'Focus Browser address bar', desc: 'Native chrome, WebEngine content', run: () => focusCard('Browser') },
+      { icon: '⌘', title: 'Launch Terminal', desc: 'Session element launch', run: () => focusCard('Terminal') },
+      { icon: '⌨', title: 'Show shortcut map', desc: 'Depends on global shortcut policy bead', run: () => flash('Shortcut map sheet') },
+    ];
+    const overlay = document.getElementById('overlay');
+    const results = document.getElementById('results');
+    const query = document.getElementById('query');
+    let active = 0;
+    let filtered = commands;
+
+    function render() {
+      results.innerHTML = filtered.map((c,i) => `
+        <div class="result ${i===active?'active':''}" data-i="${i}">
+          <div>${c.icon}</div>
+          <div><div class="title">${c.title}</div><div class="desc">${c.desc}</div></div>
+          <div class="badge">run</div>
+        </div>`).join('');
+      [...results.children].forEach(el => el.onclick = () => execute(+el.dataset.i));
+    }
+    function openPalette() {
+      overlay.classList.add('open');
+      query.value = '';
+      filtered = commands;
+      active = 0;
+      render();
+      query.focus();
+    }
+    function closePalette() { overlay.classList.remove('open'); }
+    function execute(i = active) {
+      filtered[i]?.run();
+      closePalette();
+    }
+    function focusCard(name) {
+      document.querySelectorAll('.card').forEach(c => c.classList.toggle('active', c.dataset.name === name));
+      flash('Confirmed focus → ' + name);
+    }
+    function flash(msg) {
+      document.title = msg;
+      const n = document.createElement('div');
+      n.textContent = msg;
+      Object.assign(n.style, {
+        position:'fixed', right:'24px', bottom:'24px', background:'#171923', color:'#fff',
+        border:'1px solid rgba(113,112,255,.45)', padding:'12px 14px', borderRadius:'12px', zIndex:40
+      });
+      document.body.appendChild(n);
+      setTimeout(() => n.remove(), 1600);
+    }
+    document.getElementById('openPalette').onclick = openPalette;
+    document.querySelectorAll('.card').forEach(c => c.addEventListener('click', () => focusCard(c.dataset.name)));
+    overlay.addEventListener('click', e => { if (e.target === overlay) closePalette(); });
+    query.addEventListener('input', () => {
+      const q = query.value.toLowerCase().trim();
+      filtered = commands.filter(c => (c.title + c.desc).toLowerCase().includes(q));
+      active = 0; render();
+    });
+    window.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); }
+      if (!overlay.classList.contains('open')) return;
+      if (e.key === 'Escape') closePalette();
+      if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(filtered.length-1, active+1); render(); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(0, active-1); render(); }
+      if (e.key === 'Enter') { e.preventDefault(); execute(); }
+    });
+    render();
+  </script>
+</body>
+</html>

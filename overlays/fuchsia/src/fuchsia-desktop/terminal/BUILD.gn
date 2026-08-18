@@ -1,0 +1,60 @@
+# Copyright 2026 The Fuchsia Desktop Authors.
+# Use of this source code is governed by a BSD-style license.
+
+import("//build/bazel/export_fuchsia_package_to_bazel.gni")
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+rustc_binary("input_driver_bin") {
+  name = "terminal_input_driver"
+  edition = "2024"
+  source_root = "src/input_driver.rs"
+  sources = [ "src/input_driver.rs" ]
+  deps = [
+    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//third_party/rust_crates:anyhow",
+  ]
+}
+
+# Development-only generic-element control for live capability audits. It is
+# published to the local repository, never assembled into Workbench.
+fuchsia_package("generic_control_package") {
+  package_name = "terminal_generic_control"
+  deps = [ "//src/ui/examples/flatland-rainbow:flatland-rainbow" ]
+}
+
+fuchsia_component("input_driver_component") {
+  component_name = "terminal_input_driver"
+  manifest = "meta/input_driver.cml"
+  deps = [ ":input_driver_bin" ]
+}
+
+fuchsia_package("input_driver_package") {
+  package_name = "terminal_input_driver"
+  deps = [ ":input_driver_component" ]
+}
+
+fuchsia_component("component") {
+  component_name = "fuchsia_terminal"
+  manifest = "meta/fuchsia_terminal.cml"
+  deps = [
+    "//src/ui/bin/terminal:bin",
+    "//src/zircon/bin/zxsh:sh",
+  ]
+}
+
+fuchsia_package("package") {
+  package_name = "fuchsia_terminal"
+  deps = [ ":component" ]
+}
+
+export_fuchsia_package_to_bazel("package_bazel") {
+  package = ":package"
+  visibility = [
+    "//products/workbench:*",
+    "//src/fuchsia-desktop/terminal:*",
+  ]
+}

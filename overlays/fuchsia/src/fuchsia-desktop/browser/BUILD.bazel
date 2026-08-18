@@ -1,0 +1,11 @@
+# Copyright 2026 The Fuchsia Desktop Authors.
+# Use of this source code is governed by a BSD-style license.
+
+load("@rules_fuchsia//fuchsia:assembly.bzl", "fuchsia_prebuilt_package")
+
+package(default_visibility = ["//visibility:public"])
+
+fuchsia_prebuilt_package(
+    name = "package",
+    archive = "@gn_targets//src/fuchsia-desktop/browser:package",
+)

@@ -1,0 +1,44 @@
+# Copyright 2026 The Fuchsia Desktop Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+rustc_binary("bin") {
+  name = "fuchsia_cosmic_panel_spike"
+  edition = "2024"
+  sources = [
+    "src/main.rs",
+    "src/text_surface.rs",
+  ]
+  inputs = [ "//prebuilt/third_party/fonts/robotoslab/RobotoSlab-Regular.ttf" ]
+  deps = [
+    "//sdk/fidl/fuchsia.images2:fuchsia.images2_rust",
+    "//sdk/fidl/fuchsia.math:fuchsia.math_rust",
+    "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_rust",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
+    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//src/lib/ui/carnelian",
+    "//src/lib/ui/fuchsia-framebuffer",
+    "//src/lib/ui/fuchsia-scenic",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:euclid",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
+  ]
+}
+
+fuchsia_component("component") {
+  component_name = "fuchsia_cosmic_panel_spike"
+  manifest = "meta/fuchsia_cosmic_panel_spike.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_package("package") {
+  package_name = "fuchsia_cosmic_panel_spike"
+  deps = [ ":component" ]
+}

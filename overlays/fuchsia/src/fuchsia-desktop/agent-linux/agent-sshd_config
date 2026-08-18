@@ -1,0 +1,27 @@
+Port 7000
+AddressFamily inet
+ListenAddress 0.0.0.0
+PermitRootLogin prohibit-password
+PubkeyAuthentication yes
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitEmptyPasswords no
+AuthenticationMethods publickey
+StrictModes yes
+AllowUsers root
+AllowTcpForwarding no
+AllowAgentForwarding no
+GatewayPorts no
+X11Forwarding no
+PermitTunnel no
+PermitUserEnvironment no
+PermitUserRC no
+UseDNS no
+PrintMotd no
+PidFile /tmp/fuchsia-agent-linux/sshd.pid
+LogLevel VERBOSE
+MaxAuthTries 3
+MaxSessions 16
+ClientAliveInterval 60
+ClientAliveCountMax 3
+Subsystem sftp internal-sftp

@@ -1,0 +1,37 @@
+// Copyright 2026 The Fuchsia Desktop Authors.
+// Use of this source code is governed by a BSD-style license.
+{
+    include: [
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        runner: "elf",
+        binary: "bin/terminal",
+        args: [ "/pkg/bin/sh" ],
+    },
+    capabilities: [
+        { protocol: "fuchsia.ui.app.ViewProvider" },
+    ],
+    use: [
+        {
+            protocol: [
+                "fuchsia.hardware.pty.Device",
+                "fuchsia.process.Launcher",
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+                "fuchsia.tracing.provider.Registry",
+                "fuchsia.ui.composition.Allocator",
+                "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.input.ImeService",
+                "fuchsia.ui.input3.Keyboard",
+            ],
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.ui.app.ViewProvider",
+            from: "self",
+        },
+    ],
+}

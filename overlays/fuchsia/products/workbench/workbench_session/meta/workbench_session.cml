@@ -1,0 +1,348 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//sdk/lib/inspect/client.shard.cml",
+        "inspect/offer.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    children: [
+        {
+            name: "element_manager",
+            url: "workbench_element_manager#meta/element_manager.cm",
+            startup: "eager",
+        },
+        {
+            name: "tiling_wm",
+            url: "tiling_wm#meta/tiling_wm.cm",
+            startup: "eager",
+        },
+        {
+            name: "tiling_wm_driver",
+            url: "tiling_wm_driver#meta/tiling_wm_driver.cm",
+        },
+        {
+            name: "tiling_wm_driver_after_churn",
+            url: "tiling_wm_driver#meta/tiling_wm_driver.cm",
+        },
+        {
+            name: "gui_input_driver",
+            url: "fuchsia-pkg://fuchsia.com/fuchsia_agent_linux_gui#meta/gui_input_driver.cm",
+        },
+        {
+            name: "terminal_input_driver",
+            url: "terminal_input_driver#meta/terminal_input_driver.cm",
+        },
+        {
+            name: "files_input_driver",
+            url: "files_input_driver#meta/files_input_driver.cm",
+        },
+        {
+            name: "settings_input_driver",
+            url: "settings_input_driver#meta/settings_input_driver.cm",
+        },
+        {
+            name: "context_provider",
+            url: "fuchsia-pkg://fuchsia.com/web_engine#meta/context_provider.cm",
+        },
+    ],
+    collections: [
+        {
+            name: "elements",
+            durability: "transient",
+            persistent_storage: true,
+        },
+        {
+            name: "browser_elements",
+            durability: "transient",
+            persistent_storage: true,
+        },
+        {
+            name: "terminal_elements",
+            durability: "transient",
+            persistent_storage: true,
+        },
+        {
+            name: "files_elements",
+            durability: "transient",
+            persistent_storage: true,
+        },
+        {
+            name: "settings_elements",
+            durability: "transient",
+            persistent_storage: true,
+        },
+    ],
+    offer: [
+        // Dependencies for elements
+        {
+            protocol: [ "fuchsia.element.GraphicalPresenter" ],
+            from: "#tiling_wm",
+            to: [
+                "#browser_elements",
+                "#elements",
+                "#files_elements",
+                "#settings_elements",
+                "#terminal_elements",
+            ],
+        },
+        {
+            protocol: [
+                "fuchsia.accessibility.semantics.SemanticsManager",
+                "fuchsia.diagnostics.ArchiveAccessor",
+                "fuchsia.fonts.Provider",
+                "fuchsia.intl.PropertyProvider",
+                "fuchsia.media.Audio",
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+                "fuchsia.tracing.provider.Registry",
+                "fuchsia.ui.composition.Allocator",
+                "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.composition.internal.ScreenCapture",
+                "fuchsia.ui.composition.ScreenCapture",
+                "fuchsia.ui.display.singleton.Info",
+                "fuchsia.ui.input.ImeService",
+                "fuchsia.ui.input3.Keyboard",
+                "fuchsia.vulkan.loader.Loader",
+            ],
+            from: "parent",
+            to: [
+                "#browser_elements",
+                "#elements",
+            ],
+        },
+        {
+            // TODO(https://fxbug.dev/406844662) - remove this when SDK shard is updated
+            protocol: [ "fuchsia.logger.LogSink" ],
+            from: "parent/diagnostics",
+            to: [
+                "#browser_elements",
+                "#elements",
+                "#files_elements",
+                "#settings_elements",
+                "#terminal_elements",
+                "#terminal_input_driver",
+                "#gui_input_driver",
+                "#files_input_driver",
+                "#settings_input_driver",
+            ],
+        },
+        {
+            protocol: "fuchsia.ui.test.input.Registry",
+            from: "parent",
+            to: [
+                "#files_input_driver",
+                "#gui_input_driver",
+                "#settings_input_driver",
+                "#terminal_input_driver",
+            ],
+        },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent/diagnostics",
+            to: [
+                "#files_elements",
+                "#settings_elements",
+                "#terminal_elements",
+            ],
+        },
+        {
+            protocol: "fuchsia.web.ContextProvider",
+            from: "#context_provider",
+            to: "#browser_elements",
+        },
+        {
+            protocol: [
+                "fuchsia.feedback.ComponentDataRegister",
+                "fuchsia.feedback.CrashReportingProductRegister",
+            ],
+            from: "parent",
+            to: "#context_provider",
+            availability: "same_as_target",
+        },
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "parent/diagnostics",
+            to: "#context_provider",
+        },
+        {
+            directory: "config-data",
+            from: "parent",
+            as: "config-data-for-web-instance",
+            to: "#context_provider",
+            subdir: "web_engine",
+            availability: "optional",
+        },
+        {
+            directory: [
+                "root-ssl-certificates",
+                "tzdata-icu",
+            ],
+            from: "parent",
+            to: "#context_provider",
+            availability: "same_as_target",
+        },
+        {
+            storage: "data",
+            from: "parent",
+            to: [
+                "#element_manager",
+                "#elements",
+                "#files_elements",
+                "#settings_elements",
+            ],
+        },
+        {
+            protocol: [
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+                "fuchsia.tracing.provider.Registry",
+                "fuchsia.ui.composition.Allocator",
+                "fuchsia.ui.composition.Flatland",
+            ],
+            from: "parent",
+            to: "#files_elements",
+            availability: "same_as_target",
+        },
+        {
+            protocol: [
+                "fuchsia.buildinfo.Provider",
+                "fuchsia.hwinfo.Product",
+                "fuchsia.settings.Intl",
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+                "fuchsia.tracing.provider.Registry",
+                "fuchsia.ui.composition.Allocator",
+                "fuchsia.ui.composition.Flatland",
+            ],
+            from: "parent",
+            to: "#settings_elements",
+            availability: "same_as_target",
+        },
+        {
+            protocol: [
+                "fuchsia.hardware.pty.Device",
+                "fuchsia.process.Launcher",
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+                "fuchsia.tracing.provider.Registry",
+                "fuchsia.ui.composition.Allocator",
+                "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.input.ImeService",
+                "fuchsia.ui.input3.Keyboard",
+            ],
+            from: "parent",
+            to: "#terminal_elements",
+            availability: "same_as_target",
+        },
+        {
+            protocol: [
+                "fuchsia.buildinfo.Provider",
+                "fuchsia.device.NameProvider",
+                "fuchsia.hwinfo.Product",
+                "fuchsia.kernel.VmexResource",
+                "fuchsia.memorypressure.Provider",
+                "fuchsia.net.interfaces.State",
+                "fuchsia.net.name.Lookup",
+                "fuchsia.posix.socket.Provider",
+                "fuchsia.process.Launcher",
+            ],
+            from: "parent",
+            to: "#browser_elements",
+            availability: "same_as_target",
+        },
+        {
+            protocol: [
+                "fuchsia.audio.device.ControlCreator",
+                "fuchsia.audio.device.Provider",
+                "fuchsia.audio.device.Registry",
+                "fuchsia.net.interfaces.State",
+                "fuchsia.net.routes.StateV4",
+                "fuchsia.net.routes.StateV6",
+                "fuchsia.net.stack.Stack",
+                "fuchsia.paver.Paver",
+                "fuchsia.power.battery.BatteryManager",
+                "fuchsia.update.CommitStatusProvider",
+                "fuchsia.update.installer.Installer",
+                "fuchsia.wlan.wlanix.Wlanix",
+            ],
+            from: "parent",
+            to: "#elements",
+            availability: "same_as_target",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
+            directory: "dev-bt-hci",
+            from: "parent",
+            to: "#elements",
+            availability: "same_as_target",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.bluetooth.Service",
+            from: "parent",
+            to: "#elements",
+            availability: "same_as_target",
+        },
+
+        // Dependencies for element_manager
+        {
+            protocol: [ "fuchsia.element.GraphicalPresenter" ],
+            from: "#tiling_wm",
+            to: [ "#element_manager" ],
+        },
+        {
+            event_stream: [ "stopped" ],
+            from: "parent",
+            to: "#element_manager",
+        },
+        {
+            protocol: "fuchsia.component.Realm",
+            from: "framework",
+            to: "#element_manager",
+        },
+
+        // Test-only control surface for the bounded tiling WM journey.
+        {
+            protocol: "fuchsia.session.window.Manager",
+            from: "#tiling_wm",
+            to: "#tiling_wm_driver",
+        },
+        {
+            protocol: "fuchsia.session.window.Manager",
+            from: "#tiling_wm",
+            to: "#tiling_wm_driver_after_churn",
+        },
+
+        // Dependencies for tiling_wm
+        {
+            protocol: [
+                "fuchsia.session.scene.Manager",
+                "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.focus.FocusChainListenerRegistry",
+            ],
+            from: "parent",
+            to: "#tiling_wm",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.component.Binder",
+            from: "framework",
+        },
+        {
+            protocol: [ "fuchsia.element.GraphicalPresenter" ],
+            from: "#tiling_wm",
+        },
+        {
+            protocol: [ "fuchsia.element.Manager" ],
+            from: "#element_manager",
+        },
+        {
+            protocol: [ "fuchsia.session.window.Manager" ],
+            from: "#tiling_wm",
+        },
+    ],
+}

@@ -1,0 +1,119 @@
+# Copyright 2026 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bazel/export_fuchsia_package_to_bazel.gni")
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+import("//src/starnix/kernel/starnix.gni")
+
+rustc_binary("gui_input_driver_bin") {
+  name = "gui_input_driver"
+  edition = "2024"
+  source_root = "gui-input-driver.rs"
+  sources = [ "gui-input-driver.rs" ]
+  deps = [
+    "//sdk/fidl/fuchsia.input:fuchsia.input_rust",
+    "//sdk/fidl/fuchsia.math:fuchsia.math_rust",
+    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_rust",
+    "//sdk/rust/zx",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:log",
+  ]
+}
+
+fuchsia_component("gui_input_driver_component") {
+  component_name = "gui_input_driver"
+  manifest = "meta/gui_input_driver.cml"
+  deps = [ ":gui_input_driver_bin" ]
+}
+
+config("framebuffer_demo_config") {
+  cflags = [
+    "-fPIC",
+    "-fno-builtin",
+  ]
+}
+
+executable("framebuffer_demo") {
+  sources = [ "framebuffer-demo.cc" ]
+  disable_syslog_backend = true
+  exclude_toolchain_tags = [ "instrumented" ]
+  configs += [
+    "//build/config/fuchsia:no_cpp_standard_library",
+    "//build/config/fuchsia:static-pie-config",
+    ":framebuffer_demo_config",
+  ]
+  if (current_toolchain == target_linux_toolchain) {
+    configs -= [ "//build/config/linux:implicit-host-libs" ]
+  }
+}
+
+resource("framebuffer_demo_binary") {
+  init_label = ":framebuffer_demo($target_linux_toolchain)"
+  out_dir = get_label_info(init_label, "root_out_dir")
+  sources = [ "${out_dir}/framebuffer_demo" ]
+  outputs = [ "data/framebuffer-demo" ]
+  deps = [ init_label ]
+}
+
+fuchsia_component("agent_linux_gui_container") {
+  component_name = "agent_linux_gui_container"
+  manifest = "meta/agent_linux_gui_container.cml"
+}
+
+fuchsia_component("framebuffer_demo_command") {
+  component_name = "framebuffer_demo"
+  manifest = "meta/framebuffer_demo.cml"
+  deps = [ ":framebuffer_demo_binary" ]
+}
+
+fuchsia_package("gui_package") {
+  package_name = "fuchsia_agent_linux_gui"
+  deps = [
+    ":agent_linux_gui_container",
+    ":framebuffer_demo_command",
+    ":gui_input_driver_component",
+    "//src/starnix/containers:default_init",
+    "//src/starnix/containers/alpine:alpine_package_system_image",
+  ]
+}
+
+export_fuchsia_package_to_bazel("gui_package_bazel") {
+  package = ":gui_package"
+  visibility = [
+    "//products/workbench:*",
+    "//src/fuchsia-desktop/agent-linux:*",
+  ]
+}
+
+resource("agent_linux_resources") {
+  sources = [
+    "agent-linux-init.sh",
+    "agent-sshd_config",
+    "authorized_keys",
+  ]
+  outputs = [ "data/{{source_file_part}}" ]
+}
+
+fuchsia_component("agent_linux_sshd") {
+  manifest = "meta/agent_linux_sshd.cml"
+  deps = [ ":agent_linux_resources" ]
+}
+
+fuchsia_package("package") {
+  package_name = "fuchsia_agent_linux"
+  deps = [ ":agent_linux_sshd" ]
+}
+
+export_fuchsia_package_to_bazel("package_bazel") {
+  package = ":package"
+  visibility = [
+    "//products/workbench:*",
+    "//src/fuchsia-desktop/agent-linux:*",
+  ]
+}

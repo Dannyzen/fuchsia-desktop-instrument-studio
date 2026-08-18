@@ -1,0 +1,5 @@
+{
+    gap_px: 12,
+    active_border_px: 3,
+    wrap_focus: true,
+}

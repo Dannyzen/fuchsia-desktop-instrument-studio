@@ -1,0 +1,63 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bazel/bazel_inputs.gni")
+import("//build/components.gni")
+import("//build/components/fuchsia_package_archive.gni")
+
+fuchsia_component_manifest("workbench_session_component_manifest") {
+  manifest = "meta/workbench_session.cml"
+  component_name = "workbench_session"
+}
+
+fuchsia_component("workbench_session_component") {
+  cm_label = ":workbench_session_component_manifest"
+}
+
+fuchsia_structured_config_values("workbench_element_manager_config") {
+  cm_label = "//src/session/bin/element_manager:manifest"
+  component_name = "element_manager"
+  values = {
+    url_to_collection = [
+      "fuchsia-pkg://fuchsia.com/fuchsia_browser#meta/fuchsia_browser.cm|browser_elements",
+      "fuchsia-pkg://fuchsia.com/fuchsia_files#meta/fuchsia_files.cm|files_elements",
+      "fuchsia-pkg://fuchsia.com/fuchsia_settings#meta/fuchsia_settings.cm|settings_elements",
+      "fuchsia-pkg://fuchsia.com/fuchsia_settings_failure#meta/fuchsia_settings_failure.cm|settings_elements",
+      "fuchsia-pkg://fuchsia.com/fuchsia_terminal#meta/fuchsia_terminal.cm|terminal_elements",
+    ]
+    default_collection = "elements"
+  }
+}
+
+fuchsia_package("workbench_element_manager") {
+  package_name = "workbench_element_manager"
+  deps = [
+    ":workbench_element_manager_config",
+    "//src/session/bin/element_manager:element_manager_comp",
+  ]
+}
+
+fuchsia_package("workbench_session") {
+  package_name = "workbench_session"
+  subpackages = [
+    ":workbench_element_manager",
+    "//src/fuchsia-desktop/files:input_driver_package",
+    "//src/fuchsia-desktop/settings:input_driver_package",
+    "//src/fuchsia-desktop/terminal:input_driver_package",
+    "//src/ui/bin/tiling_wm",
+    "//src/ui/bin/tiling_wm:driver_package",
+  ]
+  deps = [ ":workbench_session_component" ]
+}
+
+# Make `workbench_session` available to products assembled with Bazel.
+#
+# TODO: b/295034058 - Make this less verbose.
+fuchsia_package_archive("workbench_session_archive") {
+  package = ":workbench_session"
+}
+
+bazel_input_file("workbench_session_bazel_inputs") {
+  generator = ":workbench_session_archive"
+}

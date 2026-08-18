@@ -1,0 +1,10 @@
+// Copyright 2026 The Fuchsia Desktop Authors.
+// Use of this source code is governed by a BSD-style license.
+{
+    include: [ "syslog/client.shard.cml" ],
+    program: {
+        runner: "elf",
+        binary: "bin/gui_input_driver",
+    },
+    use: [ { protocol: "fuchsia.ui.test.input.Registry" } ],
+}

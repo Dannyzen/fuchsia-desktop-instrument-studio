@@ -1,0 +1,22 @@
+services:
+  fuchsia-dev:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: localhost/fuchsia-desktop-mvp:dev
+    container_name: fuchsia-desktop-mvp
+    init: true
+    userns_mode: keep-id
+    devices:
+      - /dev/kvm:/dev/kvm
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    environment:
+      HOME: /workspace/state/home
+      FFX_ISOLATE_DIR: /workspace/state/ffx
+      XDG_CACHE_HOME: /workspace/cache
+      XDG_CONFIG_HOME: /workspace/state/config
+    command: ["sleep", "infinity"]
+    stdin_open: true
+    tty: true

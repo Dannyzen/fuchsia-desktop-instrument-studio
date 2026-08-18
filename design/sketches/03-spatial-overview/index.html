@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fuchsia Desktop — Spatial Overview</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #071018;
+    --panel: #0b1520;
+    --elev: #102033;
+    --line: rgba(186,230,253,0.12);
+    --text: #ecfeff;
+    --muted: #9fb3c8;
+    --faint: #6f879d;
+    --cyan: #22d3ee;
+    --mint: #34d399;
+    --sand: #fbbf24;
+    --rose: #fb7185;
+    --font: "Inter", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    color: var(--text);
+    background:
+      radial-gradient(1000px 600px at 10% 0%, rgba(34,211,238,0.14), transparent 50%),
+      radial-gradient(800px 500px at 90% 10%, rgba(52,211,153,0.10), transparent 45%),
+      var(--bg);
+    min-height: 100vh;
+    padding: 28px;
+  }
+  .frame {
+    max-width: 1280px; margin: 0 auto; border: 1px solid var(--line); border-radius: 22px;
+    overflow: hidden; background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent 140px), var(--panel);
+    box-shadow: 0 28px 80px rgba(0,0,0,0.45);
+  }
+  .top {
+    display: flex; justify-content: space-between; align-items: center; gap: 16px;
+    padding: 14px 18px; border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; gap: 10px; align-items: center; font-weight: 600; }
+  .orb {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #fff, var(--cyan) 45%, #0369a1);
+    box-shadow: 0 0 24px rgba(34,211,238,0.35);
+  }
+  .modes { display: flex; gap: 8px; }
+  .mode {
+    border: 1px solid var(--line); background: rgba(255,255,255,0.02); color: var(--muted);
+    border-radius: 999px; padding: 8px 12px; cursor: pointer; font-size: 12px;
+  }
+  .mode.active { color: var(--text); background: rgba(34,211,238,0.14); border-color: rgba(34,211,238,0.35); }
+  .stage { position: relative; min-height: 760px; padding: 18px; }
+  .tiling {
+    display: grid; grid-template-columns: 1.2fr 0.8fr; grid-template-rows: 1fr 1fr; gap: 14px; height: 700px;
+    transition: transform .28s ease, opacity .28s ease, filter .28s ease;
+  }
+  .tile {
+    border: 1px solid var(--line); border-radius: 18px; background: var(--elev); overflow: hidden;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04); cursor: pointer; position: relative;
+  }
+  .tile.active { outline: 2px solid rgba(34,211,238,0.85); box-shadow: 0 0 0 6px rgba(34,211,238,0.10); }
+  .chrome {
+    display: flex; justify-content: space-between; align-items: center; padding: 12px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px; font-weight: 600;
+  }
+  .body { padding: 16px; color: var(--muted); font-size: 13px; line-height: 1.55; height: calc(100% - 46px); }
+  .body h2 { color: var(--text); font-size: 22px; letter-spacing: -0.03em; margin-bottom: 8px; }
+  .mini-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 12px; }
+  .mini {
+    border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: rgba(0,0,0,0.16); color: var(--text); font-size: 12px;
+  }
+  .browser-page, .term {
+    border: 1px solid var(--line); border-radius: 14px; min-height: 180px; padding: 16px; margin-top: 10px;
+    background: rgba(0,0,0,0.18);
+  }
+  .term { font-family: var(--mono); font-size: 12px; color: #d1fae5; }
+  .overview {
+    position: absolute; inset: 18px; display: none; place-items: center;
+  }
+  .stage.overview-on .tiling {
+    transform: scale(0.78) translateY(18px);
+    filter: blur(1px) brightness(0.72);
+    opacity: 0.55;
+    pointer-events: none;
+  }
+  .stage.overview-on .overview { display: grid; }
+  .board {
+    width: min(980px, 100%);
+    display: grid;
+    grid-template-columns: 210px 1fr;
+    gap: 16px;
+    background: rgba(7,16,24,0.88);
+    border: 1px solid rgba(34,211,238,0.25);
+    border-radius: 22px;
+    padding: 16px;
+    box-shadow: 0 30px 90px rgba(0,0,0,0.5);
+    backdrop-filter: blur(10px);
+  }
+  .ws-list { display: grid; gap: 8px; align-content: start; }
+  .ws {
+    border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: rgba(255,255,255,0.02);
+    cursor: pointer; color: var(--muted);
+  }
+  .ws.active, .ws:hover { color: var(--text); border-color: rgba(34,211,238,0.4); background: rgba(34,211,238,0.08); }
+  .ws strong { display: block; color: inherit; margin-bottom: 4px; }
+  .ws span { font-size: 11px; color: var(--faint); }
+  .thumbs {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+  }
+  .thumb {
+    border: 1px solid var(--line); border-radius: 16px; min-height: 150px; padding: 14px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.03), transparent),
+      rgba(16,32,51,0.95);
+    cursor: pointer; position: relative; overflow: hidden;
+  }
+  .thumb:hover, .thumb.active {
+    border-color: rgba(34,211,238,0.55);
+    box-shadow: 0 0 0 4px rgba(34,211,238,0.08);
+  }
+  .thumb .label { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+  .thumb .preview {
+    height: 86px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);
+    display: grid; place-items: center; color: var(--faint); font-size: 12px;
+  }
+  .thumb[data-name="Settings"] .preview { background: linear-gradient(135deg, rgba(34,211,238,0.18), rgba(15,23,42,0.2)); }
+  .thumb[data-name="Files"] .preview { background: linear-gradient(135deg, rgba(167,139,250,0.18), rgba(15,23,42,0.2)); }
+  .thumb[data-name="Browser"] .preview { background: linear-gradient(135deg, rgba(251,191,36,0.16), rgba(15,23,42,0.2)); }
+  .thumb[data-name="Terminal"] .preview { background: linear-gradient(135deg, rgba(52,211,153,0.16), rgba(15,23,42,0.2)); }
+  .drop {
+    position: absolute; inset: 10px; border: 1px dashed rgba(34,211,238,0.5); border-radius: 14px;
+    display: none; place-items: center; color: var(--cyan); background: rgba(34,211,238,0.06); font-size: 12px;
+  }
+  .thumb.drop-target .drop { display: grid; }
+  .hint {
+    max-width: 1280px; margin: 18px auto 0; color: var(--muted); font-size: 13px; line-height: 1.55;
+  }
+  .badge {
+    font-family: var(--mono); font-size: 10px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 8px; color: var(--muted);
+  }
+  .toast {
+    position: fixed; right: 24px; bottom: 24px; display: none; background: #0b1924; border: 1px solid rgba(34,211,238,0.35);
+    color: var(--text); padding: 12px 14px; border-radius: 12px; box-shadow: 0 16px 40px rgba(0,0,0,0.4);
+  }
+  .toast.show { display: block; }
+</style>
+</head>
+<body>
+  <div class="frame">
+    <div class="top">
+      <div class="brand"><div class="orb"></div> Spatial Workbench</div>
+      <div class="modes">
+        <button class="mode active" id="tileMode">Tiles</button>
+        <button class="mode" id="overviewMode">Overview</button>
+        <button class="mode" id="insertMode">Show insert targets</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;color:var(--muted);font-size:12px;">
+        <span class="badge">semantic first</span>
+        <span class="badge">reduced motion safe</span>
+      </div>
+    </div>
+    <div class="stage" id="stage">
+      <div class="tiling" id="tiling">
+        <section class="tile active" data-name="Settings">
+          <div class="chrome"><span>Settings</span><span class="badge">confirmed</span></div>
+          <div class="body">
+            <h2>Responsive shell</h2>
+            <p>Sidebar collapses cleanly in half-width tiles. Cards, toggles, and search stay usable without horizontal clipping.</p>
+            <div class="mini-grid">
+              <div class="mini">Gaps 12</div>
+              <div class="mini">Border 3</div>
+              <div class="mini">Wrap on</div>
+              <div class="mini">Focus safe</div>
+            </div>
+          </div>
+        </section>
+        <section class="tile" data-name="Files">
+          <div class="chrome"><span>Files</span><span class="badge">stackable</span></div>
+          <div class="body">
+            <h2>Project corpus</h2>
+            <p>Breadcrumbs, list/grid modes, inspector. Narrow tiles prefer list mode automatically.</p>
+          </div>
+        </section>
+        <section class="tile" data-name="Browser">
+          <div class="chrome"><span>Browser</span><span class="badge">child view</span></div>
+          <div class="body">
+            <h2>Page + chrome</h2>
+            <div class="browser-page">WebEngine content stays nested under native controls and can stack when width gets tight.</div>
+          </div>
+        </section>
+        <section class="tile" data-name="Terminal">
+          <div class="chrome"><span>Terminal</span><span class="badge">starnix</span></div>
+          <div class="body">
+            <div class="term">
+              $ session overview --workspace Build<br/>
+              projected 4 tiles · no second state model<br/>
+              $ _
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="overview" id="overview">
+        <div class="board">
+          <div class="ws-list">
+            <div class="ws active" data-ws="Build"><strong>Build</strong><span>Settings · Files · Browser · Terminal</span></div>
+            <div class="ws" data-ws="Research"><strong>Research</strong><span>Browser · Notes</span></div>
+            <div class="ws" data-ws="Ops"><strong>Ops</strong><span>Terminal · Metrics</span></div>
+            <div class="ws" data-ws="+"><strong>New workspace</strong><span>named tileset</span></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+              <div>
+                <div style="font-size:12px;color:var(--faint);margin-bottom:4px;">Overview projection</div>
+                <strong>Build</strong>
+              </div>
+              <button class="mode" id="closeOverview">Back to tiles</button>
+            </div>
+            <div class="thumbs" id="thumbs">
+              <div class="thumb active" data-name="Settings"><div class="label">Settings</div><div class="preview">WM cards</div><div class="drop">Insert left split</div></div>
+              <div class="thumb" data-name="Files"><div class="label">Files</div><div class="preview">project tree</div><div class="drop">Stack here</div></div>
+              <div class="thumb" data-name="Browser"><div class="label">Browser</div><div class="preview">WebEngine</div><div class="drop">Insert right split</div></div>
+              <div class="thumb" data-name="Terminal"><div class="label">Terminal</div><div class="preview">agent shell</div><div class="drop">Float transient</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="hint">
+    <strong style="color:var(--text)">Variant 3 — Spatial Overview.</strong> Current tiles remain the true state. Overview is only a projection for workspace switching, focus jumps, stack/split insert targets, and later reduced-motion transitions. Best when the product story is “I can see and rearrange my work.”
+  </div>
+  <div class="toast" id="toast"></div>
+  <script>
+    const stage = document.getElementById('stage');
+    const toast = (msg) => {
+      const el = document.getElementById('toast');
+      el.textContent = msg; el.classList.add('show');
+      clearTimeout(window.__t); window.__t = setTimeout(() => el.classList.remove('show'), 1600);
+    };
+    const setMode = (overview) => {
+      stage.classList.toggle('overview-on', overview);
+      document.getElementById('tileMode').classList.toggle('active', !overview);
+      document.getElementById('overviewMode').classList.toggle('active', overview);
+    };
+    document.getElementById('tileMode').onclick = () => setMode(false);
+    document.getElementById('overviewMode').onclick = () => setMode(true);
+    document.getElementById('closeOverview').onclick = () => setMode(false);
+    document.getElementById('insertMode').onclick = () => {
+      setMode(true);
+      document.querySelectorAll('.thumb').forEach(t => t.classList.add('drop-target'));
+      toast('Drop targets visible: split, stack, float');
+    };
+    document.querySelectorAll('.tile').forEach(tile => tile.addEventListener('click', () => {
+      document.querySelectorAll('.tile').forEach(t => t.classList.remove('active'));
+      tile.classList.add('active');
+      toast('Confirmed focus → ' + tile.dataset.name);
+    }));
+    document.querySelectorAll('.thumb').forEach(thumb => thumb.addEventListener('click', () => {
+      document.querySelectorAll('.thumb,.tile').forEach(t => t.classList.remove('active'));
+      thumb.classList.add('active');
+      const tile = document.querySelector('.tile[data-name="'+thumb.dataset.name+'"]');
+      if (tile) tile.classList.add('active');
+      setMode(false);
+      toast('Jump focus → ' + thumb.dataset.name);
+    }));
+    document.querySelectorAll('.ws').forEach(ws => ws.addEventListener('click', () => {
+      document.querySelectorAll('.ws').forEach(w => w.classList.remove('active'));
+      if (ws.dataset.ws !== '+') ws.classList.add('active');
+      toast(ws.dataset.ws === '+' ? 'Create named workspace' : 'Workspace → ' + ws.dataset.ws);
+    }));
+    if (new URLSearchParams(location.search).get('overview') === '1') {
+      setMode(true);
+      document.querySelectorAll('.thumb').forEach(t => t.classList.add('drop-target'));
+    }
+  </script>
+</body>
+</html>

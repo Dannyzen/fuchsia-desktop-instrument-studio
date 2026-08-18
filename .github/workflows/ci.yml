@@ -1,0 +1,37 @@
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  public-readiness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Secret and structure scan
+        run: |
+          chmod +x scripts/*.sh scripts/*.py || true
+          ./scripts/secret-scan.sh
+      - name: Package structure checks
+        run: |
+          test -f versions.env
+          test -d overlays/fuchsia/src/ui/bin/tiling_wm
+          test -d overlays/fuchsia/src/fuchsia-desktop
+          test -f design/screenshots/01-instrument-studio.png
+          test -f design/sketches/01-instrument-studio/index.html
+          test ! -e overlays/fuchsia/src/fuchsia-desktop/agent-linux/authorized_keys
+          test ! -e state
+          test ! -e source
+          test ! -e sdk
+          if find . -type f \( -name 'id_ed25519' -o -name 'id_rsa' -o -name '*.pem' -o -name 'authorized_keys' \) | grep .; then
+            echo 'forbidden credential filenames present' >&2
+            exit 1
+          fi
+      - name: Shell syntax
+        run: |
+          bash -n scripts/*.sh
+      - name: Python compile
+        run: |
+          python3 -m py_compile scripts/*.py

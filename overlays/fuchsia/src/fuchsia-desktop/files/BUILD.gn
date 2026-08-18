@@ -1,0 +1,110 @@
+# Copyright 2026 The Fuchsia Desktop Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bazel/export_fuchsia_package_to_bazel.gni")
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+rustc_binary("bin") {
+  name = "fuchsia_files"
+  edition = "2024"
+  sources = [
+    "src/files_core.rs",
+    "src/files_ui.rs",
+    "src/main.rs",
+    "src/text_surface.rs",
+  ]
+  inputs = [ "//prebuilt/third_party/fonts/robotoslab/RobotoSlab-Regular.ttf" ]
+  deps = [
+    "//sdk/fidl/fuchsia.images2:fuchsia.images2_rust",
+    "//sdk/fidl/fuchsia.math:fuchsia.math_rust",
+    "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_rust",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
+    "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_rust",
+    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
+    "//sdk/rust/zx",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/lib/ui/carnelian",
+    "//src/lib/ui/fuchsia-framebuffer",
+    "//src/lib/ui/fuchsia-scenic",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:euclid",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
+  ]
+}
+
+rustc_binary("input_driver_bin") {
+  name = "files_input_driver"
+  edition = "2024"
+  source_root = "src/input_driver.rs"
+  sources = [ "src/input_driver.rs" ]
+  deps = [
+    "//sdk/fidl/fuchsia.math:fuchsia.math_rust",
+    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_rust",
+    "//sdk/rust/zx",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:log",
+  ]
+}
+
+rustc_binary("generic_control_bin") {
+  name = "files_generic_control"
+  edition = "2024"
+  source_root = "src/generic_control.rs"
+  sources = [ "src/generic_control.rs" ]
+  deps = [
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:log",
+  ]
+}
+
+fuchsia_component("component") {
+  component_name = "fuchsia_files"
+  manifest = "meta/fuchsia_files.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_package("package") {
+  package_name = "fuchsia_files"
+  deps = [ ":component" ]
+}
+
+export_fuchsia_package_to_bazel("package_bazel") {
+  package = ":package"
+  visibility = [
+    "//products/workbench:*",
+    "//src/fuchsia-desktop/files:*",
+  ]
+}
+
+fuchsia_component("input_driver_component") {
+  component_name = "files_input_driver"
+  manifest = "meta/input_driver.cml"
+  deps = [ ":input_driver_bin" ]
+}
+
+fuchsia_package("input_driver_package") {
+  package_name = "files_input_driver"
+  deps = [ ":input_driver_component" ]
+}
+
+fuchsia_component("generic_control_component") {
+  component_name = "files_generic_control"
+  manifest = "meta/generic_control.cml"
+  deps = [ ":generic_control_bin" ]
+}
+
+fuchsia_package("generic_control_package") {
+  package_name = "files_generic_control"
+  deps = [ ":generic_control_component" ]
+}

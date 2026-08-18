@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fuchsia Desktop — Instrument Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #07090d;
+    --panel: #0e1218;
+    --elev: #151b24;
+    --elev-2: #1b2330;
+    --line: rgba(255,255,255,0.08);
+    --line-soft: rgba(255,255,255,0.05);
+    --text: #f4f7fb;
+    --muted: #9aa6b5;
+    --faint: #6d7a8b;
+    --cyan: #00eaff;
+    --cyan-dim: rgba(0,234,255,0.16);
+    --violet: #8b7cff;
+    --green: #3dd68c;
+    --amber: #f0b429;
+    --danger: #ff6b7a;
+    --radius: 12px;
+    --shadow: 0 18px 50px rgba(0,0,0,0.45);
+    --font: "Inter", system-ui, -apple-system, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(0,234,255,0.10), transparent 55%),
+      radial-gradient(900px 500px at 90% 0%, rgba(139,124,255,0.12), transparent 50%),
+      var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 28px;
+  }
+  .frame {
+    max-width: 1280px;
+    margin: 0 auto;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent 120px), var(--panel);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .topbar {
+    display: grid;
+    grid-template-columns: 220px 1fr auto;
+    gap: 16px;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(8,11,16,0.85);
+    backdrop-filter: blur(12px);
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: -0.02em;
+  }
+  .mark {
+    width: 28px; height: 28px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--cyan), var(--violet));
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.12), 0 0 24px rgba(0,234,255,0.25);
+  }
+  .workspaces { display: flex; gap: 8px; justify-content: center; }
+  .ws {
+    border: 1px solid var(--line); background: rgba(255,255,255,0.02);
+    color: var(--muted); border-radius: 999px; padding: 7px 12px; font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: .15s ease;
+  }
+  .ws.active, .ws:hover { color: var(--text); border-color: rgba(0,234,255,0.35); background: var(--cyan-dim); }
+  .status { display: flex; gap: 10px; align-items: center; color: var(--muted); font-size: 12px; }
+  .pill {
+    display: inline-flex; gap: 6px; align-items: center;
+    border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; background: rgba(255,255,255,0.02);
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); }
+  .shell {
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    min-height: 760px;
+  }
+  .rail {
+    border-right: 1px solid var(--line);
+    background: #0a0e14;
+    padding: 14px 10px;
+    display: flex; flex-direction: column; gap: 8px; align-items: center;
+  }
+  .rail button {
+    width: 42px; height: 42px; border-radius: 12px; border: 1px solid transparent;
+    background: transparent; color: var(--muted); cursor: pointer; font-size: 16px;
+  }
+  .rail button.active, .rail button:hover {
+    color: var(--text); background: rgba(255,255,255,0.04); border-color: var(--line);
+  }
+  .rail button.active { box-shadow: inset 0 0 0 1px rgba(0,234,255,0.35), 0 0 18px rgba(0,234,255,0.12); color: var(--cyan); }
+  .main {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    min-width: 0;
+  }
+  .desktop {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    grid-template-rows: 1.05fr 0.95fr;
+    gap: 12px;
+    padding: 14px;
+    background:
+      linear-gradient(var(--line-soft) 1px, transparent 1px) 0 0 / 24px 24px,
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px) 0 0 / 24px 24px,
+      #090c11;
+  }
+  .tile {
+    position: relative;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--elev);
+    overflow: hidden;
+    min-height: 0;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .tile.active {
+    border-color: rgba(0,234,255,0.7);
+    box-shadow: 0 0 0 1px rgba(0,234,255,0.25), 0 0 0 4px rgba(0,234,255,0.08), var(--shadow);
+  }
+  .tile-chrome {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 12px; border-bottom: 1px solid var(--line-soft);
+    background: rgba(255,255,255,0.02);
+  }
+  .tile-title { display: flex; gap: 8px; align-items: center; font-size: 13px; font-weight: 600; }
+  .app-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .tile-actions { display: flex; gap: 6px; color: var(--faint); font-size: 12px; }
+  .chip {
+    border: 1px solid var(--line); border-radius: 999px; padding: 3px 8px; color: var(--muted);
+    font-family: var(--mono); font-size: 10px;
+  }
+  .tile-body { padding: 14px; height: calc(100% - 44px); overflow: auto; }
+  .settings-layout { display: grid; grid-template-columns: 180px 1fr; gap: 14px; height: 100%; }
+  .side nav { display: flex; flex-direction: column; gap: 4px; }
+  .side button {
+    text-align: left; border: 0; background: transparent; color: var(--muted);
+    padding: 9px 10px; border-radius: 10px; cursor: pointer; font: inherit; font-size: 13px;
+  }
+  .side button.active, .side button:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+  .side button.active { box-shadow: inset 3px 0 0 var(--cyan); }
+  .cards { display: grid; gap: 12px; }
+  .card {
+    border: 1px solid var(--line); border-radius: 12px; padding: 14px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+  }
+  .card h3 { font-size: 14px; margin-bottom: 4px; letter-spacing: -0.02em; }
+  .card p { color: var(--muted); font-size: 12px; line-height: 1.5; margin-bottom: 12px; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line-soft); }
+  .row:first-of-type { border-top: 0; padding-top: 0; }
+  .label { font-size: 13px; }
+  .sub { color: var(--faint); font-size: 11px; margin-top: 2px; }
+  .toggle {
+    width: 42px; height: 24px; border-radius: 999px; border: 1px solid var(--line);
+    background: #243041; position: relative; cursor: pointer;
+  }
+  .toggle.on { background: rgba(0,234,255,0.28); border-color: rgba(0,234,255,0.5); }
+  .toggle::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
+    border-radius: 50%; background: white; transition: .15s ease;
+  }
+  .toggle.on::after { left: 20px; background: var(--cyan); }
+  .slider {
+    appearance: none; width: 140px; height: 4px; border-radius: 999px;
+    background: linear-gradient(90deg, var(--cyan), rgba(255,255,255,0.12));
+    outline: none;
+  }
+  .files-toolbar, .browser-toolbar {
+    display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;
+  }
+  .btn, .ghost, .seg {
+    border: 1px solid var(--line); background: rgba(255,255,255,0.03); color: var(--text);
+    border-radius: 9px; padding: 7px 10px; font-size: 12px; cursor: pointer;
+  }
+  .btn.primary { background: linear-gradient(135deg, rgba(0,234,255,0.25), rgba(139,124,255,0.22)); border-color: rgba(0,234,255,0.35); }
+  .seg-group { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .seg { border: 0; border-right: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--muted); }
+  .seg:last-child { border-right: 0; }
+  .seg.active { background: rgba(0,234,255,0.14); color: var(--cyan); }
+  .crumbs { color: var(--muted); font-size: 12px; }
+  .crumbs strong { color: var(--text); font-weight: 500; }
+  .file-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .file {
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: rgba(255,255,255,0.02);
+    cursor: pointer; min-height: 84px;
+  }
+  .file:hover, .file.selected { border-color: rgba(0,234,255,0.45); background: rgba(0,234,255,0.06); }
+  .file .ico { font-size: 18px; margin-bottom: 8px; }
+  .file .name { font-size: 12px; font-weight: 500; }
+  .file .meta { color: var(--faint); font-size: 10px; margin-top: 4px; font-family: var(--mono); }
+  .urlbar {
+    flex: 1; min-width: 180px; display: flex; gap: 8px; align-items: center;
+    border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: rgba(0,0,0,0.25);
+    color: var(--muted); font-size: 12px;
+  }
+  .urlbar strong { color: var(--text); font-weight: 500; }
+  .page {
+    border: 1px solid var(--line); border-radius: 12px; min-height: 180px; padding: 18px;
+    background:
+      radial-gradient(circle at 20% 20%, rgba(0,234,255,0.08), transparent 40%),
+      radial-gradient(circle at 80% 0%, rgba(139,124,255,0.10), transparent 35%),
+      #10151d;
+  }
+  .page h2 { font-size: 22px; letter-spacing: -0.03em; margin-bottom: 8px; }
+  .page p { color: var(--muted); font-size: 13px; line-height: 1.55; max-width: 42ch; }
+  .term {
+    font-family: var(--mono); font-size: 12px; line-height: 1.6; color: #c8d4e2;
+    background: #070b10; border: 1px solid var(--line); border-radius: 10px; padding: 12px; min-height: 180px;
+  }
+  .term .prompt { color: var(--cyan); }
+  .term .ok { color: var(--green); }
+  .inspector {
+    border-top: 1px solid var(--line);
+    background: #0b1017;
+    padding: 10px 14px;
+    display: grid;
+    grid-template-columns: 1.2fr 1fr auto;
+    gap: 16px;
+    align-items: center;
+  }
+  .toast {
+    position: fixed; right: 28px; bottom: 28px; min-width: 280px;
+    background: #121821; border: 1px solid rgba(0,234,255,0.35); border-radius: 14px;
+    padding: 14px 16px; box-shadow: var(--shadow); display: none;
+  }
+  .toast.show { display: block; animation: rise .2s ease; }
+  @keyframes rise { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .legend {
+    max-width: 1280px; margin: 18px auto 0; color: var(--muted); font-size: 13px; line-height: 1.55;
+  }
+  .legend strong { color: var(--text); }
+  .kbd {
+    font-family: var(--mono); font-size: 11px; border: 1px solid var(--line); border-bottom-width: 2px;
+    border-radius: 6px; padding: 2px 6px; background: rgba(255,255,255,0.03); color: var(--text);
+  }
+</style>
+</head>
+<body>
+  <div class="frame">
+    <div class="topbar">
+      <div class="brand"><div class="mark"></div> Workbench Studio</div>
+      <div class="workspaces">
+        <button class="ws active" data-ws="Build">Build</button>
+        <button class="ws" data-ws="Research">Research</button>
+        <button class="ws" data-ws="Ops">Ops</button>
+        <button class="ws" data-ws="+">+</button>
+      </div>
+      <div class="status">
+        <span class="pill"><span class="dot"></span> session healthy</span>
+        <span class="pill">focus confirmed</span>
+        <span class="pill">12px gaps</span>
+      </div>
+    </div>
+    <div class="shell">
+      <aside class="rail">
+        <button class="active" title="Launcher">⌘</button>
+        <button title="Overview">⬚</button>
+        <button title="Files">▤</button>
+        <button title="Browser">◎</button>
+        <button title="Terminal">&gt;_</button>
+        <button title="Settings">⚙</button>
+        <div style="flex:1"></div>
+        <button title="Notifications">•</button>
+      </aside>
+      <div class="main">
+        <div class="desktop">
+          <section class="tile active" id="settingsTile">
+            <div class="tile-chrome">
+              <div class="tile-title"><span class="app-dot" style="background:var(--cyan)"></span> Settings <span class="chip">confirmed</span></div>
+              <div class="tile-actions"><span class="chip">WM · Live</span><span>⌕</span><span>⋯</span></div>
+            </div>
+            <div class="tile-body">
+              <div class="settings-layout">
+                <div class="side">
+                  <nav>
+                    <button class="active">Window Manager</button>
+                    <button>Appearance</button>
+                    <button>Keyboard</button>
+                    <button>Displays</button>
+                    <button>Privacy</button>
+                  </nav>
+                </div>
+                <div class="cards">
+                  <div class="card">
+                    <h3>Tiling geometry</h3>
+                    <p>Validated structured config with smart gaps. Single-window mode keeps exact fullscreen geometry.</p>
+                    <div class="row">
+                      <div><div class="label">Outer gap</div><div class="sub">12 logical px</div></div>
+                      <input class="slider" type="range" min="0" max="24" value="12" id="gapSlider" />
+                    </div>
+                    <div class="row">
+                      <div><div class="label">Active border</div><div class="sub">cyan only after Scenic confirm</div></div>
+                      <div class="toggle on" id="borderToggle"></div>
+                    </div>
+                    <div class="row">
+                      <div><div class="label">Wrap navigation</div><div class="sub">edges cycle through tiles</div></div>
+                      <div class="toggle on" id="wrapToggle"></div>
+                    </div>
+                  </div>
+                  <div class="card">
+                    <h3>Focus policy</h3>
+                    <p>Requested selection and confirmed focus stay separate so the ring never lies.</p>
+                    <div class="row">
+                      <div><div class="label">Delayed pointer focus</div><div class="sub">COSMIC-style settle delay</div></div>
+                      <div class="toggle" id="pointerToggle"></div>
+                    </div>
+                    <div class="row">
+                      <button class="btn primary" id="applyBtn">Apply live</button>
+                      <button class="ghost" id="resetBtn">Reset defaults</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="tile" id="filesTile">
+            <div class="tile-chrome">
+              <div class="tile-title"><span class="app-dot" style="background:var(--violet)"></span> Files</div>
+              <div class="tile-actions"><span class="chip">/home/danny</span></div>
+            </div>
+            <div class="tile-body">
+              <div class="files-toolbar">
+                <div class="seg-group">
+                  <button class="seg active" data-view="grid">Grid</button>
+                  <button class="seg" data-view="list">List</button>
+                </div>
+                <div class="crumbs">Home / <strong>projects</strong> / fuchsia-desktop-mvp</div>
+                <button class="ghost" id="newFolder">New folder</button>
+              </div>
+              <div class="file-grid" id="fileGrid">
+                <div class="file selected"><div class="ico">📄</div><div class="name">donor-roadmap.md</div><div class="meta">5.4 KB</div></div>
+                <div class="file"><div class="ico">🧪</div><div class="name">release-receipt.json</div><div class="meta">exact source</div></div>
+                <div class="file"><div class="ico">🖼</div><div class="name">confirmed-focus.png</div><div class="meta">720×1200</div></div>
+                <div class="file"><div class="ico">📁</div><div class="name">artifacts</div><div class="meta">dir</div></div>
+                <div class="file"><div class="ico">📁</div><div class="name">source</div><div class="meta">fuchsia</div></div>
+                <div class="file"><div class="ico">⚙</div><div class="name">scripts</div><div class="meta">verify</div></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="tile" id="browserTile">
+            <div class="tile-chrome">
+              <div class="tile-title"><span class="app-dot" style="background:var(--amber)"></span> Browser</div>
+              <div class="tile-actions"><span class="chip">WebEngine child</span></div>
+            </div>
+            <div class="tile-body">
+              <div class="browser-toolbar">
+                <button class="ghost">←</button>
+                <button class="ghost">→</button>
+                <button class="ghost">↻</button>
+                <div class="urlbar">🔒 <strong>fuchsia.dev</strong>/contribute/governance/rfcs/0166_ui_stack</div>
+                <button class="btn">Open in tile</button>
+              </div>
+              <div class="page">
+                <h2>One UI Stack</h2>
+                <p>Native chrome around a Flatland-hosted WebEngine page. Address bar, tabs, and find stay in the desktop kit; page pixels stay in Chromium.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="tile" id="termTile">
+            <div class="tile-chrome">
+              <div class="tile-title"><span class="app-dot" style="background:var(--green)"></span> Terminal</div>
+              <div class="tile-actions"><span class="chip">agent-linux</span></div>
+            </div>
+            <div class="tile-body">
+              <div class="term">
+                <div><span class="prompt">root@starnix</span>:~# id</div>
+                <div>uid=0(root) gid=0(root)</div>
+                <div><span class="prompt">root@starnix</span>:~# ./verify-focus.sh</div>
+                <div class="ok">ACTIVE_CLEARED → successor confirmed</div>
+                <div><span class="prompt">root@starnix</span>:~# <span id="cursor">▌</span></div>
+              </div>
+            </div>
+          </section>
+        </div>
+        <div class="inspector">
+          <div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Command palette preview</div>
+            <div><span class="kbd">Ctrl</span> <span class="kbd">Space</span> Focus left · <span class="kbd">Ctrl</span> <span class="kbd">Shift</span> <span class="kbd">H</span> Move tile · <span class="kbd">Super</span> <span class="kbd">O</span> Overview</div>
+          </div>
+          <div style="font-size:12px;color:var(--muted);">
+            Active tile uses confirmed Scenic focus. Gaps, borders, wrap, and workspaces live in one settings model.
+          </div>
+          <button class="btn primary" id="overviewBtn">Open overview idea</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="legend">
+    <strong>Variant 1 — Instrument Studio.</strong> Dense, polished desktop chrome: top workspace strip, left launcher rail, shared cards/toggles/sliders, unmistakable active tile, and live WM settings beside real apps. Best when the desktop should feel like a finished product shell, not a demo grid.
+  </div>
+  <div class="toast" id="toast"></div>
+  <script>
+    const toast = (msg) => {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(window.__t);
+      window.__t = setTimeout(() => el.classList.remove('show'), 1800);
+    };
+    document.querySelectorAll('.tile').forEach(tile => {
+      tile.addEventListener('click', () => {
+        document.querySelectorAll('.tile').forEach(t => t.classList.remove('active'));
+        tile.classList.add('active');
+        toast('Confirmed focus → ' + tile.querySelector('.tile-title').childNodes[1].textContent.trim());
+      });
+    });
+    document.querySelectorAll('.ws').forEach(btn => btn.addEventListener('click', () => {
+      document.querySelectorAll('.ws').forEach(b => b.classList.remove('active'));
+      if (btn.dataset.ws !== '+') btn.classList.add('active');
+      toast(btn.dataset.ws === '+' ? 'New workspace sheet' : 'Workspace → ' + btn.dataset.ws);
+    }));
+    document.querySelectorAll('.toggle').forEach(t => t.addEventListener('click', () => {
+      t.classList.toggle('on');
+      toast((t.classList.contains('on') ? 'Enabled' : 'Disabled') + ' setting');
+    }));
+    document.querySelectorAll('.seg').forEach(seg => seg.addEventListener('click', () => {
+      document.querySelectorAll('.seg').forEach(s => s.classList.remove('active'));
+      seg.classList.add('active');
+      toast('Files view → ' + seg.dataset.view);
+    }));
+    document.querySelectorAll('.file').forEach(f => f.addEventListener('click', e => {
+      e.stopPropagation();
+      document.querySelectorAll('.file').forEach(x => x.classList.remove('selected'));
+      f.classList.add('selected');
+    }));
+    document.getElementById('applyBtn').onclick = e => { e.stopPropagation(); toast('Live WM settings applied (atomic, last-valid retained)'); };
+    document.getElementById('resetBtn').onclick = e => { e.stopPropagation(); document.getElementById('gapSlider').value = 12; toast('Defaults restored'); };
+    document.getElementById('newFolder').onclick = e => { e.stopPropagation(); toast('New folder sheet'); };
+    document.getElementById('overviewBtn').onclick = () => toast('Overview would project current workspace tiles without a second state model');
+    document.getElementById('gapSlider').addEventListener('input', e => toast('Outer gap → ' + e.target.value + 'px'));
+  </script>
+</body>
+</html>
