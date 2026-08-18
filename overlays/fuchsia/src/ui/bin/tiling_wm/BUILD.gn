@@ -25,6 +25,8 @@ rustc_binary("bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/lib/diagnostics/inspect/runtime/rust",
+    "//src/lib/diagnostics/inspect/rust",
     "//src/lib/ui/fuchsia-scenic",
     "//src/lib/ui/fidl_fuchsia_ui_views_ext:lib",
     "//third_party/rust_crates:anyhow",
@@ -35,6 +37,7 @@ rustc_binary("bin") {
 
   sources = [
     "src/main.rs",
+    "src/observability.rs",
     "src/policy.rs",
   ]
 }
@@ -82,6 +85,8 @@ rustc_binary("driver_bin") {
     "//sdk/fidl/fuchsia.session.window:fuchsia.session.window_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
+    "//src/lib/diagnostics/inspect/runtime/rust",
+    "//src/lib/diagnostics/inspect/rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:log",
   ]

@@ -21,6 +21,10 @@ jobs:
           test -d overlays/fuchsia/src/fuchsia-desktop
           test -f design/screenshots/01-instrument-studio.png
           test -f design/sketches/01-instrument-studio/index.html
+          test -f overlays/fuchsia/src/ui/bin/tiling_wm/src/observability.rs
+          test -f scripts/collect-desktop-diagnostics.sh
+          test -f scripts/design-feedback-report.py
+          test -f docs/observability-feedback-loop.md
           test ! -e overlays/fuchsia/src/fuchsia-desktop/agent-linux/authorized_keys
           test ! -e state
           test ! -e source
@@ -35,3 +39,14 @@ jobs:
       - name: Python compile
         run: |
           python3 -m py_compile scripts/*.py
+      - name: Design feedback empty fixture
+        run: |
+          mkdir -p /tmp/df-empty
+          python3 scripts/design-feedback-report.py --out-dir /tmp/df-empty > /tmp/df-empty/out.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open('/tmp/df-empty/out.json'))
+          assert d['evaluation']['ready_for_ui_iteration'] is False
+          assert d['wm']['available'] is False
+          print('fixture_ok')
+          PY

@@ -118,6 +118,17 @@ docs/                 # architecture + donor roadmap
 versions.env          # pins
 ```
 
+## Observability feedback loop
+
+Instrument Studio development uses Fuchsia diagnostics as the feedback channel:
+
+```bash
+./scripts/collect-desktop-diagnostics.sh ./artifacts/diagnostics-run
+cat ./artifacts/diagnostics-run/design-feedback.json
+```
+
+See `docs/observability-feedback-loop.md` for the Inspect tree and design checks.
+
 ## Status
 
 Interactive tiling WM foundation is proven on the pinned detached source identity above. Richer Instrument Studio UI implementation is the next build phase tracked from this public package.

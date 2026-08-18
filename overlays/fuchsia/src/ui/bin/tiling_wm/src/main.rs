@@ -18,13 +18,17 @@ use fuchsia_scenic::ViewRefPair;
 use fuchsia_scenic::flatland::{IdGenerator, ViewCreationTokenPair};
 use futures::channel::mpsc::UnboundedSender;
 use futures::{StreamExt, TryStreamExt};
+use fuchsia_inspect::component;
+use fuchsia_inspect::health::Reporter;
 use log::{error, info, warn};
 use rand::distr::{Alphanumeric, SampleString};
 use rand::rng;
 use std::collections::HashMap;
 
+mod observability;
 mod policy;
 
+use observability::WmObservability;
 use policy::{LayoutConfig, Size, WindowPolicy, compute_layout};
 
 // The maximum number of concurrent services to serve.
@@ -111,6 +115,7 @@ pub struct TilingWm {
     layout_config: LayoutConfig,
     tiles: HashMap<TileId, ChildView>,
     policy: WindowPolicy,
+    observability: WmObservability,
 }
 
 impl Drop for TilingWm {
@@ -461,13 +466,19 @@ impl TilingWm {
         Ok(())
     }
 
-    fn present(&self, context: &str) -> Result<(), Error> {
+    fn publish_observability(&mut self, context: &str) {
+        self.observability.publish_state(&self.policy, &self.layout_config);
+        self.observability.record_present(context);
+    }
+
+    fn present(&mut self, context: &str) -> Result<(), Error> {
         self.flatland
             .present(ui_comp::PresentArgs {
                 requested_presentation_time: Some(0),
                 ..Default::default()
             })
             .with_context(|| format!("{context} present"))?;
+        self.publish_observability(context);
         Ok(())
     }
 
@@ -525,6 +536,7 @@ impl TilingWm {
             layout_config,
             tiles: HashMap::new(),
             policy: WindowPolicy::new(layout_config).map_err(anyhow::Error::msg)?,
+            observability: WmObservability::attach(component::inspector().root(), &layout_config),
         })
     }
 
@@ -885,6 +897,11 @@ fn watch_focus_chain(internal_sender: UnboundedSender<MessageInternal>) -> Resul
 
 #[fuchsia::main(logging = true)]
 async fn main() -> Result<(), Error> {
+    let inspector = component::inspector();
+    component::health().set_ok();
+    let _inspect_server_task =
+        inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
+
     let config = tiling_wm_config::Config::take_from_startup_handle();
     let layout_config = LayoutConfig {
         gap_px: config.gap_px,
