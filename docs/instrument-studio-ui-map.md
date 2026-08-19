@@ -78,3 +78,10 @@ Rail glyphs follow design sketch order:
 Brand mark uses cyan/violet split. Active rail slot tracks confirmed focus.
 
 Evidence: `docs/evidence/instrument-studio-icons-20260819T001859Z/`.
+
+
+## Typography/labels pass (2026-08-19)
+
+Chrome now draws 5x7 bitmap labels for brand, workspace pills, status chips, and inspector cards.
+Evidence: `docs/evidence/instrument-studio-labels-20260819T020608Z/`.
+Residual: increase glyph scale / add true font path for OCR-clean production text.

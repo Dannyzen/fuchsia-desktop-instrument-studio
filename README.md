@@ -60,6 +60,8 @@ We are building **Instrument Studio** first:
 
 ![Linux terminal wiring](design/screenshots/08-emulator-linux-terminal.png)
 
+![Live emulator labels pass](design/screenshots/09-emulator-labels-live.png)
+
 Interactive sketches live under `design/sketches/`.
 
 ## Local rebuild

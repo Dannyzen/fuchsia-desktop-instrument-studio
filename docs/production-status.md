@@ -17,6 +17,8 @@ It is **not** yet the polished production Workbench Studio UI from the design sc
 
 ## Done
 
+- Chrome bitmap label path (brand/pills/chips/inspector) live-proven
+
 - Terminal tile wired to Alpine/Linux via Starnix Controller bridge
 
 - Native tiling foundation + confirmed focus
@@ -27,6 +29,8 @@ It is **not** yet the polished production Workbench Studio UI from the design sc
 - Screenshot + vision evidence trail
 
 ## Not done (blocks “production”)
+
+1. Larger/true typography (bitmap labels not OCR-clean at 2px)
 
 1. Typography/labels (brand wordmark, workspace names, chip captions)
 2. True icon assets/glyphs (beyond rect approximations)
