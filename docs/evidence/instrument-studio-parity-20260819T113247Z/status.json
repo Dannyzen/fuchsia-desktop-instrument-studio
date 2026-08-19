@@ -1,0 +1,35 @@
+{
+  "stamp": "20260819T113247Z",
+  "built_merkle": "35d48552678039295b3a1f46cbc5dd3d68e2c1625a10b0523be10af242ddba44",
+  "live_merkle": "35d48552678039295b3a1f46cbc5dd3d68e2c1625a10b0523be10af242ddba44",
+  "running": {
+    "browser": true,
+    "terminal": true,
+    "files": true,
+    "settings": true
+  },
+  "inspect": "core/session-manager/session:session/tiling_wm:\n  metadata:\n    name = root\n    component_url = tiling_wm#meta/tiling_wm.cm\n    timestamp = 29445685345\n  payload:\n    root:\n      fuchsia.inspect.Health:\n        start_timestamp_nanos = 1351250004\n        status = OK\n      tiling_wm:\n        last_present_context = WindowManagerSetOrder\n        order = par-terminal-20260819T113247Z,par-settings-20260819T113247Z,par-files-20260819T113247Z,par-browser-20260819T113247Z\n        present_count = 3\n        tile_count = 4\n        config:\n          active_border_px = 3\n          gap_px = 12\n          wrap_focus = true\n        focus:\n          confirmed = par-terminal-20260819T113247Z\n          selected = par-terminal-20260819T113247Z\n\n",
+  "screenshots": [
+    "/srv/bigs-runtime/workspaces/projects/fuchsia-desktop-mvp/artifacts/instrument-studio-parity-20260819T113247Z/screenshots/screenshot.png"
+  ],
+  "feedback": {
+    "ready": true,
+    "wm": {
+      "available": true,
+      "tile_count": 4,
+      "order": [
+        "par-terminal-20260819T113247Z",
+        "par-settings-20260819T113247Z",
+        "par-files-20260819T113247Z",
+        "par-browser-20260819T113247Z"
+      ],
+      "selected_focus": "par-terminal-20260819T113247Z",
+      "confirmed_focus": "par-terminal-20260819T113247Z",
+      "gap_px": 12,
+      "active_border_px": 3,
+      "wrap_focus": true,
+      "present_count": 3,
+      "last_present_context": "WindowManagerSetOrder"
+    }
+  }
+}

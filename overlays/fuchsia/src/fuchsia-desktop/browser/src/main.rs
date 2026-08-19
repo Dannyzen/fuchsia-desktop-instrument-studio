@@ -148,6 +148,18 @@ impl BrowserTab {
     }
 }
 
+fn display_url(url: &str, width: u32) -> String {
+    let max_chars = ((width / 8).max(8) as usize).min(url.len().max(8));
+    if url.len() <= max_chars {
+        return url.to_string();
+    }
+    let trimmed = url.trim_start_matches("https://").trim_start_matches("http://");
+    if trimmed.len() <= max_chars {
+        return trimmed.to_string();
+    }
+    format!("{}…", &trimmed[..max_chars.saturating_sub(1)])
+}
+
 fn create_tab_view(
     flatland: &flatland::FlatlandProxy,
     frame: BrowserFrame,
@@ -373,6 +385,7 @@ async fn create_browser_view(
         }],
     )?;
 
+    let narrow = size.width < 520;
     create_rect(
         &flatland,
         &root,
@@ -382,6 +395,7 @@ async fn create_browser_view(
         fmath::SizeU { width: size.width, height: toolbar_height },
         fmath::Vec_ { x: 0, y: 0 },
     )?;
+    if !narrow {
     create_rect(
         &flatland,
         &root,
@@ -400,15 +414,22 @@ async fn create_browser_view(
         fmath::SizeU { width: 40, height: 40 },
         fmath::Vec_ { x: 64, y: 16 },
     )?;
-    let address_width = size.width.saturating_sub(180).max(1);
+    }
+    let btn = if narrow { 28 } else { 40 };
+    let addr_x = if narrow { 8 } else { 116 };
+    let address_width = if narrow {
+        size.width.saturating_sub(16).max(48)
+    } else {
+        size.width.saturating_sub(180).max(1)
+    };
     create_rect(
         &flatland,
         &root,
         8,
         9,
         &ADDRESS_COLOR,
-        fmath::SizeU { width: address_width, height: 40 },
-        fmath::Vec_ { x: 116, y: 16 },
+        fmath::SizeU { width: address_width, height: if narrow { 28 } else { 40 } },
+        fmath::Vec_ { x: addr_x, y: if narrow { 36 } else { 16 } },
     )?;
     create_rect(
         &flatland,
@@ -466,14 +487,15 @@ async fn create_browser_view(
         fmath::Vec_ { x: 220, y: 1 },
     )?;
 
+    let shown_url = display_url(initial_url, address_width);
     let mut address_text_surface = TextSurface::new(
         &flatland,
         &root,
         flatland::TransformId { value: 14 },
         flatland::ContentId { value: 15 },
-        fmath::SizeU { width: address_width, height: 40 },
-        fmath::Vec_ { x: 116, y: 16 },
-        initial_url,
+        fmath::SizeU { width: address_width, height: if narrow { 28 } else { 40 } },
+        fmath::Vec_ { x: addr_x, y: if narrow { 36 } else { 16 } },
+        &shown_url,
     )
     .await?;
 
@@ -482,9 +504,9 @@ async fn create_browser_view(
         &root,
         flatland::TransformId { value: 60 },
         flatland::ContentId { value: 61 },
-        fmath::SizeU { width: 104, height: 14 },
-        fmath::Vec_ { x: 116, y: 1 },
-        "Tab 1",
+        fmath::SizeU { width: if narrow { address_width.min(160) } else { 104 }, height: 16 },
+        fmath::Vec_ { x: if narrow { 8 } else { 116 }, y: if narrow { 8 } else { 1 } },
+        if narrow { "Browser" } else { "Tab 1" },
         TextStyle::TAB,
     )
     .await?;

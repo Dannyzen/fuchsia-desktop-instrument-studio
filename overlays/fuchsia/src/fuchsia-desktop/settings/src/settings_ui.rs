@@ -19,16 +19,16 @@ pub fn action_for_point(x: f32, y: f32, width: f32) -> Option<UiAction> {
         if !(inset..inset + btn_w).contains(&x) {
             return None;
         }
-        if (96.0..152.0).contains(&y) {
+        if (88.0..136.0).contains(&y) {
             return Some(UiAction::ThemeDark);
         }
-        if (160.0..216.0).contains(&y) {
+        if (140.0..188.0).contains(&y) {
             return Some(UiAction::ThemeContrast);
         }
-        if (256.0..312.0).contains(&y) {
+        if (220.0..268.0).contains(&y) {
             return Some(UiAction::TemperatureCelsius);
         }
-        if (320.0..376.0).contains(&y) {
+        if (272.0..320.0).contains(&y) {
             return Some(UiAction::TemperatureFahrenheit);
         }
         return None;
@@ -78,10 +78,10 @@ mod tests {
 
     #[test]
     fn maps_narrow_stacked_buttons() {
-        assert_eq!(action_for_point(40.0, 120.0, 348.0), Some(UiAction::ThemeDark));
-        assert_eq!(action_for_point(40.0, 180.0, 348.0), Some(UiAction::ThemeContrast));
-        assert_eq!(action_for_point(40.0, 280.0, 348.0), Some(UiAction::TemperatureCelsius));
-        assert_eq!(action_for_point(40.0, 340.0, 348.0), Some(UiAction::TemperatureFahrenheit));
+        assert_eq!(action_for_point(40.0, 110.0, 348.0), Some(UiAction::ThemeDark));
+        assert_eq!(action_for_point(40.0, 160.0, 348.0), Some(UiAction::ThemeContrast));
+        assert_eq!(action_for_point(40.0, 240.0, 348.0), Some(UiAction::TemperatureCelsius));
+        assert_eq!(action_for_point(40.0, 290.0, 348.0), Some(UiAction::TemperatureFahrenheit));
         assert_eq!(action_for_point(400.0, 230.0, 348.0), None);
     }
 }

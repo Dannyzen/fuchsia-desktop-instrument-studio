@@ -318,14 +318,20 @@ async fn create_settings_view(root_token: views::ViewCreationToken) -> Result<()
     let btn_w = if narrow { size.width.saturating_sub(32).max(80) } else { 240 };
     let info_w = size.width.saturating_sub(32).max(80);
     let status_w = size.width.saturating_sub(32).max(80);
+    let status_y = if narrow {
+        size.height.saturating_sub(40).max(430) as i32
+    } else {
+        size.height.saturating_sub(96) as i32
+    };
+    let info_h = if narrow { 48 } else { 216 };
     let rects = if narrow {
         [
-            (20, 21, &SURFACE, btn_w, 56, 16, 96),
-            (22, 23, &SURFACE, btn_w, 56, 16, 160),
-            (24, 25, &SURFACE, btn_w, 56, 16, 256),
-            (26, 27, &SURFACE, btn_w, 56, 16, 320),
-            (30, 31, &PANEL, info_w, 168, 16, 400),
-            (40, 41, &PANEL, status_w, 56, 16, size.height.saturating_sub(72) as i32),
+            (20, 21, &SURFACE, btn_w, 48, 16, 88),
+            (22, 23, &SURFACE, btn_w, 48, 16, 140),
+            (24, 25, &SURFACE, btn_w, 48, 16, 220),
+            (26, 27, &SURFACE, btn_w, 48, 16, 272),
+            (30, 31, &PANEL, info_w, info_h, 16, 340),
+            (40, 41, &PANEL, status_w, 32, 16, status_y),
         ]
     } else {
         [
@@ -353,17 +359,17 @@ async fn create_settings_view(root_token: views::ViewCreationToken) -> Result<()
     let title_w = size.width.saturating_sub(32).max(80);
     let text_specs: Vec<(u64, u64, u32, u32, i32, i32, &str, TextStyle)> = if narrow {
         vec![
-            (100, 101, title_w, 40, 16, 8, "Settings", TextStyle { font_size: 20.0, left_padding: 6, top_padding: 6 }),
-            (108, 109, title_w, 28, 16, 64, "Appearance", TextStyle { font_size: 16.0, left_padding: 4, top_padding: 4 }),
-            (112, 113, btn_w, 56, 16, 96, "Dark", TextStyle { font_size: 16.0, left_padding: 16, top_padding: 16 }),
-            (116, 117, btn_w, 56, 16, 160, "Contrast", TextStyle { font_size: 16.0, left_padding: 16, top_padding: 16 }),
-            (120, 121, title_w, 28, 16, 224, "Temperature", TextStyle { font_size: 16.0, left_padding: 4, top_padding: 4 }),
-            (124, 125, btn_w, 56, 16, 256, "Celsius", TextStyle { font_size: 16.0, left_padding: 16, top_padding: 16 }),
-            (128, 129, btn_w, 56, 16, 320, "Fahrenheit", TextStyle { font_size: 16.0, left_padding: 16, top_padding: 16 }),
-            (132, 133, title_w, 28, 16, 384, "System", TextStyle { font_size: 16.0, left_padding: 4, top_padding: 4 }),
-            (136, 137, info_w.saturating_sub(16), 40, 24, 408, &build_line, TextStyle { font_size: 13.0, left_padding: 4, top_padding: 8 }),
-            (140, 141, info_w.saturating_sub(16), 40, 24, 452, &product_line, TextStyle { font_size: 13.0, left_padding: 4, top_padding: 8 }),
-            (144, 145, info_w.saturating_sub(16), 40, 24, 496, "build-info + hwinfo", TextStyle { font_size: 13.0, left_padding: 4, top_padding: 8 }),
+            (100, 101, title_w, 32, 16, 8, "Settings", TextStyle { font_size: 18.0, left_padding: 6, top_padding: 4 }),
+            (108, 109, title_w, 24, 16, 60, "Appearance", TextStyle { font_size: 14.0, left_padding: 4, top_padding: 3 }),
+            (112, 113, btn_w, 48, 16, 88, "Dark", TextStyle { font_size: 15.0, left_padding: 12, top_padding: 12 }),
+            (116, 117, btn_w, 48, 16, 140, "Contrast", TextStyle { font_size: 15.0, left_padding: 12, top_padding: 12 }),
+            (120, 121, title_w, 24, 16, 196, "Temperature", TextStyle { font_size: 14.0, left_padding: 4, top_padding: 3 }),
+            (124, 125, btn_w, 48, 16, 220, "Celsius", TextStyle { font_size: 15.0, left_padding: 12, top_padding: 12 }),
+            (128, 129, btn_w, 48, 16, 272, "Fahrenheit", TextStyle { font_size: 15.0, left_padding: 12, top_padding: 12 }),
+            (132, 133, title_w, 24, 16, 328, "System", TextStyle { font_size: 14.0, left_padding: 4, top_padding: 3 }),
+            (136, 137, info_w.saturating_sub(16), 36, 24, 348, &build_line, TextStyle { font_size: 12.0, left_padding: 4, top_padding: 8 }),
+            (140, 141, 1, 1, -64, -64, &product_line, TextStyle { font_size: 12.0, left_padding: 4, top_padding: 8 }),
+            (144, 145, 1, 1, -64, -64, "build-info + hwinfo", TextStyle { font_size: 12.0, left_padding: 4, top_padding: 8 }),
         ]
     } else {
         vec![
@@ -430,8 +436,8 @@ async fn create_settings_view(root_token: views::ViewCreationToken) -> Result<()
         &root,
         flatland::TransformId { value: 208 },
         flatland::ContentId { value: 209 },
-        fmath::SizeU { width: status_w, height: if narrow { 48 } else { 64 } },
-        fmath::Vec_ { x: 16, y: size.height.saturating_sub(if narrow { 64 } else { 88 }) as i32 },
+        fmath::SizeU { width: status_w, height: if narrow { 28 } else { 64 } },
+        fmath::Vec_ { x: 16, y: if narrow { status_y } else { size.height.saturating_sub(88) as i32 } },
         controller.status(),
         TextStyle { font_size: 16.0, left_padding: 8, top_padding: 15 },
     )

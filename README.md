@@ -68,6 +68,8 @@ We are building **Instrument Studio** first:
 
 ![Live emulator responsive tiles](design/screenshots/12-emulator-responsive-live.png)
 
+![Live emulator design-parity loop](design/screenshots/13-emulator-parity-live.png)
+
 Interactive sketches live under `design/sketches/`.
 
 ## Local rebuild

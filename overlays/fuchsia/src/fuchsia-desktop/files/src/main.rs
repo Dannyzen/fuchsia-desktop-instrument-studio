@@ -307,7 +307,7 @@ async fn create_files_view(root_token: views::ViewCreationToken) -> Result<(), E
         flatland::ContentId { value: 505 },
         fmath::SizeU { width: 220, height: 48 },
         fmath::Vec_ { x: 24, y: 12 },
-        "Fuchsia Files",
+        "Files",
         TextStyle { font_size: 24.0, left_padding: 8, top_padding: 5 },
     )
     .await?;

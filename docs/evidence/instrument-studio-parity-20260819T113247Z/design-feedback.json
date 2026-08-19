@@ -1,0 +1,75 @@
+{
+  "design_target": "instrument-studio",
+  "wm": {
+    "available": true,
+    "tile_count": 4,
+    "order": [
+      "par-terminal-20260819T113247Z",
+      "par-settings-20260819T113247Z",
+      "par-files-20260819T113247Z",
+      "par-browser-20260819T113247Z"
+    ],
+    "selected_focus": "par-terminal-20260819T113247Z",
+    "confirmed_focus": "par-terminal-20260819T113247Z",
+    "gap_px": 12,
+    "active_border_px": 3,
+    "wrap_focus": true,
+    "present_count": 3,
+    "last_present_context": "WindowManagerSetOrder"
+  },
+  "log_markers": {
+    "last_active": null,
+    "active_cleared_count": 0,
+    "last_order": null
+  },
+  "artifacts": {
+    "inspect_tiling_wm": "/srv/bigs-runtime/workspaces/projects/fuchsia-desktop-mvp/artifacts/instrument-studio-parity-20260819T113247Z/diagnostics/inspect-tiling_wm.json",
+    "inspect_all": "/srv/bigs-runtime/workspaces/projects/fuchsia-desktop-mvp/artifacts/instrument-studio-parity-20260819T113247Z/diagnostics/inspect-all.json",
+    "logs": "/srv/bigs-runtime/workspaces/projects/fuchsia-desktop-mvp/artifacts/instrument-studio-parity-20260819T113247Z/diagnostics/tiling-wm-markers.log",
+    "screenshot": "/srv/bigs-runtime/workspaces/projects/fuchsia-desktop-mvp/artifacts/instrument-studio-parity-20260819T113247Z/diagnostics/session.png"
+  },
+  "evaluation": {
+    "design_target": "instrument-studio",
+    "ready_for_ui_iteration": true,
+    "checks": [
+      {
+        "name": "inspect_available",
+        "ok": true,
+        "detail": "tiling_wm inspect hierarchy present"
+      },
+      {
+        "name": "has_tiles",
+        "ok": true,
+        "detail": "tile_count=4"
+      },
+      {
+        "name": "instrument_studio_grid_ready",
+        "ok": true,
+        "detail": "design sketch assumes a 2x2 app grid when four apps are launched"
+      },
+      {
+        "name": "confirmed_focus_visible_when_present",
+        "ok": true,
+        "detail": "selected='par-terminal-20260819T113247Z' confirmed='par-terminal-20260819T113247Z'"
+      },
+      {
+        "name": "confirmed_focus_non_empty_for_active_desktop",
+        "ok": true,
+        "detail": "active desktop should expose confirmed focus or recent TILING_WM_ACTIVE marker"
+      },
+      {
+        "name": "gap_default_or_set",
+        "ok": true,
+        "detail": "gap_px=12"
+      },
+      {
+        "name": "active_border_default_or_set",
+        "ok": true,
+        "detail": "active_border_px=3"
+      }
+    ],
+    "next_actions": [
+      "Diagnostics match the foundation contract; implement shared desktop_ui kit screens next."
+    ]
+  }
+}
