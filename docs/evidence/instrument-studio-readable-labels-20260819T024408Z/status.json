@@ -1,0 +1,35 @@
+{
+  "stamp": "20260819T024408Z",
+  "built_merkle": "3f003ec758ca36054a1af8df249285ed5fd46a607d0c21499bb4cc81fa41ab53",
+  "live_merkle": "3f003ec758ca36054a1af8df249285ed5fd46a607d0c21499bb4cc81fa41ab53",
+  "running": {
+    "browser": true,
+    "terminal": true,
+    "files": true,
+    "settings": true
+  },
+  "inspect": "core/session-manager/session:session/tiling_wm:\n  metadata:\n    name = root\n    component_url = tiling_wm#meta/tiling_wm.cm\n    timestamp = 35569264150\n  payload:\n    root:\n      fuchsia.inspect.Health:\n        start_timestamp_nanos = 1378255569\n        status = OK\n      tiling_wm:\n        last_present_context = WindowManagerSetOrder\n        order = rdl-terminal-20260819T024408Z,rdl-settings-20260819T024408Z,rdl-files-20260819T024408Z,rdl-browser-20260819T024408Z\n        present_count = 3\n        tile_count = 4\n        config:\n          active_border_px = 3\n          gap_px = 12\n          wrap_focus = true\n        focus:\n          confirmed = rdl-terminal-20260819T024408Z\n          selected = rdl-terminal-20260819T024408Z\n\n",
+  "screenshots": [
+    "/srv/bigs-runtime/workspaces/projects/fuchsia-desktop-mvp/artifacts/instrument-studio-readable-labels-20260819T024408Z/screenshots/screenshot.png"
+  ],
+  "feedback": {
+    "ready": true,
+    "wm": {
+      "available": true,
+      "tile_count": 4,
+      "order": [
+        "rdl-terminal-20260819T024408Z",
+        "rdl-settings-20260819T024408Z",
+        "rdl-files-20260819T024408Z",
+        "rdl-browser-20260819T024408Z"
+      ],
+      "selected_focus": "rdl-terminal-20260819T024408Z",
+      "confirmed_focus": "rdl-terminal-20260819T024408Z",
+      "gap_px": 12,
+      "active_border_px": 3,
+      "wrap_focus": true,
+      "present_count": 3,
+      "last_present_context": "WindowManagerSetOrder"
+    }
+  }
+}

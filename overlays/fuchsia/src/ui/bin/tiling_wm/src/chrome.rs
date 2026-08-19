@@ -72,7 +72,7 @@ fn rgba(r: f32, g: f32, b: f32, a: f32) -> ui_comp::ColorRgba {
 const GLYPH_PARTS: usize = 64;
 const RAIL_SLOTS: usize = 6;
 const PARTS_PER_ICON: usize = 8;
-const LABEL_PARTS: usize = 220;
+const LABEL_PARTS: usize = 360;
 
 fn glyph5(ch: u8) -> [u8; 7] {
     match ch {
@@ -121,7 +121,8 @@ fn glyph5(ch: u8) -> [u8; 7] {
     }
 }
 
-/// Draw ASCII uppercase labels using a 5x7 bitmap into sequential bars.
+/// Draw ASCII uppercase labels using 5x7 bitmaps packed into horizontal runs.
+/// Run-length bars keep label parts bounded when glyph scale is 3-4px.
 fn draw_text(
     parts: &[Bar],
     flatland: &ui_comp::FlatlandProxy,
@@ -137,21 +138,28 @@ fn draw_text(
     for ch in text.bytes() {
         let rows = glyph5(ch.to_ascii_uppercase());
         for (ry, row) in rows.iter().enumerate() {
-            for rx in 0..5 {
-                if (row >> (4 - rx)) & 1 == 1 {
-                    if cursor >= parts.len() {
-                        return Ok(cursor);
-                    }
-                    parts[cursor].layout(
-                        flatland,
-                        cx + (rx as i32) * px as i32,
-                        y + (ry as i32) * px as i32,
-                        px,
-                        px,
-                        color,
-                    )?;
-                    cursor += 1;
+            let mut rx = 0u32;
+            while rx < 5 {
+                if (row >> (4 - rx)) & 1 == 0 {
+                    rx += 1;
+                    continue;
                 }
+                let start = rx;
+                while rx < 5 && (row >> (4 - rx)) & 1 == 1 {
+                    rx += 1;
+                }
+                if cursor >= parts.len() {
+                    return Ok(cursor);
+                }
+                parts[cursor].layout(
+                    flatland,
+                    cx + (start as i32) * px as i32,
+                    y + (ry as i32) * px as i32,
+                    (rx - start) * px,
+                    px,
+                    color,
+                )?;
+                cursor += 1;
             }
         }
         cx += (5 * px as i32) + gap as i32;
@@ -300,7 +308,7 @@ impl ShellChrome {
         self.brand_b.layout(flatland, bx + (mark / 2) as i32, by, mark - mark / 2, mark, violet)?;
 
         let mut li = 0usize;
-        let brand_px = 2u32;
+        let brand_px = 3u32;
         let brand_text = if strip.width < 820 { "STUDIO" } else { "WORKBENCH STUDIO" };
         li = draw_text(
             &self.labels,
@@ -314,8 +322,8 @@ impl ShellChrome {
         )?;
 
         let pill_h = strip.height.saturating_sub(14).max(18);
-        let pill_w = if strip.width < 800 { 58 } else { 78 };
-        let brand_w = if strip.width < 820 { 5 * 6 * 2 + 20 } else { 15 * 6 * 2 + 20 };
+        let pill_w = if strip.width < 800 { 72 } else { 92 };
+        let brand_w = if strip.width < 820 { 5 * 6 * 3 + 24 } else { 15 * 6 * 3 + 24 };
         let mut px = bx + mark as i32 + brand_w;
         let py = (strip.y + (strip.height - pill_h) / 2) as i32;
         let pill_labels = ["BUILD", "RSRCH", "OPS"];
@@ -331,7 +339,7 @@ impl ShellChrome {
                 2,
                 if active { cyan } else { line },
             )?;
-            let tpx = 2u32;
+            let tpx = 3u32;
             let tw = (pill_labels[i].len() as i32) * (5 * tpx as i32 + tpx as i32);
             li = draw_text(
                 &self.labels,
@@ -346,7 +354,7 @@ impl ShellChrome {
             px += pill_w as i32 + 8;
         }
 
-        let chip_w = if strip.width < 800 { 52 } else { 64 };
+        let chip_w = if strip.width < 800 { 62 } else { 74 };
         let chip_h = pill_h;
         let mut cx = (strip.x + strip.width) as i32 - 12;
         let chips = [
@@ -371,9 +379,9 @@ impl ShellChrome {
                 flatland,
                 li,
                 cx + 18,
-                py + (chip_h as i32 - 14) / 2,
+                py + (chip_h as i32 - 21) / 2,
                 chips[i].2,
-                2,
+                3,
                 if chips[i].0 { text } else { faint },
             )?;
             cx -= 8;
@@ -462,7 +470,7 @@ impl ShellChrome {
             inspector.x as i32 + 10,
             inspector.y as i32 + 6,
             "INSPECT",
-            2,
+            3,
             cyan,
         )?;
 
@@ -500,7 +508,7 @@ impl ShellChrome {
                 x + 24,
                 card_y + 8,
                 card_labels[i],
-                2,
+                3,
                 text,
             )?;
         }

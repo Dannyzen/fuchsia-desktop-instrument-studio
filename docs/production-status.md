@@ -18,6 +18,7 @@ It is **not** yet the polished production Workbench Studio UI from the design sc
 ## Done
 
 - Chrome bitmap label path (brand/pills/chips/inspector) live-proven
+- 3px/RLE label scale attempt live-proven (still not OCR-clean)
 
 - Terminal tile wired to Alpine/Linux via Starnix Controller bridge
 

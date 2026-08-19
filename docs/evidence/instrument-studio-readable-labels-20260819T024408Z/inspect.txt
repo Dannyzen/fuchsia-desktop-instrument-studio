@@ -1,0 +1,23 @@
+core/session-manager/session:session/tiling_wm:
+  metadata:
+    name = root
+    component_url = tiling_wm#meta/tiling_wm.cm
+    timestamp = 35569264150
+  payload:
+    root:
+      fuchsia.inspect.Health:
+        start_timestamp_nanos = 1378255569
+        status = OK
+      tiling_wm:
+        last_present_context = WindowManagerSetOrder
+        order = rdl-terminal-20260819T024408Z,rdl-settings-20260819T024408Z,rdl-files-20260819T024408Z,rdl-browser-20260819T024408Z
+        present_count = 3
+        tile_count = 4
+        config:
+          active_border_px = 3
+          gap_px = 12
+          wrap_focus = true
+        focus:
+          confirmed = rdl-terminal-20260819T024408Z
+          selected = rdl-terminal-20260819T024408Z
+

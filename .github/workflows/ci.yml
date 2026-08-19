@@ -29,6 +29,8 @@ jobs:
           test -f overlays/fuchsia/src/fuchsia-desktop/terminal/src/linux_console_bridge.rs
           test -f design/screenshots/08-emulator-linux-terminal.png
           test -f design/screenshots/09-emulator-labels-live.png
+          test -f design/screenshots/10-emulator-readable-labels-live.png
+          test -f docs/evidence/instrument-studio-readable-labels-20260819T024408Z/vision-comparison.md
           test -f docs/evidence/instrument-studio-labels-20260819T020608Z/vision-comparison.md
           grep -q linux_container overlays/fuchsia/products/workbench/workbench_session/meta/workbench_session.cml
           grep -q linux_console_bridge overlays/fuchsia/src/fuchsia-desktop/terminal/meta/fuchsia_terminal.cml

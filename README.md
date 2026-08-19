@@ -62,6 +62,8 @@ We are building **Instrument Studio** first:
 
 ![Live emulator labels pass](design/screenshots/09-emulator-labels-live.png)
 
+![Live emulator readable-labels attempt](design/screenshots/10-emulator-readable-labels-live.png)
+
 Interactive sketches live under `design/sketches/`.
 
 ## Local rebuild
