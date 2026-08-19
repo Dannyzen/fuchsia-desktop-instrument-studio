@@ -34,6 +34,8 @@ jobs:
           test -f design/screenshots/12-emulator-responsive-live.png
           test -f design/screenshots/13-emulator-parity-live.png
           test -f design/screenshots/14-emulator-tile-identity-live.png
+          test -f design/screenshots/16-emulator-looks-cards-live.png
+          test -f docs/evidence/instrument-studio-looks-20260819T143013Z/vision-comparison.md
           test -f docs/design-vision-bead-matrix.md
           test -f docs/evidence/instrument-studio-tile-identity-20260819T133604Z/vision-comparison.md
           test -f docs/evidence/instrument-studio-parity-20260819T113247Z/vision-comparison.md

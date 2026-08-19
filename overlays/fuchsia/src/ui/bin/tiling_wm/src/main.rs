@@ -64,8 +64,8 @@ fn desktop_ui_tile_title(
     title_h: u32,
 ) -> chrome::TileTitle {
     chrome::TileTitle {
-        x: (stage_x + slot.x + inset + 22) as i32,
-        y: (stage_y + slot.y + inset + title_h.saturating_sub(22) / 2) as i32,
+        x: (stage_x + slot.x + inset + 16) as i32,
+        y: (stage_y + slot.y + inset + title_h.saturating_sub(21) / 2) as i32,
         label: tile_short_label(id).to_string(),
     }
 }
@@ -288,14 +288,7 @@ impl TilingWm {
                 self.tiles.insert(new_tile_id.clone(), new_tile);
                 self.policy.add_front(new_tile_id.0.clone());
                 self.layout_tiles()?;
-
-                // Flush the changes.
-                self.flatland
-                    .present(ui_comp::PresentArgs {
-                        requested_presentation_time: Some(0),
-                        ..Default::default()
-                    })
-                    .context("GraphicalPresenterPresentView present")?;
+                self.present("GraphicalPresenterPresentView")?;
 
                 // Alert the client that the view has been presented, then begin servicing ViewController requests.
                 if view_controller_request_stream.is_some() {
@@ -545,12 +538,13 @@ impl TilingWm {
     }
 
     fn present(&mut self, context: &str) -> Result<(), Error> {
-        self.flatland
-            .present(ui_comp::PresentArgs {
-                requested_presentation_time: Some(0),
-                ..Default::default()
-            })
-            .with_context(|| format!("{context} present"))?;
+        if let Err(error) = self.flatland.present(ui_comp::PresentArgs {
+            requested_presentation_time: Some(0),
+            ..Default::default()
+        }) {
+            warn!("{context} present failed (continuing): {error}");
+            return Ok(());
+        }
         self.publish_observability(context);
         Ok(())
     }
@@ -695,27 +689,29 @@ impl TilingWm {
                 .context("translate tile group")?;
 
             let inset = slot.content_inset;
-            let title_h = 28u32.min(slot.height.saturating_sub(inset * 2).saturating_sub(8));
+            let title_h = 36u32.min(slot.height.saturating_sub(inset * 2).saturating_sub(8));
             let inner_w = slot.width.saturating_sub(inset * 2).max(1);
             let inner_h = slot.height.saturating_sub(inset * 2).max(1);
+            let (ar, ag, ab) = tile_accent(&id);
+            // Card header wash — darker panel with the app accent so tiles read as cards.
             self.flatland.set_solid_fill(
                 &view.title_content_id,
-                &ui_comp::ColorRgba { red: 0.07, green: 0.09, blue: 0.12, alpha: 1.0 },
+                &ui_comp::ColorRgba { red: ar * 0.18, green: ag * 0.18, blue: ab * 0.22, alpha: 1.0 },
                 &fidl_fuchsia_math::SizeU { width: inner_w, height: title_h },
             )?;
             self.flatland.set_translation(
                 &view.title_transform_id,
                 &fidl_fuchsia_math::Vec_ { x: inset as i32, y: inset as i32 },
             )?;
-            let (ar, ag, ab) = tile_accent(&id);
+            // Left identity rail (design app-dot, but readable at FEMU scale).
             self.flatland.set_solid_fill(
                 &view.accent_content_id,
                 &ui_comp::ColorRgba { red: ar, green: ag, blue: ab, alpha: 1.0 },
-                &fidl_fuchsia_math::SizeU { width: 10, height: 10 },
+                &fidl_fuchsia_math::SizeU { width: 8, height: title_h },
             )?;
             self.flatland.set_translation(
                 &view.accent_transform_id,
-                &fidl_fuchsia_math::Vec_ { x: 8, y: (title_h as i32 - 10) / 2 },
+                &fidl_fuchsia_math::Vec_ { x: 0, y: 0 },
             )?;
             let viewport_size = fidl_fuchsia_math::SizeU {
                 width: inner_w,
@@ -1056,8 +1052,9 @@ async fn main() -> Result<(), Error> {
     // Process internal messages using tiling wm, then cleanup when done.
     while let Some(message) = internal_receiver.next().await {
         if let Err(e) = wm.handle_message(message).await {
-            error!("Error handling message: {e}");
-            break;
+            // A single PresentView / present-credit failure must not tear down the
+            // desktop. Later session-add apps never become tiles if we break here.
+            error!("Error handling message (continuing): {e}");
         }
     }
 

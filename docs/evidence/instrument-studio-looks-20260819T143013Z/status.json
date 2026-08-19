@@ -1,0 +1,33 @@
+{
+  "stamp": "20260819T143013Z",
+  "built_merkle": "875b46ad1be566487b25a898d4bc2698bcd6bf3ba65b5275ea85e92e686f2e4e",
+  "live_merkle": "875b46ad1be566487b25a898d4bc2698bcd6bf3ba65b5275ea85e92e686f2e4e",
+  "running": {
+    "terminal": true,
+    "settings": true,
+    "files": true,
+    "browser": true
+  },
+  "final_tile_count": 1,
+  "inspect": "core/session-manager/session:session/tiling_wm:\n  metadata:\n    name = root\n    component_url = tiling_wm#meta/tiling_wm.cm\n    timestamp = 36991839509\n  payload:\n    root:\n      fuchsia.inspect.Health:\n        start_timestamp_nanos = 1189445940\n        status = OK\n      tiling_wm:\n        last_present_context = FocusChainChanged\n        order = look-terminal-20260819T143013Z\n        present_count = 1\n        tile_count = 1\n        config:\n          active_border_px = 3\n          gap_px = 12\n          wrap_focus = true\n        focus:\n          confirmed = look-terminal-20260819T143013Z\n          selected = look-terminal-20260819T143013Z\n\n",
+  "screenshots": [
+    "/srv/bigs-runtime/workspaces/projects/fuchsia-desktop-mvp/artifacts/instrument-studio-looks-20260819T143013Z/screenshots/screenshot.png"
+  ],
+  "feedback": {
+    "ready": true,
+    "wm": {
+      "available": true,
+      "tile_count": 1,
+      "order": [
+        "look-terminal-20260819T143013Z"
+      ],
+      "selected_focus": "look-terminal-20260819T143013Z",
+      "confirmed_focus": "look-terminal-20260819T143013Z",
+      "gap_px": 12,
+      "active_border_px": 3,
+      "wrap_focus": true,
+      "present_count": 1,
+      "last_present_context": "FocusChainChanged"
+    }
+  }
+}

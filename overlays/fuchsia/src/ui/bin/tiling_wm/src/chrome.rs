@@ -541,7 +541,7 @@ impl ShellChrome {
         }
         let _ = li;
         // Tile identity names (SET/FIL/BRW/TRM) painted last so they sit on title bars.
-        let title_px = 3u32;
+        let title_px = 4u32;
         let title_color = rgba(0.96, 0.97, 0.98, 1.0);
         for title in &state.tile_titles {
             if li >= self.labels.len() {
