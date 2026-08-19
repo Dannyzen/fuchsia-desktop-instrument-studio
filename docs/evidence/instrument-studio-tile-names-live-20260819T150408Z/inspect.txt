@@ -1,0 +1,23 @@
+core/session-manager/session:session/tiling_wm:
+  metadata:
+    name = root
+    component_url = tiling_wm#meta/tiling_wm.cm
+    timestamp = 27953976048
+  payload:
+    root:
+      fuchsia.inspect.Health:
+        start_timestamp_nanos = 1379675345
+        status = OK
+      tiling_wm:
+        last_present_context = GraphicalPresenterPresentView
+        order = nam-browser-20260819T150408Z,nam-files-20260819T150408Z,nam-terminal-20260819T150408Z
+        present_count = 6
+        tile_count = 3
+        config:
+          active_border_px = 3
+          gap_px = 12
+          wrap_focus = true
+        focus:
+          confirmed = nam-terminal-20260819T150408Z
+          selected = nam-terminal-20260819T150408Z
+

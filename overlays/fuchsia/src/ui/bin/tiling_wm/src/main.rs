@@ -156,6 +156,7 @@ struct ChildView {
     title_content_id: ui_comp::ContentId,
     accent_transform_id: ui_comp::TransformId,
     accent_content_id: ui_comp::ContentId,
+    name: chrome::TileName,
     view_ref: Option<ui_views::ViewRef>,
     view_ref_koid: Option<zx::Koid>,
 }
@@ -272,6 +273,12 @@ impl TilingWm {
                 self.flatland.create_filled_rect(&accent_content_id)?;
                 self.flatland.set_content(&accent_transform_id, &accent_content_id)?;
                 self.flatland.add_child(&title_transform_id, &accent_transform_id)?;
+                // Names last so they paint above the header wash and accent rail.
+                let name = chrome::TileName::create(
+                    &self.flatland,
+                    &mut self.id_generator,
+                    &title_transform_id,
+                )?;
 
                 let new_tile = ChildView {
                     border_transform_id,
@@ -282,6 +289,7 @@ impl TilingWm {
                     title_content_id,
                     accent_transform_id,
                     accent_content_id,
+                    name,
                     view_ref: None,
                     view_ref_koid: None,
                 };
@@ -713,6 +721,7 @@ impl TilingWm {
                 &view.accent_transform_id,
                 &fidl_fuchsia_math::Vec_ { x: 0, y: 0 },
             )?;
+            view.name.layout(&self.flatland, tile_short_label(id), title_h)?;
             let viewport_size = fidl_fuchsia_math::SizeU {
                 width: inner_w,
                 height: inner_h.saturating_sub(title_h).max(1),

@@ -74,6 +74,8 @@ We are building **Instrument Studio** first:
 
 ![Live emulator Instrument Studio cards](design/screenshots/16-emulator-looks-cards-live.png)
 
+![Live emulator tile header names](design/screenshots/17-emulator-tile-names-live.png)
+
 Interactive sketches live under `design/sketches/`.
 
 ## Local rebuild

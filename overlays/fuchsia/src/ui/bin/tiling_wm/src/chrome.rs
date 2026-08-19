@@ -39,12 +39,20 @@ impl Bar {
         ids: &mut IdGenerator,
         root: &ui_comp::TransformId,
     ) -> Result<Self, Error> {
+        Self::create_on(flatland, ids, root)
+    }
+
+    fn create_on(
+        flatland: &ui_comp::FlatlandProxy,
+        ids: &mut IdGenerator,
+        parent: &ui_comp::TransformId,
+    ) -> Result<Self, Error> {
         let transform = ids.next_transform_id();
         let content = ids.next_content_id();
         flatland.create_transform(&transform).context("chrome create transform")?;
         flatland.create_filled_rect(&content).context("chrome create rect")?;
         flatland.set_content(&transform, &content).context("chrome set content")?;
-        flatland.add_child(root, &transform).context("chrome add child")?;
+        flatland.add_child(parent, &transform).context("chrome add child")?;
         Ok(Self { transform, content })
     }
 
@@ -75,6 +83,43 @@ impl Bar {
 
 fn rgba(r: f32, g: f32, b: f32, a: f32) -> ui_comp::ColorRgba {
     ui_comp::ColorRgba { red: r, green: g, blue: b, alpha: a }
+}
+
+
+const TILE_NAME_PARTS: usize = 64;
+
+pub struct TileName {
+    parts: [Bar; TILE_NAME_PARTS],
+}
+
+impl TileName {
+    pub fn create(
+        flatland: &ui_comp::FlatlandProxy,
+        ids: &mut IdGenerator,
+        parent: &ui_comp::TransformId,
+    ) -> Result<Self, Error> {
+        let mut parts = Vec::with_capacity(TILE_NAME_PARTS);
+        for _ in 0..TILE_NAME_PARTS {
+            parts.push(Bar::create_on(flatland, ids, parent)?);
+        }
+        Ok(Self { parts: parts.try_into().map_err(|_| anyhow!("tile name parts"))? })
+    }
+
+    pub fn layout(
+        &self,
+        flatland: &ui_comp::FlatlandProxy,
+        label: &str,
+        title_h: u32,
+    ) -> Result<(), Error> {
+        for p in &self.parts {
+            p.hide(flatland)?;
+        }
+        let px = 4u32;
+        let text = rgba(0.96, 0.97, 0.98, 1.0);
+        let y = (title_h as i32 - 7 * px as i32) / 2;
+        let _ = draw_text(&self.parts, flatland, 0, 16, y.max(2), label, px, text)?;
+        Ok(())
+    }
 }
 
 const GLYPH_PARTS: usize = 64;
@@ -540,25 +585,7 @@ impl ShellChrome {
             )?;
         }
         let _ = li;
-        // Tile identity names (SET/FIL/BRW/TRM) painted last so they sit on title bars.
-        let title_px = 4u32;
-        let title_color = rgba(0.96, 0.97, 0.98, 1.0);
-        for title in &state.tile_titles {
-            if li >= self.labels.len() {
-                break;
-            }
-            li = draw_text(
-                &self.labels,
-                flatland,
-                li,
-                title.x,
-                title.y,
-                &title.label,
-                title_px,
-                title_color,
-            )?;
-        }
-
+        // Tile names are drawn on each tile header (TileName), not the chrome pool.
         Ok(())
     }
 }

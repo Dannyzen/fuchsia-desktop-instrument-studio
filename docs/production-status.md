@@ -6,6 +6,8 @@ Updated: 2026-08-19
 
 Live 16 (`875b46ad…`) is a 2x2 of colored app cards (amber Browser, violet Files, cyan Settings, green Terminal). Still not production Instrument Studio.
 
+Live 17: tile headers read BRW / FIL / TRM. Settings dropped this shot.
+
 **No. The live emulator screen is not production yet.**
 
 It is a real native Fuchsia Workbench session with:
