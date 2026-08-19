@@ -17,6 +17,8 @@ It is **not** yet the polished production Workbench Studio UI from the design sc
 
 ## Done
 
+- Terminal tile wired to Alpine/Linux via Starnix Controller bridge
+
 - Native tiling foundation + confirmed focus
 - Live DF/Inspect feedback loop
 - Shell chrome geometry (strip/rail/inspector)

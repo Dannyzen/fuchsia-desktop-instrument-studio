@@ -1,0 +1,36 @@
+                 Moniker:  core/session-manager/session:session/terminal_elements:linux-term-20260819T010820Z
+                     URL:  fuchsia-pkg://fuchsia.com/fuchsia_terminal#meta/fuchsia_terminal.cm
+             Environment:  session-env
+             Instance ID:  None
+         Component State:  Resolved
+            Resolved URL:  fuchsia-pkg://fuchsia.com/fuchsia_terminal#meta/fuchsia_terminal.cm
+                  Runner:  elf
+  Namespace Capabilities:  /svc/fuchsia.hardware.pty.Device
+                           /svc/fuchsia.process.Launcher
+                           /svc/fuchsia.starnix.container.Controller
+                           /svc/fuchsia.sysmem.Allocator
+                           /svc/fuchsia.sysmem2.Allocator
+                           /svc/fuchsia.tracing.provider.Registry
+                           /svc/fuchsia.ui.composition.Allocator
+                           /svc/fuchsia.ui.composition.Flatland
+                           /svc/fuchsia.ui.input.ImeService
+                           /svc/fuchsia.ui.input3.Keyboard
+                           /svc/fuchsia.inspect.InspectSink
+                           /svc/fuchsia.logger.LogSink
+    Exposed Capabilities:  fuchsia.ui.app.ViewProvider
+             Merkle root:  65af9e94122d1ccc27ecc31c9eeb3d050f19cb1c9354914fa974aa3d7cdac419
+        Manifest Sources:  src/fuchsia-desktop/terminal/meta/fuchsia_terminal.cml
+                           sdk/lib/inspect/client.shard.cml
+                           sdk/lib/inspect/offer.shard.cml
+                           sdk/lib/inspect/use.shard.cml
+                           sdk/lib/syslog/client.shard.cml
+                           sdk/lib/syslog/offer.shard.cml
+                           sdk/lib/syslog/use.shard.cml
+         Execution State:  Running
+            Start reason:  Instance is an eager child
+   Outgoing Capabilities:  fuchsia.ui.app.ViewProvider
+                 Runtime:  ELF
+           Running since:  2026-08-19 01:09:06.775949418 UTC
+                  Job ID:  45647
+              Process ID:  45685
+

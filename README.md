@@ -58,6 +58,8 @@ We are building **Instrument Studio** first:
 
 ![Live emulator iconography pass](design/screenshots/07-emulator-icons-live.png)
 
+![Linux terminal wiring](design/screenshots/08-emulator-linux-terminal.png)
+
 Interactive sketches live under `design/sketches/`.
 
 ## Local rebuild
@@ -147,6 +149,10 @@ cat ./artifacts/diagnostics-run/design-feedback.json
 ```
 
 See `docs/observability-feedback-loop.md` for the Inspect tree and design checks.
+
+## Linux terminal
+
+Workbench terminal bridges to Alpine/Linux via Starnix. See `docs/linux-terminal.md`.
 
 ## Production status
 

@@ -1,0 +1,20 @@
+Moniker: core/session-manager/session:session/terminal_elements:linux-term-20260819T010820Z
+        Used Capability                                    Result 
+ [32m[✓][0m  protocol svc/fuchsia.hardware.pty.Device           Success 
+ [32m[✓][0m  protocol svc/fuchsia.inspect.InspectSink           Success 
+ [32m[✓][0m  protocol svc/fuchsia.logger.LogSink                Success 
+ [32m[✓][0m  protocol svc/fuchsia.process.Launcher              Success 
+ [32m[✓][0m  protocol svc/fuchsia.starnix.container.Controller  Success 
+ [32m[✓][0m  protocol svc/fuchsia.sysmem.Allocator              Success 
+ [32m[✓][0m  protocol svc/fuchsia.sysmem2.Allocator             Success 
+ [32m[✓][0m  protocol svc/fuchsia.tracing.provider.Registry     Success 
+ [32m[✓][0m  protocol svc/fuchsia.ui.composition.Allocator      Success 
+ [32m[✓][0m  protocol svc/fuchsia.ui.composition.Flatland       Success 
+ [32m[✓][0m  protocol svc/fuchsia.ui.input.ImeService           Success 
+ [32m[✓][0m  protocol svc/fuchsia.ui.input3.Keyboard            Success 
+ [32m[✓][0m  protocol 3d                                        Success 
+ [32m[✓][0m  runner <runner>                                    Success 
+
+        Exposed Capability                    Result 
+ [32m[✓][0m  protocol fuchsia.ui.app.ViewProvider  Success 
+

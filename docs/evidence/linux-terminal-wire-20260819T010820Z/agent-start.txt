@@ -1,0 +1,37 @@
+URL: fuchsia-pkg://fuchsia.com/alpine#meta/alpine_container.cm
+Moniker: core/starnix_runner/playground:agent-linux
+Creating component instance...
+Resolving component instance...
+Starting component instance...
+Component instance is running!
+
+
+WARNING: your component may not run correctly due to some required capabilities not being available:
+
+        Used Capability                      Result 
+ [32m[✓][0m  protocol svc/fuchsia.logger.LogSink  Success 
+ [31m[✗][0m  svc/fuchsia.session.power.Handoff    NotFound(UseFromParentNotFound { moniker: core/starnix_runner/playground:agent- 
+                                             linux, capability_id: "fuchsia.session.power.Handoff" }) 
+ [32m[✓][0m  protocol 3d                          Success 
+ [32m[✓][0m  runner <runner>                      Success 
+
+        Exposed Capability                                 Result 
+ [32m[✓][0m  protocol fuchsia.component.runner.ComponentRunner  Success 
+ [32m[✓][0m  protocol fuchsia.memory.attribution.Provider       Success 
+ [32m[✓][0m  protocol fuchsia.starnix.binder.LutexController    Success 
+ [32m[✓][0m  protocol fuchsia.starnix.container.Controller      Success 
+ [32m[✓][0m  runner starnix_container                           Success 
+
+For further diagnosis, try:
+
+  $ ffx component route core/starnix_runner/playground:agent-linux svc/fuchsia.session.power.Handoff
+URL: fuchsia-pkg://fuchsia.com/fuchsia_agent_linux#meta/agent_linux_sshd.cm
+Moniker: core/starnix_runner/playground:agent-linux/daemons:sshd
+Creating component instance...
+Resolving component instance...
+Starting component instance...
+Component instance is running!
+{"guest_port": 7000, "host": "127.0.0.1", "host_port": 17000, "listen_namespace": "lab-container", "status": "ready"}
+FUCHSIA_AGENT_LINUX_READY
+Warning: Failed to connect to PackageCache: Service dependency exists but connecting to it failed with error NoMatchingComponent. Moniker: core/pkg-cache. Capability name: fuchsia.pkg.PackageCache. Assuming package is not on device.
+Warning: Failed to connect to PackageCache: Service dependency exists but connecting to it failed with error NoMatchingComponent. Moniker: core/pkg-cache. Capability name: fuchsia.pkg.PackageCache. Assuming package is not on device.

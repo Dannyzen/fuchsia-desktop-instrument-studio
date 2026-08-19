@@ -1,0 +1,7 @@
+Linux localhost 6.6.30-starnix 2026-08-16T03:12:14+00:00 x86_64 Linux
+NAME="Alpine Linux"
+ID=alpine
+VERSION_ID=3.19.1
+PRETTY_NAME="Alpine Linux v3.19"
+/bin/bash
+LINUX_AGENT_OK

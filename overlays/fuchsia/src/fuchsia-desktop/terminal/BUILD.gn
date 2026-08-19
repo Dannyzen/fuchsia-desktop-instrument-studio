@@ -37,10 +37,29 @@ fuchsia_package("input_driver_package") {
   deps = [ ":input_driver_component" ]
 }
 
+
+rustc_binary("linux_console_bridge_bin") {
+  name = "linux_console_bridge"
+  edition = "2024"
+  source_root = "src/linux_console_bridge.rs"
+  sources = [ "src/linux_console_bridge.rs" ]
+  deps = [
+    "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container_rust",
+    "//sdk/rust/zx",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:libc",
+  ]
+}
+
 fuchsia_component("component") {
   component_name = "fuchsia_terminal"
   manifest = "meta/fuchsia_terminal.cml"
   deps = [
+    ":linux_console_bridge_bin",
     "//src/ui/bin/terminal:bin",
     "//src/zircon/bin/zxsh:sh",
   ]

@@ -46,6 +46,12 @@
             name: "context_provider",
             url: "fuchsia-pkg://fuchsia.com/web_engine#meta/context_provider.cm",
         },
+        {
+            // Alpine/Linux userspace for Instrument Studio terminal.
+            name: "linux_container",
+            url: "fuchsia-pkg://fuchsia.com/alpine#meta/alpine_container.cm",
+            startup: "eager",
+        },
     ],
     collections: [
         {
@@ -86,6 +92,12 @@
                 "#settings_elements",
                 "#terminal_elements",
             ],
+        },
+
+        {
+            protocol: [ "fuchsia.starnix.container.Controller" ],
+            from: "#linux_container",
+            to: [ "#terminal_elements" ],
         },
         {
             protocol: [

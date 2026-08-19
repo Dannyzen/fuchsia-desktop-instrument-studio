@@ -1,0 +1,49 @@
+                 Moniker:  core/session-manager/session:session/linux_container
+                     URL:  fuchsia-pkg://fuchsia.com/alpine#meta/alpine_container.cm
+             Environment:  session-env
+             Instance ID:  None
+         Component State:  Resolved
+            Resolved URL:  fuchsia-pkg://fuchsia.com/alpine#meta/alpine_container.cm
+                  Runner:  starnix
+  Namespace Capabilities:  /svc/fuchsia.logger.LogSink
+                           /svc/fuchsia.session.power.Handoff
+    Exposed Capabilities:  fuchsia.component.runner.ComponentRunner
+                           fuchsia.memory.attribution.Provider
+                           fuchsia.starnix.binder.LutexController
+                           fuchsia.starnix.container.Controller
+                           starnix_container
+             Merkle root:  527d543832126ba144cd8ad89ecb083351f8352e2cf1d558cb94abc547e60b04
+           Configuration:  additional_mounts          -> StringVector(
+                                                             [],
+                                                         )
+                           cached_zx_map_info_bytes   -> Uint32(524288)
+                           crash_report_throttling    -> Bool(true)
+                           dirent_cache_size          -> Uint32(32)
+                           enable_utc_time_adjustment -> Bool(false)
+                           extra_features             -> StringVector(
+                                                             [],
+                                                         )
+                           initial_view_id_annotation -> String("starnix_framebuffer")
+                           mlock_always_onfault       -> Bool(false)
+                           mlock_pin_flavor           -> String("shadow_process")
+                           selinux_exceptions         -> StringVector(
+                                                             [],
+                                                         )
+                           ui_visual_debugging_level  -> Uint8(0)
+             Collections:  daemons
+        Manifest Sources:  gen/src/starnix/containers/alpine/alpine_package_container.cml
+                           sdk/lib/syslog/client.shard.cml
+                           sdk/lib/syslog/offer.shard.cml
+                           sdk/lib/syslog/use.shard.cml
+                           src/starnix/containers/container.shard.cml
+                           src/starnix/containers/container_config.shard.cml
+         Execution State:  Running
+            Start reason:  Instance is an eager child
+   Outgoing Capabilities:  fs_root
+                           fuchsia.component.runner.ComponentRunner
+                           fuchsia.element.GraphicalPresenter
+                           fuchsia.starnix.binder.LutexController
+                           fuchsia.starnix.container.Controller
+                 Runtime:  ELF
+                  Job ID:  29840
+
