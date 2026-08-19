@@ -229,17 +229,31 @@ async fn create_files_view(root_token: views::ViewCreationToken) -> Result<(), E
         fmath::Vec_ { x: 0, y: 0 },
     )?;
 
-    let button_specs = [
-        (16, 72, "Up"),
-        (96, 72, "Open"),
-        (176, 72, "New"),
-        (256, 88, "Rename"),
-        (352, 72, "Copy"),
-        (432, 72, "Move"),
-        (512, 88, "Delete"),
-    ];
+    let narrow = size.width < 520;
+    let button_specs = if narrow {
+        [
+            (8, 72, "Up"),
+            (84, 72, "Open"),
+            (160, 72, "New"),
+            (236, 80, "Ren"),
+            (8, 72, "Copy"),
+            (84, 72, "Move"),
+            (160, 80, "Del"),
+        ]
+    } else {
+        [
+            (16, 72, "Up"),
+            (96, 72, "Open"),
+            (176, 72, "New"),
+            (256, 88, "Rename"),
+            (352, 72, "Copy"),
+            (432, 72, "Move"),
+            (512, 88, "Delete"),
+        ]
+    };
     let mut static_text = Vec::new();
     for (index, (x, width, label)) in button_specs.iter().enumerate() {
+        let by = if narrow && index >= 4 { 140 } else { 88 };
         create_rect(
             &flatland,
             &root,
@@ -247,7 +261,7 @@ async fn create_files_view(root_token: views::ViewCreationToken) -> Result<(), E
             21 + index as u64 * 2,
             &SURFACE,
             fmath::SizeU { width: *width, height: 48 },
-            fmath::Vec_ { x: *x, y: 88 },
+            fmath::Vec_ { x: *x, y: by },
         )?;
         static_text.push(
             TextSurface::new_with_style(
@@ -256,7 +270,7 @@ async fn create_files_view(root_token: views::ViewCreationToken) -> Result<(), E
                 flatland::TransformId { value: 100 + index as u64 * 4 },
                 flatland::ContentId { value: 101 + index as u64 * 4 },
                 fmath::SizeU { width: *width, height: 48 },
-                fmath::Vec_ { x: *x, y: 88 },
+                fmath::Vec_ { x: *x, y: by },
                 label,
                 TextStyle { font_size: 15.0, left_padding: 8, top_padding: 11 },
             )
@@ -271,8 +285,8 @@ async fn create_files_view(root_token: views::ViewCreationToken) -> Result<(), E
             200 + index as u64 * 2,
             201 + index as u64 * 2,
             &SURFACE,
-            fmath::SizeU { width: 672, height: 56 },
-            fmath::Vec_ { x: 24, y: 160 + index as i32 * 64 },
+            fmath::SizeU { width: size.width.saturating_sub(24).max(80), height: 56 },
+            fmath::Vec_ { x: 12, y: (if narrow { 200 } else { 160 }) + index as i32 * 64 },
         )?;
     }
     create_rect(
@@ -302,8 +316,8 @@ async fn create_files_view(root_token: views::ViewCreationToken) -> Result<(), E
         &root,
         flatland::TransformId { value: 500 },
         flatland::ContentId { value: 501 },
-        fmath::SizeU { width: 320, height: 40 },
-        fmath::Vec_ { x: 280, y: 16 },
+        fmath::SizeU { width: if narrow { size.width.saturating_sub(32).max(80) } else { 320 }, height: 40 },
+        fmath::Vec_ { x: if narrow { 16 } else { 280 }, y: if narrow { 44 } else { 16 } },
         "Files /",
         TextStyle::ADDRESS,
     )
@@ -327,8 +341,8 @@ async fn create_files_view(root_token: views::ViewCreationToken) -> Result<(), E
                 &root,
                 flatland::TransformId { value: 300 + index as u64 * 4 },
                 flatland::ContentId { value: 301 + index as u64 * 4 },
-                fmath::SizeU { width: 656, height: 56 },
-                fmath::Vec_ { x: 32, y: 160 + index as i32 * 64 },
+                fmath::SizeU { width: size.width.saturating_sub(32).max(72), height: 56 },
+                fmath::Vec_ { x: 16, y: (if narrow { 200 } else { 160 }) + index as i32 * 64 },
                 &row_label(controller.entries().get(index)),
                 TextStyle { font_size: 19.0, left_padding: 8, top_padding: 12 },
             )

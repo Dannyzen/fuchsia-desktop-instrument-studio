@@ -19,6 +19,7 @@ It is **not** yet the polished production Workbench Studio UI from the design sc
 
 - Chrome bitmap label path (brand/pills/chips/inspector) live-proven
 - 3px/RLE label scale attempt live-proven (still not OCR-clean)
+- Narrow-tile stacked Settings/Files (Browser clip residual)
 - OCR-readable chrome labels (4px, labels-on-top): STUDIO / BLD RSH OPS / OK FOC GAP / INSPECT TILE FOC GAP LIVE
 
 - Terminal tile wired to Alpine/Linux via Starnix Controller bridge

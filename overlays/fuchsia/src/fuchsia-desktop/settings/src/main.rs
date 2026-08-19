@@ -314,14 +314,30 @@ async fn create_settings_view(root_token: views::ViewCreationToken) -> Result<()
         );
     }
 
-    for (transform, content, color, width, height, x, y) in [
-        (20, 21, &SURFACE, 240, 80, 80, 192),
-        (22, 23, &SURFACE, 240, 80, 400, 192),
-        (24, 25, &SURFACE, 240, 80, 80, 352),
-        (26, 27, &SURFACE, 240, 80, 400, 352),
-        (30, 31, &PANEL, 640, 216, 40, 488),
-        (40, 41, &PANEL, 688, 80, 16, size.height.saturating_sub(96) as i32),
-    ] {
+    let narrow = size.width < 520;
+    let btn_w = if narrow { size.width.saturating_sub(32).max(80) } else { 240 };
+    let info_w = size.width.saturating_sub(32).max(80);
+    let status_w = size.width.saturating_sub(32).max(80);
+    let rects = if narrow {
+        [
+            (20, 21, &SURFACE, btn_w, 56, 16, 96),
+            (22, 23, &SURFACE, btn_w, 56, 16, 160),
+            (24, 25, &SURFACE, btn_w, 56, 16, 256),
+            (26, 27, &SURFACE, btn_w, 56, 16, 320),
+            (30, 31, &PANEL, info_w, 168, 16, 400),
+            (40, 41, &PANEL, status_w, 56, 16, size.height.saturating_sub(72) as i32),
+        ]
+    } else {
+        [
+            (20, 21, &SURFACE, 240, 80, 80, 192),
+            (22, 23, &SURFACE, 240, 80, 400, 192),
+            (24, 25, &SURFACE, 240, 80, 80, 352),
+            (26, 27, &SURFACE, 240, 80, 400, 352),
+            (30, 31, &PANEL, 640, 216, 40, 488),
+            (40, 41, &PANEL, 688, 80, 16, size.height.saturating_sub(96) as i32),
+        ]
+    };
+    for (transform, content, color, width, height, x, y) in rects {
         create_rect(
             &flatland,
             &root,
@@ -334,20 +350,38 @@ async fn create_settings_view(root_token: views::ViewCreationToken) -> Result<()
     }
 
     let mut static_text = Vec::new();
-    for (transform, content, width, height, x, y, text, style) in [
-        (100, 101, 300, 56, 24, 16, "Fuchsia Settings", TextStyle { font_size: 25.0, left_padding: 8, top_padding: 7 }),
-        (104, 105, 360, 48, 344, 20, "Backed controls only", TextStyle { font_size: 17.0, left_padding: 8, top_padding: 9 }),
-        (108, 109, 300, 44, 48, 120, "Appearance", TextStyle { font_size: 21.0, left_padding: 8, top_padding: 5 }),
-        (112, 113, 240, 80, 80, 192, "Dark", TextStyle { font_size: 20.0, left_padding: 80, top_padding: 22 }),
-        (116, 117, 240, 80, 400, 192, "High Contrast", TextStyle { font_size: 20.0, left_padding: 52, top_padding: 22 }),
-        (120, 121, 300, 44, 48, 288, "Temperature unit", TextStyle { font_size: 21.0, left_padding: 8, top_padding: 5 }),
-        (124, 125, 240, 80, 80, 352, "Celsius", TextStyle { font_size: 20.0, left_padding: 74, top_padding: 22 }),
-        (128, 129, 240, 80, 400, 352, "Fahrenheit", TextStyle { font_size: 20.0, left_padding: 62, top_padding: 22 }),
-        (132, 133, 300, 44, 48, 448, "System information", TextStyle { font_size: 21.0, left_padding: 8, top_padding: 5 }),
-        (136, 137, 608, 48, 56, 520, &build_line, TextStyle { font_size: 15.0, left_padding: 8, top_padding: 10 }),
-        (140, 141, 608, 48, 56, 584, &product_line, TextStyle { font_size: 15.0, left_padding: 8, top_padding: 10 }),
-        (144, 145, 608, 48, 56, 648, "Owner: build-info + hwinfo (read-only)", TextStyle { font_size: 15.0, left_padding: 8, top_padding: 10 }),
-    ] {
+    let title_w = size.width.saturating_sub(32).max(80);
+    let text_specs: Vec<(u64, u64, u32, u32, i32, i32, &str, TextStyle)> = if narrow {
+        vec![
+            (100, 101, title_w, 40, 16, 8, "Settings", TextStyle { font_size: 20.0, left_padding: 6, top_padding: 6 }),
+            (108, 109, title_w, 28, 16, 64, "Appearance", TextStyle { font_size: 16.0, left_padding: 4, top_padding: 4 }),
+            (112, 113, btn_w, 56, 16, 96, "Dark", TextStyle { font_size: 16.0, left_padding: 16, top_padding: 16 }),
+            (116, 117, btn_w, 56, 16, 160, "Contrast", TextStyle { font_size: 16.0, left_padding: 16, top_padding: 16 }),
+            (120, 121, title_w, 28, 16, 224, "Temperature", TextStyle { font_size: 16.0, left_padding: 4, top_padding: 4 }),
+            (124, 125, btn_w, 56, 16, 256, "Celsius", TextStyle { font_size: 16.0, left_padding: 16, top_padding: 16 }),
+            (128, 129, btn_w, 56, 16, 320, "Fahrenheit", TextStyle { font_size: 16.0, left_padding: 16, top_padding: 16 }),
+            (132, 133, title_w, 28, 16, 384, "System", TextStyle { font_size: 16.0, left_padding: 4, top_padding: 4 }),
+            (136, 137, info_w.saturating_sub(16), 40, 24, 408, &build_line, TextStyle { font_size: 13.0, left_padding: 4, top_padding: 8 }),
+            (140, 141, info_w.saturating_sub(16), 40, 24, 452, &product_line, TextStyle { font_size: 13.0, left_padding: 4, top_padding: 8 }),
+            (144, 145, info_w.saturating_sub(16), 40, 24, 496, "build-info + hwinfo", TextStyle { font_size: 13.0, left_padding: 4, top_padding: 8 }),
+        ]
+    } else {
+        vec![
+            (100, 101, 300, 56, 24, 16, "Fuchsia Settings", TextStyle { font_size: 25.0, left_padding: 8, top_padding: 7 }),
+            (104, 105, 360, 48, 344, 20, "Backed controls only", TextStyle { font_size: 17.0, left_padding: 8, top_padding: 9 }),
+            (108, 109, 300, 44, 48, 120, "Appearance", TextStyle { font_size: 21.0, left_padding: 8, top_padding: 5 }),
+            (112, 113, 240, 80, 80, 192, "Dark", TextStyle { font_size: 20.0, left_padding: 80, top_padding: 22 }),
+            (116, 117, 240, 80, 400, 192, "High Contrast", TextStyle { font_size: 20.0, left_padding: 52, top_padding: 22 }),
+            (120, 121, 300, 44, 48, 288, "Temperature unit", TextStyle { font_size: 21.0, left_padding: 8, top_padding: 5 }),
+            (124, 125, 240, 80, 80, 352, "Celsius", TextStyle { font_size: 20.0, left_padding: 74, top_padding: 22 }),
+            (128, 129, 240, 80, 400, 352, "Fahrenheit", TextStyle { font_size: 20.0, left_padding: 62, top_padding: 22 }),
+            (132, 133, 300, 44, 48, 448, "System information", TextStyle { font_size: 21.0, left_padding: 8, top_padding: 5 }),
+            (136, 137, 608, 48, 56, 520, &build_line, TextStyle { font_size: 15.0, left_padding: 8, top_padding: 10 }),
+            (140, 141, 608, 48, 56, 584, &product_line, TextStyle { font_size: 15.0, left_padding: 8, top_padding: 10 }),
+            (144, 145, 608, 48, 56, 648, "Owner: build-info + hwinfo (read-only)", TextStyle { font_size: 15.0, left_padding: 8, top_padding: 10 }),
+        ]
+    };
+    for (transform, content, width, height, x, y, text, style) in text_specs {
         static_text.push(
             TextSurface::new_with_style(
                 &flatland,
@@ -368,8 +402,8 @@ async fn create_settings_view(root_token: views::ViewCreationToken) -> Result<()
         &root,
         flatland::TransformId { value: 200 },
         flatland::ContentId { value: 201 },
-        fmath::SizeU { width: 320, height: 40 },
-        fmath::Vec_ { x: 352, y: 124 },
+        fmath::SizeU { width: if narrow { 1 } else { 320 }, height: if narrow { 1 } else { 40 } },
+        fmath::Vec_ { x: if narrow { -64 } else { 352 }, y: if narrow { -64 } else { 124 } },
         &format!("Current: {}", controller.theme().label()),
         TextStyle { font_size: 16.0, left_padding: 8, top_padding: 8 },
     )
@@ -396,8 +430,8 @@ async fn create_settings_view(root_token: views::ViewCreationToken) -> Result<()
         &root,
         flatland::TransformId { value: 208 },
         flatland::ContentId { value: 209 },
-        fmath::SizeU { width: 656, height: 64 },
-        fmath::Vec_ { x: 32, y: size.height.saturating_sub(88) as i32 },
+        fmath::SizeU { width: status_w, height: if narrow { 48 } else { 64 } },
+        fmath::Vec_ { x: 16, y: size.height.saturating_sub(if narrow { 64 } else { 88 }) as i32 },
         controller.status(),
         TextStyle { font_size: 16.0, left_padding: 8, top_padding: 15 },
     )
@@ -425,7 +459,7 @@ async fn create_settings_view(root_token: views::ViewCreationToken) -> Result<()
         futures::select! {
             position = touch_events.next() => {
                 let Some([x, y]) = position else { break };
-                let Some(action) = action_for_point(x, y) else { continue };
+                let Some(action) = action_for_point(x, y, size.width as f32) else { continue };
                 let action_name = format!("{action:?}");
                 match action {
                     UiAction::ThemeDark => {

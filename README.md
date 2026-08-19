@@ -66,6 +66,8 @@ We are building **Instrument Studio** first:
 
 ![Live emulator OCR-readable labels](design/screenshots/11-emulator-ocr-labels-live.png)
 
+![Live emulator responsive tiles](design/screenshots/12-emulator-responsive-live.png)
+
 Interactive sketches live under `design/sketches/`.
 
 ## Local rebuild

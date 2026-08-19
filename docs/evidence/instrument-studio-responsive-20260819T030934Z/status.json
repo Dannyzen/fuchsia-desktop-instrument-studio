@@ -1,0 +1,35 @@
+{
+  "stamp": "20260819T030934Z",
+  "built_merkle": "35d48552678039295b3a1f46cbc5dd3d68e2c1625a10b0523be10af242ddba44",
+  "live_merkle": "35d48552678039295b3a1f46cbc5dd3d68e2c1625a10b0523be10af242ddba44",
+  "running": {
+    "browser": true,
+    "terminal": true,
+    "files": true,
+    "settings": true
+  },
+  "inspect": "core/session-manager/session:session/tiling_wm:\n  metadata:\n    name = root\n    component_url = tiling_wm#meta/tiling_wm.cm\n    timestamp = 29831774546\n  payload:\n    root:\n      fuchsia.inspect.Health:\n        start_timestamp_nanos = 1253813108\n        status = OK\n      tiling_wm:\n        last_present_context = WindowManagerSetOrder\n        order = rsp-terminal-20260819T030934Z,rsp-settings-20260819T030934Z,rsp-files-20260819T030934Z,rsp-browser-20260819T030934Z\n        present_count = 3\n        tile_count = 4\n        config:\n          active_border_px = 3\n          gap_px = 12\n          wrap_focus = true\n        focus:\n          confirmed = rsp-terminal-20260819T030934Z\n          selected = rsp-terminal-20260819T030934Z\n\n",
+  "screenshots": [
+    "/srv/bigs-runtime/workspaces/projects/fuchsia-desktop-mvp/artifacts/instrument-studio-responsive-20260819T030934Z/screenshots/screenshot.png"
+  ],
+  "feedback": {
+    "ready": true,
+    "wm": {
+      "available": true,
+      "tile_count": 4,
+      "order": [
+        "rsp-terminal-20260819T030934Z",
+        "rsp-settings-20260819T030934Z",
+        "rsp-files-20260819T030934Z",
+        "rsp-browser-20260819T030934Z"
+      ],
+      "selected_focus": "rsp-terminal-20260819T030934Z",
+      "confirmed_focus": "rsp-terminal-20260819T030934Z",
+      "gap_px": 12,
+      "active_border_px": 3,
+      "wrap_focus": true,
+      "present_count": 3,
+      "last_present_context": "WindowManagerSetOrder"
+    }
+  }
+}
