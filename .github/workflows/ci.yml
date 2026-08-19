@@ -23,6 +23,9 @@ jobs:
           test -f design/screenshots/04-emulator-four-app-live.png
           test -f design/screenshots/05-emulator-chrome-live.png
           test -f design/screenshots/06-emulator-density-live.png
+          test -f design/screenshots/07-emulator-icons-live.png
+          test -f docs/production-status.md
+          test -f docs/evidence/instrument-studio-icons-20260819T001859Z/vision-comparison.md
           test -f docs/evidence/instrument-studio-density-20260818T230716Z/vision-comparison.md
           test -f overlays/fuchsia/src/ui/bin/tiling_wm/src/chrome.rs
           test -f docs/evidence/instrument-studio-chrome-20260818T225220Z/vision-comparison.md

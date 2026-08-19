@@ -62,3 +62,19 @@ Chrome now includes geometric product density:
 - 4 inspector cards with state-bound meter bars
 
 Evidence: `docs/evidence/instrument-studio-density-20260818T230716Z/`.
+
+
+## Iconography pass (2026-08-19)
+
+Rail glyphs follow design sketch order:
+
+1. Launcher
+2. Overview
+3. Files
+4. Browser
+5. Terminal
+6. Settings
+
+Brand mark uses cyan/violet split. Active rail slot tracks confirmed focus.
+
+Evidence: `docs/evidence/instrument-studio-icons-20260819T001859Z/`.

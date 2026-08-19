@@ -1,21 +1,26 @@
 # Live diagnostics status
 
-Last proven run: density `20260818T230716Z`
+Last proven run: icons `20260819T001859Z`
 
 ```json
 {
-  "live_merkle": "8e5dafcf765fbf546c234b370ddbd9e9f1e5c23f5e3adbaced79bb512d8e6e05",
+  "live_merkle": "00b0ab7f75eee3723a733e4c5b512a1420a4a66c7899e870c10620176fb654be",
   "inspect_available": true,
   "tile_count": 4,
   "confirmed_focus": "terminal",
-  "chrome_regions_visible": true,
-  "density": {
-    "workspace_pills": 3,
-    "rail_marks": 4,
-    "inspector_cards": 4,
-    "status_chip": true
+  "iconography": {
+    "brand_split": true,
+    "rail_glyphs": [
+      "launcher",
+      "overview",
+      "files",
+      "browser",
+      "terminal",
+      "settings"
+    ],
+    "active_rail": "terminal"
   },
-  "ready_for_ui_iteration": true,
-  "remaining": "glyph labels + richer icons + app chrome restyle"
+  "production_complete": false,
+  "ready_for_ui_iteration": true
 }
 ```

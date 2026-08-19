@@ -56,6 +56,8 @@ We are building **Instrument Studio** first:
 
 ![Live emulator density pass](design/screenshots/06-emulator-density-live.png)
 
+![Live emulator iconography pass](design/screenshots/07-emulator-icons-live.png)
+
 Interactive sketches live under `design/sketches/`.
 
 ## Local rebuild
@@ -145,6 +147,10 @@ cat ./artifacts/diagnostics-run/design-feedback.json
 ```
 
 See `docs/observability-feedback-loop.md` for the Inspect tree and design checks.
+
+## Production status
+
+See `docs/production-status.md` for an honest done/not-done gate.
 
 ## Live demo evidence
 
