@@ -85,3 +85,9 @@ Evidence: `docs/evidence/instrument-studio-icons-20260819T001859Z/`.
 Chrome now draws 5x7 bitmap labels for brand, workspace pills, status chips, and inspector cards.
 Evidence: `docs/evidence/instrument-studio-labels-20260819T020608Z/`.
 Residual: increase glyph scale / add true font path for OCR-clean production text.
+
+
+## OCR-readable labels (2026-08-19)
+
+4px 5x7 labels paint above chrome. Vision reads STUDIO, BLD/RSH/OPS, OK/FOC/GAP, INSPECT, TILE/FOC/GAP/LIVE.
+Evidence: `docs/evidence/instrument-studio-ocr-labels-20260819T025833Z/`.

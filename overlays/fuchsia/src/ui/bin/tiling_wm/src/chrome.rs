@@ -72,7 +72,7 @@ fn rgba(r: f32, g: f32, b: f32, a: f32) -> ui_comp::ColorRgba {
 const GLYPH_PARTS: usize = 64;
 const RAIL_SLOTS: usize = 6;
 const PARTS_PER_ICON: usize = 8;
-const LABEL_PARTS: usize = 360;
+const LABEL_PARTS: usize = 420;
 
 fn glyph5(ch: u8) -> [u8; 7] {
     match ch {
@@ -195,60 +195,79 @@ impl ShellChrome {
         root: &ui_comp::TransformId,
     ) -> Result<Self, Error> {
         let mk = |flatland: &ui_comp::FlatlandProxy, ids: &mut IdGenerator| Bar::create(flatland, ids, root);
+        // Create chrome surfaces first, then labels last so Flatland paints
+        // wordmarks above strip/pills/cards instead of under them.
+        let strip = mk(flatland, ids)?;
+        let strip_accent = mk(flatland, ids)?;
+        let brand_a = mk(flatland, ids)?;
+        let brand_b = mk(flatland, ids)?;
+        let pills = [mk(flatland, ids)?, mk(flatland, ids)?, mk(flatland, ids)?];
+        let pill_accents = [mk(flatland, ids)?, mk(flatland, ids)?, mk(flatland, ids)?];
+        let status_chips = [mk(flatland, ids)?, mk(flatland, ids)?, mk(flatland, ids)?];
+        let status_dots = [mk(flatland, ids)?, mk(flatland, ids)?, mk(flatland, ids)?];
+        let rail = mk(flatland, ids)?;
+        let rail_edge = mk(flatland, ids)?;
+        let rail_slots = [
+            mk(flatland, ids)?,
+            mk(flatland, ids)?,
+            mk(flatland, ids)?,
+            mk(flatland, ids)?,
+            mk(flatland, ids)?,
+            mk(flatland, ids)?,
+        ];
+        let rail_parts = {
+            let mut v = Vec::with_capacity(GLYPH_PARTS);
+            for _ in 0..GLYPH_PARTS {
+                v.push(mk(flatland, ids)?);
+            }
+            v.try_into().map_err(|_| anyhow!("rail_parts len"))?
+        };
+        let inspector = mk(flatland, ids)?;
+        let inspector_accent = mk(flatland, ids)?;
+        let inspector_cards = [
+            mk(flatland, ids)?,
+            mk(flatland, ids)?,
+            mk(flatland, ids)?,
+            mk(flatland, ids)?,
+        ];
+        let inspector_card_bars = [
+            mk(flatland, ids)?,
+            mk(flatland, ids)?,
+            mk(flatland, ids)?,
+            mk(flatland, ids)?,
+        ];
+        let inspector_card_icons = [
+            mk(flatland, ids)?,
+            mk(flatland, ids)?,
+            mk(flatland, ids)?,
+            mk(flatland, ids)?,
+            mk(flatland, ids)?,
+            mk(flatland, ids)?,
+            mk(flatland, ids)?,
+            mk(flatland, ids)?,
+        ];
         let mut labels = Vec::with_capacity(LABEL_PARTS);
         for _ in 0..LABEL_PARTS {
             labels.push(mk(flatland, ids)?);
         }
         Ok(Self {
-            strip: mk(flatland, ids)?,
-            strip_accent: mk(flatland, ids)?,
-            brand_a: mk(flatland, ids)?,
-            brand_b: mk(flatland, ids)?,
-            pills: [mk(flatland, ids)?, mk(flatland, ids)?, mk(flatland, ids)?],
-            pill_accents: [mk(flatland, ids)?, mk(flatland, ids)?, mk(flatland, ids)?],
-            status_chips: [mk(flatland, ids)?, mk(flatland, ids)?, mk(flatland, ids)?],
-            status_dots: [mk(flatland, ids)?, mk(flatland, ids)?, mk(flatland, ids)?],
-            rail: mk(flatland, ids)?,
-            rail_edge: mk(flatland, ids)?,
-            rail_slots: [
-                mk(flatland, ids)?,
-                mk(flatland, ids)?,
-                mk(flatland, ids)?,
-                mk(flatland, ids)?,
-                mk(flatland, ids)?,
-                mk(flatland, ids)?,
-            ],
-            rail_parts: {
-                let mut v = Vec::with_capacity(GLYPH_PARTS);
-                for _ in 0..GLYPH_PARTS {
-                    v.push(mk(flatland, ids)?);
-                }
-                v.try_into().map_err(|_| anyhow!("rail_parts len"))?
-            },
-            inspector: mk(flatland, ids)?,
-            inspector_accent: mk(flatland, ids)?,
-            inspector_cards: [
-                mk(flatland, ids)?,
-                mk(flatland, ids)?,
-                mk(flatland, ids)?,
-                mk(flatland, ids)?,
-            ],
-            inspector_card_bars: [
-                mk(flatland, ids)?,
-                mk(flatland, ids)?,
-                mk(flatland, ids)?,
-                mk(flatland, ids)?,
-            ],
-            inspector_card_icons: [
-                mk(flatland, ids)?,
-                mk(flatland, ids)?,
-                mk(flatland, ids)?,
-                mk(flatland, ids)?,
-                mk(flatland, ids)?,
-                mk(flatland, ids)?,
-                mk(flatland, ids)?,
-                mk(flatland, ids)?,
-            ],
+            strip,
+            strip_accent,
+            brand_a,
+            brand_b,
+            pills,
+            pill_accents,
+            status_chips,
+            status_dots,
+            rail,
+            rail_edge,
+            rail_slots,
+            rail_parts,
+            inspector,
+            inspector_accent,
+            inspector_cards,
+            inspector_card_bars,
+            inspector_card_icons,
             labels: labels.try_into().map_err(|_| anyhow!("labels len"))?,
         })
     }
@@ -308,8 +327,8 @@ impl ShellChrome {
         self.brand_b.layout(flatland, bx + (mark / 2) as i32, by, mark - mark / 2, mark, violet)?;
 
         let mut li = 0usize;
-        let brand_px = 3u32;
-        let brand_text = if strip.width < 820 { "STUDIO" } else { "WORKBENCH STUDIO" };
+        let brand_px = 4u32;
+        let brand_text = if strip.width < 900 { "STUDIO" } else { "WORKBENCH" };
         li = draw_text(
             &self.labels,
             flatland,
@@ -322,11 +341,11 @@ impl ShellChrome {
         )?;
 
         let pill_h = strip.height.saturating_sub(14).max(18);
-        let pill_w = if strip.width < 800 { 72 } else { 92 };
-        let brand_w = if strip.width < 820 { 5 * 6 * 3 + 24 } else { 15 * 6 * 3 + 24 };
+        let pill_w = if strip.width < 800 { 86 } else { 104 };
+        let brand_w = if strip.width < 900 { 6 * 6 * 4 + 16 } else { 9 * 6 * 4 + 16 };
         let mut px = bx + mark as i32 + brand_w;
         let py = (strip.y + (strip.height - pill_h) / 2) as i32;
-        let pill_labels = ["BUILD", "RSRCH", "OPS"];
+        let pill_labels = ["BLD", "RSH", "OPS"];
         for i in 0..3 {
             let active = i == 0;
             let fill = if active { cyan_dim } else { elev };
@@ -339,7 +358,7 @@ impl ShellChrome {
                 2,
                 if active { cyan } else { line },
             )?;
-            let tpx = 3u32;
+            let tpx = 4u32;
             let tw = (pill_labels[i].len() as i32) * (5 * tpx as i32 + tpx as i32);
             li = draw_text(
                 &self.labels,
@@ -354,7 +373,7 @@ impl ShellChrome {
             px += pill_w as i32 + 8;
         }
 
-        let chip_w = if strip.width < 800 { 62 } else { 74 };
+        let chip_w = if strip.width < 800 { 78 } else { 90 };
         let chip_h = pill_h;
         let mut cx = (strip.x + strip.width) as i32 - 12;
         let chips = [
@@ -379,9 +398,9 @@ impl ShellChrome {
                 flatland,
                 li,
                 cx + 18,
-                py + (chip_h as i32 - 21) / 2,
+                py + (chip_h as i32 - 28) / 2,
                 chips[i].2,
-                3,
+                4,
                 if chips[i].0 { text } else { faint },
             )?;
             cx -= 8;
@@ -468,9 +487,9 @@ impl ShellChrome {
             flatland,
             li,
             inspector.x as i32 + 10,
-            inspector.y as i32 + 6,
+            inspector.y as i32 + 8,
             "INSPECT",
-            3,
+            4,
             cyan,
         )?;
 
@@ -486,7 +505,7 @@ impl ShellChrome {
             meter_color((state.gap_px as f32 / 24.0).clamp(0.15, 1.0), violet, muted),
             meter_color((state.present_count.min(12) as f32) / 12.0, green, muted),
         ];
-        let card_labels = ["TILES", "FOCUS", "GAP", "LIVE"];
+        let card_labels = ["TILE", "FOC", "GAP", "LIVE"];
         for i in 0..4 {
             let x = (inspector.x + pad + i as u32 * (card_w + pad)) as i32;
             self.inspector_cards[i].layout(flatland, x, card_y, card_w, card_h, elev)?;
@@ -505,10 +524,10 @@ impl ShellChrome {
                 &self.labels,
                 flatland,
                 li,
-                x + 24,
-                card_y + 8,
+                x + 22,
+                card_y + 10,
                 card_labels[i],
-                3,
+                4,
                 text,
             )?;
         }

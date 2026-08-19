@@ -24,7 +24,8 @@ def main() -> int:
     assert inspector == (0, 740, 1440, 160)
     assert stage[2] + rail[2] == 1440
     assert strip[3] + stage[3] + inspector[3] == 900
-    strip, rail, stage, inspector = regions(720, 1200, panel_h=40, rail_w=56, inspector_h=120)
+    strip, rail, stage, inspector = regions(720, 1200, panel_h=52, rail_w=56, inspector_h=136)
+    assert strip[3] >= 52 and inspector[3] >= 136
     assert stage[2] > 0 and stage[3] > 0
     try:
         regions(320, 240)

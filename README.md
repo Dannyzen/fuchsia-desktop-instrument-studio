@@ -64,6 +64,8 @@ We are building **Instrument Studio** first:
 
 ![Live emulator readable-labels attempt](design/screenshots/10-emulator-readable-labels-live.png)
 
+![Live emulator OCR-readable labels](design/screenshots/11-emulator-ocr-labels-live.png)
+
 Interactive sketches live under `design/sketches/`.
 
 ## Local rebuild

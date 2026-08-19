@@ -19,6 +19,7 @@ It is **not** yet the polished production Workbench Studio UI from the design sc
 
 - Chrome bitmap label path (brand/pills/chips/inspector) live-proven
 - 3px/RLE label scale attempt live-proven (still not OCR-clean)
+- OCR-readable chrome labels (4px, labels-on-top): STUDIO / BLD RSH OPS / OK FOC GAP / INSPECT TILE FOC GAP LIVE
 
 - Terminal tile wired to Alpine/Linux via Starnix Controller bridge
 
@@ -31,9 +32,7 @@ It is **not** yet the polished production Workbench Studio UI from the design sc
 
 ## Not done (blocks “production”)
 
-1. Larger/true typography (bitmap labels not OCR-clean at 2px)
-
-1. Typography/labels (brand wordmark, workspace names, chip captions)
+1. True font/vector typography (bitmap labels now readable, not production type)
 2. True icon assets/glyphs (beyond rect approximations)
 3. App chrome restyle to Instrument Studio cards
 4. Terminal content density and overall polish/glow/radius fidelity

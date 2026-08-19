@@ -46,8 +46,9 @@ impl InstrumentStudioLayout {
             theme.rail_width_px = theme.rail_width_px.min(56);
         }
         if height < 900 {
-            theme.panel_height_px = theme.panel_height_px.min(40);
-            theme.inspector_height_px = theme.inspector_height_px.min(120);
+            // Keep strip/inspector tall enough for 4px bitmap labels on FEMU.
+            theme.panel_height_px = theme.panel_height_px.min(56).max(52);
+            theme.inspector_height_px = theme.inspector_height_px.min(148).max(136);
         }
         Ok(Self {
             width,

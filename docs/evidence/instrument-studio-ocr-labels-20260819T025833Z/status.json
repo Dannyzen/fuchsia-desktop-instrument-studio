@@ -1,0 +1,34 @@
+{
+  "stamp": "20260819T025833Z",
+  "built_merkle": "35d48552678039295b3a1f46cbc5dd3d68e2c1625a10b0523be10af242ddba44",
+  "live_merkle": "35d48552678039295b3a1f46cbc5dd3d68e2c1625a10b0523be10af242ddba44",
+  "running": {
+    "browser": true,
+    "terminal": true,
+    "files": true,
+    "settings": true
+  },
+  "inspect": "core/session-manager/session:session/tiling_wm:\n  metadata:\n    name = root\n    component_url = tiling_wm#meta/tiling_wm.cm\n    timestamp = 35865428609\n  payload:\n    root:\n      fuchsia.inspect.Health:\n        start_timestamp_nanos = 1261485591\n        status = OK\n      tiling_wm:\n        last_present_context = RemoveTile\n        order = ocr2-files-20260819T025833Z,ocr2-terminal-20260819T025833Z,ocr2-browser-20260819T025833Z\n        present_count = 2\n        tile_count = 3\n        config:\n          active_border_px = 3\n          gap_px = 12\n          wrap_focus = true\n        focus:\n          confirmed = ocr2-browser-20260819T025833Z\n          selected = ocr2-browser-20260819T025833Z\n\n",
+  "screenshots": [
+    "/srv/bigs-runtime/workspaces/projects/fuchsia-desktop-mvp/artifacts/instrument-studio-ocr-labels-20260819T025833Z/screenshots/screenshot.png"
+  ],
+  "feedback": {
+    "ready": true,
+    "wm": {
+      "available": true,
+      "tile_count": 3,
+      "order": [
+        "ocr2-files-20260819T025833Z",
+        "ocr2-terminal-20260819T025833Z",
+        "ocr2-browser-20260819T025833Z"
+      ],
+      "selected_focus": "ocr2-browser-20260819T025833Z",
+      "confirmed_focus": "ocr2-browser-20260819T025833Z",
+      "gap_px": 12,
+      "active_border_px": 3,
+      "wrap_focus": true,
+      "present_count": 2,
+      "last_present_context": "RemoveTile"
+    }
+  }
+}
