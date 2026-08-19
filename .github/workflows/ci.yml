@@ -33,6 +33,9 @@ jobs:
           test -f design/screenshots/11-emulator-ocr-labels-live.png
           test -f design/screenshots/12-emulator-responsive-live.png
           test -f design/screenshots/13-emulator-parity-live.png
+          test -f design/screenshots/14-emulator-tile-identity-live.png
+          test -f docs/design-vision-bead-matrix.md
+          test -f docs/evidence/instrument-studio-tile-identity-20260819T133604Z/vision-comparison.md
           test -f docs/evidence/instrument-studio-parity-20260819T113247Z/vision-comparison.md
           python3 scripts/test-narrow-app-layout.py
           test -f docs/evidence/instrument-studio-responsive-20260819T030934Z/vision-comparison.md

@@ -1,0 +1,72 @@
+{
+  "design_target": "instrument-studio",
+  "wm": {
+    "available": true,
+    "tile_count": 1,
+    "order": [
+      "tid-terminal-20260819T133604Z"
+    ],
+    "selected_focus": "tid-terminal-20260819T133604Z",
+    "confirmed_focus": "tid-terminal-20260819T133604Z",
+    "gap_px": 12,
+    "active_border_px": 3,
+    "wrap_focus": true,
+    "present_count": 2,
+    "last_present_context": "RemoveTile"
+  },
+  "log_markers": {
+    "last_active": null,
+    "active_cleared_count": 0,
+    "last_order": null
+  },
+  "artifacts": {
+    "inspect_tiling_wm": "/srv/bigs-runtime/workspaces/projects/fuchsia-desktop-mvp/artifacts/instrument-studio-tile-identity-20260819T133604Z/diagnostics/inspect-tiling_wm.json",
+    "inspect_all": "/srv/bigs-runtime/workspaces/projects/fuchsia-desktop-mvp/artifacts/instrument-studio-tile-identity-20260819T133604Z/diagnostics/inspect-all.json",
+    "logs": "/srv/bigs-runtime/workspaces/projects/fuchsia-desktop-mvp/artifacts/instrument-studio-tile-identity-20260819T133604Z/diagnostics/tiling-wm-markers.log",
+    "screenshot": "/srv/bigs-runtime/workspaces/projects/fuchsia-desktop-mvp/artifacts/instrument-studio-tile-identity-20260819T133604Z/diagnostics/session.png"
+  },
+  "evaluation": {
+    "design_target": "instrument-studio",
+    "ready_for_ui_iteration": true,
+    "checks": [
+      {
+        "name": "inspect_available",
+        "ok": true,
+        "detail": "tiling_wm inspect hierarchy present"
+      },
+      {
+        "name": "has_tiles",
+        "ok": true,
+        "detail": "tile_count=1"
+      },
+      {
+        "name": "instrument_studio_grid_ready",
+        "ok": false,
+        "detail": "design sketch assumes a 2x2 app grid when four apps are launched"
+      },
+      {
+        "name": "confirmed_focus_visible_when_present",
+        "ok": true,
+        "detail": "selected='tid-terminal-20260819T133604Z' confirmed='tid-terminal-20260819T133604Z'"
+      },
+      {
+        "name": "confirmed_focus_non_empty_for_active_desktop",
+        "ok": true,
+        "detail": "active desktop should expose confirmed focus or recent TILING_WM_ACTIVE marker"
+      },
+      {
+        "name": "gap_default_or_set",
+        "ok": true,
+        "detail": "gap_px=12"
+      },
+      {
+        "name": "active_border_default_or_set",
+        "ok": true,
+        "detail": "active_border_px=3"
+      }
+    ],
+    "next_actions": [
+      "Bring session to four tiles to match the Instrument Studio 2x2 sketch."
+    ]
+  }
+}

@@ -149,11 +149,11 @@ impl BrowserTab {
 }
 
 fn display_url(url: &str, width: u32) -> String {
-    let max_chars = ((width / 8).max(8) as usize).min(url.len().max(8));
-    if url.len() <= max_chars {
-        return url.to_string();
-    }
-    let trimmed = url.trim_start_matches("https://").trim_start_matches("http://");
+    let max_chars = ((width / 9).max(6) as usize).min(24);
+    let trimmed = url
+        .trim_start_matches("https://")
+        .trim_start_matches("http://")
+        .trim_end_matches('/');
     if trimmed.len() <= max_chars {
         return trimmed.to_string();
     }
@@ -166,6 +166,7 @@ fn create_tab_view(
     index: usize,
     size: fmath::SizeU,
     page_height: u32,
+    toolbar_height: u32,
     url: &str,
 ) -> Result<BrowserTab, Error> {
     let ViewCreationTokenPair { view_creation_token, viewport_creation_token } =
@@ -188,7 +189,7 @@ fn create_tab_view(
     flatland.set_content(&viewport_transform, &viewport_content)?;
     flatland.set_translation(
         &viewport_transform,
-        &fmath::Vec_ { x: 0, y: TOOLBAR_HEIGHT as i32 },
+        &fmath::Vec_ { x: 0, y: toolbar_height as i32 },
     )?;
     frame.frame.r#create_view2(web::CreateView2Args {
         view_creation_token: Some(view_creation_token),
@@ -366,7 +367,13 @@ async fn create_browser_view(
 
     let layout = parent_watcher.r#get_layout().await?;
     let size = layout.logical_size.ok_or_else(|| anyhow!("parent supplied no logical size"))?;
-    let toolbar_height = TOOLBAR_HEIGHT.min(size.height.saturating_sub(1));
+    info!("Browser first layout {}x{}", size.width, size.height);
+    let narrow = size.width < 520 || (size.height > size.width && size.width < 800);
+    let toolbar_height = if narrow {
+        56.min(size.height.saturating_sub(1))
+    } else {
+        TOOLBAR_HEIGHT.min(size.height.saturating_sub(1))
+    };
     let page_height = size.height.saturating_sub(toolbar_height);
 
     let root = flatland::TransformId { value: 1 };
@@ -385,7 +392,7 @@ async fn create_browser_view(
         }],
     )?;
 
-    let narrow = size.width < 520;
+    let narrow = size.width < 520 || (size.height > size.width && size.width < 800);
     create_rect(
         &flatland,
         &root,
@@ -513,7 +520,7 @@ async fn create_browser_view(
     let mut tab_two_text_surface = None;
 
     let initial_tab =
-        create_tab_view(&flatland, initial_frame, 0, size, page_height, initial_url)?;
+        create_tab_view(&flatland, initial_frame, 0, size, page_height, toolbar_height, initial_url)?;
     flatland.add_child(
         &root,
         &flatland::TransformId { value: initial_tab.viewport_transform_value },
@@ -549,6 +556,7 @@ async fn create_browser_view(
                             1,
                             size,
                             page_height,
+                            toolbar_height,
                             SECOND_TAB_URL,
                         )?);
                         tab_two_text_surface = Some(

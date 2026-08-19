@@ -229,7 +229,7 @@ async fn create_files_view(root_token: views::ViewCreationToken) -> Result<(), E
         fmath::Vec_ { x: 0, y: 0 },
     )?;
 
-    let narrow = size.width < 520;
+    let narrow = size.width < 520 || (size.height > size.width && size.width < 800);
     let button_specs = if narrow {
         [
             (8, 72, "Up"),

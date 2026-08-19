@@ -49,6 +49,8 @@ Screenshot-ranked (2026-08-19 vs `01-instrument-studio.png`):
 4. Terminal content density and overall polish/glow/radius fidelity
 5. Product packaging/release gate beyond lab emulator proof
 
+Planning matrix: `docs/design-vision-bead-matrix.md` (two-round visual/IA + function validation).
+
 ## Latest live proof
 
 - `design/screenshots/07-emulator-icons-live.png`

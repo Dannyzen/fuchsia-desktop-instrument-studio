@@ -1,0 +1,32 @@
+{
+  "stamp": "20260819T133604Z",
+  "built_merkle": "cddcf7c631eb601e8d138c04e66e507912c7db921f101f78e49c4f786a7f3f08",
+  "live_merkle": "cddcf7c631eb601e8d138c04e66e507912c7db921f101f78e49c4f786a7f3f08",
+  "running": {
+    "terminal": true,
+    "settings": true,
+    "files": true,
+    "browser": true
+  },
+  "inspect": "core/session-manager/session:session/tiling_wm:\n  metadata:\n    name = root\n    component_url = tiling_wm#meta/tiling_wm.cm\n    timestamp = 28989055150\n  payload:\n    root:\n      fuchsia.inspect.Health:\n        start_timestamp_nanos = 1338375252\n        status = OK\n      tiling_wm:\n        last_present_context = RemoveTile\n        order = tid-terminal-20260819T133604Z\n        present_count = 2\n        tile_count = 1\n        config:\n          active_border_px = 3\n          gap_px = 12\n          wrap_focus = true\n        focus:\n          confirmed = tid-terminal-20260819T133604Z\n          selected = tid-terminal-20260819T133604Z\n\n",
+  "screenshots": [
+    "/srv/bigs-runtime/workspaces/projects/fuchsia-desktop-mvp/artifacts/instrument-studio-tile-identity-20260819T133604Z/screenshots/screenshot.png"
+  ],
+  "feedback": {
+    "ready": true,
+    "wm": {
+      "available": true,
+      "tile_count": 1,
+      "order": [
+        "tid-terminal-20260819T133604Z"
+      ],
+      "selected_focus": "tid-terminal-20260819T133604Z",
+      "confirmed_focus": "tid-terminal-20260819T133604Z",
+      "gap_px": 12,
+      "active_border_px": 3,
+      "wrap_focus": true,
+      "present_count": 2,
+      "last_present_context": "RemoveTile"
+    }
+  }
+}

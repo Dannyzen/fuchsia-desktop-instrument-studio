@@ -40,6 +40,22 @@ const NUM_CONCURRENT_REQUESTS: usize = 5;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TileId(pub String);
 
+fn tile_accent(id: &str) -> (f32, f32, f32) {
+    let key = id.to_ascii_lowercase();
+    if key.contains("settings") {
+        (0.0, 0.92, 1.0)
+    } else if key.contains("files") {
+        (0.55, 0.49, 1.0)
+    } else if key.contains("browser") {
+        (0.94, 0.71, 0.16)
+    } else if key.contains("terminal") {
+        (0.24, 0.84, 0.55)
+    } else {
+        (0.60, 0.66, 0.72)
+    }
+}
+
+
 impl std::fmt::Display for TileId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "id={}", self.0)
@@ -104,6 +120,10 @@ struct ChildView {
     border_content_id: ui_comp::ContentId,
     viewport_transform_id: ui_comp::TransformId,
     viewport_content_id: ui_comp::ContentId,
+    title_transform_id: ui_comp::TransformId,
+    title_content_id: ui_comp::ContentId,
+    accent_transform_id: ui_comp::TransformId,
+    accent_content_id: ui_comp::ContentId,
     view_ref: Option<ui_views::ViewRef>,
     view_ref_koid: Option<zx::Koid>,
 }
@@ -208,11 +228,28 @@ impl TilingWm {
                     .add_child(&border_transform_id, &viewport_transform_id)
                     .context("GraphicalPresenterPresentView attach viewport to tile group")?;
 
+                let title_transform_id = self.id_generator.next_transform_id();
+                let title_content_id = self.id_generator.next_content_id();
+                self.flatland.create_transform(&title_transform_id)?;
+                self.flatland.create_filled_rect(&title_content_id)?;
+                self.flatland.set_content(&title_transform_id, &title_content_id)?;
+                self.flatland.add_child(&border_transform_id, &title_transform_id)?;
+                let accent_transform_id = self.id_generator.next_transform_id();
+                let accent_content_id = self.id_generator.next_content_id();
+                self.flatland.create_transform(&accent_transform_id)?;
+                self.flatland.create_filled_rect(&accent_content_id)?;
+                self.flatland.set_content(&accent_transform_id, &accent_content_id)?;
+                self.flatland.add_child(&title_transform_id, &accent_transform_id)?;
+
                 let new_tile = ChildView {
                     border_transform_id,
                     border_content_id,
                     viewport_transform_id,
                     viewport_content_id,
+                    title_transform_id,
+                    title_content_id,
+                    accent_transform_id,
+                    accent_content_id,
                     view_ref: None,
                     view_ref_koid: None,
                 };
@@ -551,6 +588,8 @@ impl TilingWm {
         tile: &mut ChildView,
     ) -> Result<(), Error> {
         let _ = flatland.release_viewport(&tile.viewport_content_id);
+        let _ = flatland.release_filled_rect(&tile.title_content_id);
+        let _ = flatland.release_filled_rect(&tile.accent_content_id);
         flatland.release_filled_rect(&tile.border_content_id)?;
         flatland.release_transform(&tile.viewport_transform_id)?;
         flatland.release_transform(&tile.border_transform_id)?;
@@ -618,9 +657,31 @@ impl TilingWm {
                 .context("translate tile group")?;
 
             let inset = slot.content_inset;
+            let title_h = 28u32.min(slot.height.saturating_sub(inset * 2).saturating_sub(8));
+            let inner_w = slot.width.saturating_sub(inset * 2).max(1);
+            let inner_h = slot.height.saturating_sub(inset * 2).max(1);
+            self.flatland.set_solid_fill(
+                &view.title_content_id,
+                &ui_comp::ColorRgba { red: 0.07, green: 0.09, blue: 0.12, alpha: 1.0 },
+                &fidl_fuchsia_math::SizeU { width: inner_w, height: title_h },
+            )?;
+            self.flatland.set_translation(
+                &view.title_transform_id,
+                &fidl_fuchsia_math::Vec_ { x: inset as i32, y: inset as i32 },
+            )?;
+            let (ar, ag, ab) = tile_accent(&id);
+            self.flatland.set_solid_fill(
+                &view.accent_content_id,
+                &ui_comp::ColorRgba { red: ar, green: ag, blue: ab, alpha: 1.0 },
+                &fidl_fuchsia_math::SizeU { width: 10, height: 10 },
+            )?;
+            self.flatland.set_translation(
+                &view.accent_transform_id,
+                &fidl_fuchsia_math::Vec_ { x: 8, y: (title_h as i32 - 10) / 2 },
+            )?;
             let viewport_size = fidl_fuchsia_math::SizeU {
-                width: slot.width.saturating_sub(inset * 2).max(1),
-                height: slot.height.saturating_sub(inset * 2).max(1),
+                width: inner_w,
+                height: inner_h.saturating_sub(title_h).max(1),
             };
             self.flatland
                 .set_viewport_properties(
@@ -634,7 +695,7 @@ impl TilingWm {
             self.flatland
                 .set_translation(
                     &view.viewport_transform_id,
-                    &fidl_fuchsia_math::Vec_ { x: inset as i32, y: inset as i32 },
+                    &fidl_fuchsia_math::Vec_ { x: inset as i32, y: (inset + title_h) as i32 },
                 )
                 .context("translate inset viewport")?;
         }

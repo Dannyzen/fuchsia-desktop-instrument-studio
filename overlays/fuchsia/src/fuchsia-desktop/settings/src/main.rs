@@ -314,7 +314,7 @@ async fn create_settings_view(root_token: views::ViewCreationToken) -> Result<()
         );
     }
 
-    let narrow = size.width < 520;
+    let narrow = size.width < 520 || (size.height > size.width && size.width < 800);
     let btn_w = if narrow { size.width.saturating_sub(32).max(80) } else { 240 };
     let info_w = size.width.saturating_sub(32).max(80);
     let status_w = size.width.saturating_sub(32).max(80);
