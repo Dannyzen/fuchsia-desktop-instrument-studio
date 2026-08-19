@@ -784,11 +784,10 @@ impl TilingWm {
                         })
                         .expect("Failed to send MessageInternal::ReceivedClientViewRef");
                 }
-                Err(_) => {
-                    internal_sender
-                        .unbounded_send(MessageInternal::ClientDied { tile_id })
-                        .expect("Failed to send MessageInternal::ClientDied");
-                    return;
+                Err(error) => {
+                    // Settings (and other heavy CreateView2 apps) can attach after
+                    // the first GetLayout. A transient ViewRef miss is not death.
+                    warn!("get_view_ref failed for {tile_id} (keeping tile): {error}");
                 }
             }
 

@@ -86,7 +86,7 @@ fn rgba(r: f32, g: f32, b: f32, a: f32) -> ui_comp::ColorRgba {
 }
 
 
-const TILE_NAME_PARTS: usize = 64;
+const TILE_NAME_PARTS: usize = 32;
 
 pub struct TileName {
     parts: [Bar; TILE_NAME_PARTS],
