@@ -1,0 +1,23 @@
+core/session-manager/session:session/tiling_wm:
+  metadata:
+    name = root
+    component_url = tiling_wm#meta/tiling_wm.cm
+    timestamp = 26174670504
+  payload:
+    root:
+      fuchsia.inspect.Health:
+        start_timestamp_nanos = 1237041776
+        status = OK
+      tiling_wm:
+        last_present_context = FocusChainChanged
+        order = tnm-terminal-20260819T135526Z
+        present_count = 1
+        tile_count = 1
+        config:
+          active_border_px = 3
+          gap_px = 12
+          wrap_focus = true
+        focus:
+          confirmed = tnm-terminal-20260819T135526Z
+          selected = tnm-terminal-20260819T135526Z
+

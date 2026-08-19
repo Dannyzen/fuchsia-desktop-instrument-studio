@@ -49,6 +49,8 @@ Screenshot-ranked (2026-08-19 vs `01-instrument-studio.png`):
 4. Terminal content density and overall polish/glow/radius fidelity
 5. Product packaging/release gate beyond lab emulator proof
 
+4-app Inspect gate: session-add Running is not enough. Live 15 fail-closed at tile_count=1.
+
 Planning matrix: `docs/design-vision-bead-matrix.md` (two-round visual/IA + function validation).
 
 ## Latest live proof

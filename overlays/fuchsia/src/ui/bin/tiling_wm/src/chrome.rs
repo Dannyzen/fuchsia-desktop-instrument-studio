@@ -18,6 +18,14 @@ pub struct ChromeState {
     pub gap_px: u32,
     pub active_border_px: u32,
     pub present_count: u64,
+    pub tile_titles: Vec<TileTitle>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct TileTitle {
+    pub x: i32,
+    pub y: i32,
+    pub label: String,
 }
 
 struct Bar {
@@ -532,6 +540,25 @@ impl ShellChrome {
             )?;
         }
         let _ = li;
+        // Tile identity names (SET/FIL/BRW/TRM) painted last so they sit on title bars.
+        let title_px = 3u32;
+        let title_color = rgba(0.96, 0.97, 0.98, 1.0);
+        for title in &state.tile_titles {
+            if li >= self.labels.len() {
+                break;
+            }
+            li = draw_text(
+                &self.labels,
+                flatland,
+                li,
+                title.x,
+                title.y,
+                &title.label,
+                title_px,
+                title_color,
+            )?;
+        }
+
         Ok(())
     }
 }

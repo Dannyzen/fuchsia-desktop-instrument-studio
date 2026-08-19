@@ -40,6 +40,38 @@ const NUM_CONCURRENT_REQUESTS: usize = 5;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TileId(pub String);
 
+fn tile_short_label(id: &str) -> &'static str {
+    let key = id.to_ascii_lowercase();
+    if key.contains("settings") {
+        "SET"
+    } else if key.contains("files") {
+        "FIL"
+    } else if key.contains("browser") {
+        "BRW"
+    } else if key.contains("terminal") {
+        "TRM"
+    } else {
+        "APP"
+    }
+}
+
+fn desktop_ui_tile_title(
+    id: &str,
+    stage_x: u32,
+    stage_y: u32,
+    slot: &policy::LayoutSlot,
+    inset: u32,
+    title_h: u32,
+) -> chrome::TileTitle {
+    chrome::TileTitle {
+        x: (stage_x + slot.x + inset + 22) as i32,
+        y: (stage_y + slot.y + inset + title_h.saturating_sub(22) / 2) as i32,
+        label: tile_short_label(id).to_string(),
+    }
+}
+
+
+
 fn tile_accent(id: &str) -> (f32, f32, f32) {
     let key = id.to_ascii_lowercase();
     if key.contains("settings") {
@@ -612,16 +644,6 @@ impl TilingWm {
         let logical_size = self.layout_info.logical_size.context("missing root logical size")?;
         let shell = InstrumentStudioLayout::new(logical_size.width, logical_size.height)
             .map_err(anyhow::Error::msg)?;
-        let chrome_state = ChromeState {
-            tile_count: self.policy.order().len() as u32,
-            confirmed_focus: self.policy.confirmed_focus_id().unwrap_or("").to_string(),
-            order: self.policy.order().into_iter().map(str::to_string).collect(),
-            gap_px: self.layout_config.gap_px,
-            active_border_px: self.layout_config.active_border_px,
-            present_count: self.observability.present_count_value,
-        };
-        self.chrome.layout(&self.flatland, &shell, &chrome_state)?;
-
         let stage = shell.region_rect(ChromeRegion::TiledStage);
         let order: Vec<String> = self.policy.order().into_iter().map(str::to_string).collect();
         let slots = compute_layout(
@@ -630,6 +652,22 @@ impl TilingWm {
             self.layout_config,
         )
         .map_err(anyhow::Error::msg)?;
+        let mut tile_titles = Vec::new();
+        for (id, slot) in order.iter().zip(slots.iter()) {
+            let inset = slot.content_inset;
+            let title_h = 28u32.min(slot.height.saturating_sub(inset * 2).saturating_sub(8));
+            tile_titles.push(desktop_ui_tile_title(id, stage.x, stage.y, slot, inset, title_h));
+        }
+        let chrome_state = ChromeState {
+            tile_count: self.policy.order().len() as u32,
+            confirmed_focus: self.policy.confirmed_focus_id().unwrap_or("").to_string(),
+            order: order.clone(),
+            gap_px: self.layout_config.gap_px,
+            active_border_px: self.layout_config.active_border_px,
+            present_count: self.observability.present_count_value,
+            tile_titles,
+        };
+        self.chrome.layout(&self.flatland, &shell, &chrome_state)?;
         let active_id = self.policy.confirmed_focus_id().map(str::to_string);
         for (id, slot) in order.iter().zip(slots) {
             let tile_id = TileId(id.clone());
