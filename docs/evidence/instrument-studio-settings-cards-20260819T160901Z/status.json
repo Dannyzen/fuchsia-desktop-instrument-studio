@@ -1,0 +1,37 @@
+{
+  "stamp": "20260819T160901Z",
+  "built_merkle": "376c744e02ff8b8b12f7b85b54186cd5e494a11aac9d481b9849dbf152afbecc",
+  "live_merkle": "376c744e02ff8b8b12f7b85b54186cd5e494a11aac9d481b9849dbf152afbecc",
+  "running": {
+    "terminal": true,
+    "files": true,
+    "browser": true,
+    "settings": true
+  },
+  "final_tile_count": 4,
+  "order": "sc3-settings-20260819T160901Z,sc3-browser-20260819T160901Z,sc3-files-20260819T160901Z,sc3-terminal-20260819T160901Z",
+  "inspect": "core/session-manager/session:session/tiling_wm:\n  metadata:\n    name = root\n    component_url = tiling_wm#meta/tiling_wm.cm\n    timestamp = 43269755168\n  payload:\n    root:\n      fuchsia.inspect.Health:\n        start_timestamp_nanos = 1304108913\n        status = OK\n      tiling_wm:\n        last_present_context = GraphicalPresenterPresentView\n        order = sc3-settings-20260819T160901Z,sc3-browser-20260819T160901Z,sc3-files-20260819T160901Z,sc3-terminal-20260819T160901Z\n        present_count = 5\n        tile_count = 4\n        config:\n          active_border_px = 3\n          gap_px = 12\n          wrap_focus = true\n        focus:\n          confirmed = sc3-terminal-20260819T160901Z\n          selected = sc3-terminal-20260819T160901Z\n\n",
+  "screenshots": [
+    "/srv/bigs-runtime/workspaces/projects/fuchsia-desktop-mvp/artifacts/instrument-studio-settings-cards2-20260819T160901Z/screenshots/screenshot.png"
+  ],
+  "feedback": {
+    "ready": true,
+    "wm": {
+      "available": true,
+      "tile_count": 4,
+      "order": [
+        "sc3-settings-20260819T160901Z",
+        "sc3-browser-20260819T160901Z",
+        "sc3-files-20260819T160901Z",
+        "sc3-terminal-20260819T160901Z"
+      ],
+      "selected_focus": "sc3-terminal-20260819T160901Z",
+      "confirmed_focus": "sc3-terminal-20260819T160901Z",
+      "gap_px": 12,
+      "active_border_px": 3,
+      "wrap_focus": true,
+      "present_count": 5,
+      "last_present_context": "GraphicalPresenterPresentView"
+    }
+  }
+}

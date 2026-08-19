@@ -78,6 +78,8 @@ We are building **Instrument Studio** first:
 
 ![Live emulator Settings restore](design/screenshots/18-emulator-set-restore-live.png)
 
+![Live emulator Settings cards](design/screenshots/19-emulator-settings-cards-live.png)
+
 Interactive sketches live under `design/sketches/`.
 
 ## Local rebuild

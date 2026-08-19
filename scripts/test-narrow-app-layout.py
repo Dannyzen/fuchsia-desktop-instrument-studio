@@ -6,14 +6,17 @@ TILE_H = 500
 
 
 def settings_narrow():
-    dark = (88, 136)
-    contrast = (140, 188)
-    celsius = (220, 268)
-    fahr = (272, 320)
-    system = (328, 388)
-    status_y = max(TILE_H - 40, 430)
+    # 56px sidebar + Appearance/Temperature cards
+    sidebar = 56
+    dark = (44, 84)
+    contrast = (92, 132)
+    celsius = (200, 240)
+    fahr = (248, 288)
+    system = (308, 344)
+    status_y = max(TILE_H - 32, 360)
+    assert sidebar < 72
     assert dark[1] <= contrast[0] <= celsius[0] <= fahr[0] <= system[0] <= status_y
-    assert status_y + 32 <= TILE_H + 8
+    assert status_y + 28 <= TILE_H + 8
 
 
 def display_url(url: str, width: int) -> str:

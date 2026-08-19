@@ -10,25 +10,28 @@ pub enum UiAction {
     TemperatureFahrenheit,
 }
 
-/// Hit-test Settings controls. Wide tiles keep the original 2x2 grid.
-/// Narrow tiles (< 520px) stack buttons so they stay inside the tile.
+/// Instrument Studio Settings hit-test.
+/// Narrow tiles use a 56px sidebar + two cards.
+/// Wide tiles keep the original 2x2 grid.
 pub fn action_for_point(x: f32, y: f32, width: f32) -> Option<UiAction> {
     if width < 520.0 {
-        let inset = 16.0;
-        let btn_w = (width - inset * 2.0).max(80.0);
-        if !(inset..inset + btn_w).contains(&x) {
+        let sidebar = 56.0;
+        let card_x = sidebar + 8.0;
+        let btn_x = card_x + 12.0;
+        let btn_w = (width - btn_x - 20.0).max(80.0);
+        if !(btn_x..btn_x + btn_w).contains(&x) {
             return None;
         }
-        if (88.0..136.0).contains(&y) {
+        if (44.0..84.0).contains(&y) {
             return Some(UiAction::ThemeDark);
         }
-        if (140.0..188.0).contains(&y) {
+        if (92.0..132.0).contains(&y) {
             return Some(UiAction::ThemeContrast);
         }
-        if (220.0..268.0).contains(&y) {
+        if (200.0..240.0).contains(&y) {
             return Some(UiAction::TemperatureCelsius);
         }
-        if (272.0..320.0).contains(&y) {
+        if (248.0..288.0).contains(&y) {
             return Some(UiAction::TemperatureFahrenheit);
         }
         return None;
@@ -77,11 +80,13 @@ mod tests {
     }
 
     #[test]
-    fn maps_narrow_stacked_buttons() {
-        assert_eq!(action_for_point(40.0, 110.0, 348.0), Some(UiAction::ThemeDark));
-        assert_eq!(action_for_point(40.0, 160.0, 348.0), Some(UiAction::ThemeContrast));
-        assert_eq!(action_for_point(40.0, 240.0, 348.0), Some(UiAction::TemperatureCelsius));
-        assert_eq!(action_for_point(40.0, 290.0, 348.0), Some(UiAction::TemperatureFahrenheit));
-        assert_eq!(action_for_point(400.0, 230.0, 348.0), None);
+    fn maps_narrow_sidebar_card_buttons() {
+        // 326px portrait tile: buttons live in the card column, not the 56px rail.
+        assert_eq!(action_for_point(90.0, 60.0, 326.0), Some(UiAction::ThemeDark));
+        assert_eq!(action_for_point(90.0, 110.0, 326.0), Some(UiAction::ThemeContrast));
+        assert_eq!(action_for_point(90.0, 220.0, 326.0), Some(UiAction::TemperatureCelsius));
+        assert_eq!(action_for_point(90.0, 260.0, 326.0), Some(UiAction::TemperatureFahrenheit));
+        assert_eq!(action_for_point(20.0, 60.0, 326.0), None);
+        assert_eq!(action_for_point(400.0, 230.0, 326.0), None);
     }
 }

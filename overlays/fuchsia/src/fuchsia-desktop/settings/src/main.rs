@@ -202,10 +202,19 @@ struct DynamicSurfaces {
     status: TextSurface,
 }
 
+#[derive(Clone, Copy)]
+struct LayoutMetrics {
+    btn_w: u32,
+    btn_h: u32,
+    status_w: u32,
+    status_h: u32,
+}
+
 async fn refresh_ui(
     flatland: &flatland::FlatlandProxy,
     controller: &SettingsController,
     surfaces: &mut DynamicSurfaces,
+    metrics: LayoutMetrics,
 ) -> Result<(), Error> {
     surfaces
         .theme_value
@@ -217,30 +226,31 @@ async fn refresh_ui(
             .await?;
     }
     surfaces.status.update(flatland, controller.status()).await?;
+    let btn = fmath::SizeU { width: metrics.btn_w, height: metrics.btn_h };
     flatland.set_solid_fill(
         &flatland::ContentId { value: 21 },
         if controller.theme() == AppTheme::Dark { &SELECTED } else { &SURFACE },
-        &fmath::SizeU { width: 240, height: 80 },
+        &btn,
     )?;
     flatland.set_solid_fill(
         &flatland::ContentId { value: 23 },
         if controller.theme() == AppTheme::Contrast { &CONTRAST } else { &SURFACE },
-        &fmath::SizeU { width: 240, height: 80 },
+        &btn,
     )?;
     flatland.set_solid_fill(
         &flatland::ContentId { value: 25 },
         if controller.temperature() == TemperatureUnit::Celsius { &SELECTED } else { &SURFACE },
-        &fmath::SizeU { width: 240, height: 80 },
+        &btn,
     )?;
     flatland.set_solid_fill(
         &flatland::ContentId { value: 27 },
         if controller.temperature() == TemperatureUnit::Fahrenheit { &SELECTED } else { &SURFACE },
-        &fmath::SizeU { width: 240, height: 80 },
+        &btn,
     )?;
     flatland.set_solid_fill(
         &flatland::ContentId { value: 41 },
         if controller.status().starts_with("Apply failed") { &ERROR } else { &PANEL },
-        &fmath::SizeU { width: 688, height: 80 },
+        &fmath::SizeU { width: metrics.status_w, height: metrics.status_h },
     )?;
     flatland.present(flatland::PresentArgs::default())?;
     Ok(())
@@ -315,31 +325,51 @@ async fn create_settings_view(root_token: views::ViewCreationToken) -> Result<()
     }
 
     let narrow = size.width < 520 || (size.height > size.width && size.width < 800);
-    let btn_w = if narrow { size.width.saturating_sub(32).max(80) } else { 240 };
-    let info_w = size.width.saturating_sub(32).max(80);
-    let status_w = size.width.saturating_sub(32).max(80);
+    let sidebar_w = if narrow { 56 } else { 140 };
+    let card_x = sidebar_w + 8;
+    let card_w = size.width.saturating_sub(card_x + 8).max(80);
+    let btn_x = card_x + 12;
+    let btn_w = if narrow { card_w.saturating_sub(24).max(80) } else { 240 };
+    let btn_h = if narrow { 40 } else { 80 };
+    let info_w = if narrow { card_w } else { 640 };
+    let status_w = size.width.saturating_sub(16).max(80);
+    let status_h = if narrow { 28 } else { 80 };
     let status_y = if narrow {
-        size.height.saturating_sub(40).max(430) as i32
+        size.height.saturating_sub(32).max(360) as i32
     } else {
         size.height.saturating_sub(96) as i32
     };
-    let info_h = if narrow { 48 } else { 216 };
+    let info_h = if narrow { 36 } else { 216 };
+    let info_y = if narrow { 308 } else { 488 };
+    let metrics = LayoutMetrics { btn_w, btn_h, status_w, status_h };
     let rects = if narrow {
         [
-            (20, 21, &SURFACE, btn_w, 48, 16, 88),
-            (22, 23, &SURFACE, btn_w, 48, 16, 140),
-            (24, 25, &SURFACE, btn_w, 48, 16, 220),
-            (26, 27, &SURFACE, btn_w, 48, 16, 272),
-            (30, 31, &PANEL, info_w, info_h, 16, 340),
-            (40, 41, &PANEL, status_w, 32, 16, status_y),
+            (10, 11, &PANEL, sidebar_w, size.height, 0, 0),
+            (12, 13, &SELECTED, sidebar_w.saturating_sub(8), 40, 4, 12),
+            (14, 15, &PANEL, sidebar_w.saturating_sub(8), 40, 4, 60),
+            (16, 17, &PANEL, sidebar_w.saturating_sub(8), 40, 4, 108),
+            (18, 19, &PANEL, card_w, 148, card_x as i32, 8),
+            (20, 21, &SURFACE, btn_w, btn_h, btn_x as i32, 44),
+            (22, 23, &SURFACE, btn_w, btn_h, btn_x as i32, 92),
+            (28, 29, &PANEL, card_w, 148, card_x as i32, 164),
+            (24, 25, &SURFACE, btn_w, btn_h, btn_x as i32, 200),
+            (26, 27, &SURFACE, btn_w, btn_h, btn_x as i32, 248),
+            (30, 31, &PANEL, info_w, info_h, card_x as i32, info_y),
+            (40, 41, &PANEL, status_w, status_h, 8, status_y),
         ]
     } else {
         [
-            (20, 21, &SURFACE, 240, 80, 80, 192),
-            (22, 23, &SURFACE, 240, 80, 400, 192),
-            (24, 25, &SURFACE, 240, 80, 80, 352),
-            (26, 27, &SURFACE, 240, 80, 400, 352),
-            (30, 31, &PANEL, 640, 216, 40, 488),
+            (10, 11, &PANEL, sidebar_w, size.height, 0, 0),
+            (12, 13, &SELECTED, sidebar_w.saturating_sub(16), 44, 8, 16),
+            (14, 15, &PANEL, sidebar_w.saturating_sub(16), 44, 8, 68),
+            (16, 17, &PANEL, sidebar_w.saturating_sub(16), 44, 8, 120),
+            (18, 19, &PANEL, 560, 200, 160, 16),
+            (20, 21, &SURFACE, 240, 80, 176, 72),
+            (22, 23, &SURFACE, 240, 80, 432, 72),
+            (28, 29, &PANEL, 560, 200, 160, 232),
+            (24, 25, &SURFACE, 240, 80, 176, 288),
+            (26, 27, &SURFACE, 240, 80, 432, 288),
+            (30, 31, &PANEL, 640, 216, 160, 448),
             (40, 41, &PANEL, 688, 80, 16, size.height.saturating_sub(96) as i32),
         ]
     };
@@ -354,22 +384,22 @@ async fn create_settings_view(root_token: views::ViewCreationToken) -> Result<()
             fmath::Vec_ { x, y },
         )?;
     }
+    // Paint sidebar + cards before text so a TextSurface failure cannot leave a gray slab.
+    flatland.present(flatland::PresentArgs::default())?;
 
     let mut static_text = Vec::new();
-    let title_w = size.width.saturating_sub(32).max(80);
     let text_specs: Vec<(u64, u64, u32, u32, i32, i32, &str, TextStyle)> = if narrow {
         vec![
-            (100, 101, title_w, 32, 16, 8, "Settings", TextStyle { font_size: 18.0, left_padding: 6, top_padding: 4 }),
-            (108, 109, title_w, 24, 16, 60, "Appearance", TextStyle { font_size: 14.0, left_padding: 4, top_padding: 3 }),
-            (112, 113, btn_w, 48, 16, 88, "Dark", TextStyle { font_size: 15.0, left_padding: 12, top_padding: 12 }),
-            (116, 117, btn_w, 48, 16, 140, "Contrast", TextStyle { font_size: 15.0, left_padding: 12, top_padding: 12 }),
-            (120, 121, title_w, 24, 16, 196, "Temperature", TextStyle { font_size: 14.0, left_padding: 4, top_padding: 3 }),
-            (124, 125, btn_w, 48, 16, 220, "Celsius", TextStyle { font_size: 15.0, left_padding: 12, top_padding: 12 }),
-            (128, 129, btn_w, 48, 16, 272, "Fahrenheit", TextStyle { font_size: 15.0, left_padding: 12, top_padding: 12 }),
-            (132, 133, title_w, 24, 16, 328, "System", TextStyle { font_size: 14.0, left_padding: 4, top_padding: 3 }),
-            (136, 137, info_w.saturating_sub(16), 36, 24, 348, &build_line, TextStyle { font_size: 12.0, left_padding: 4, top_padding: 8 }),
-            (140, 141, 1, 1, -64, -64, &product_line, TextStyle { font_size: 12.0, left_padding: 4, top_padding: 8 }),
-            (144, 145, 1, 1, -64, -64, "build-info + hwinfo", TextStyle { font_size: 12.0, left_padding: 4, top_padding: 8 }),
+            (110, 111, card_w.saturating_sub(16), 20, (card_x + 12) as i32, 14, "Appearance", TextStyle { font_size: 13.0, left_padding: 2, top_padding: 2 }),
+            (112, 113, btn_w, btn_h, btn_x as i32, 44, "Dark", TextStyle { font_size: 14.0, left_padding: 10, top_padding: 10 }),
+            (116, 117, btn_w, btn_h, btn_x as i32, 92, "Contrast", TextStyle { font_size: 14.0, left_padding: 10, top_padding: 10 }),
+            (120, 121, card_w.saturating_sub(16), 20, (card_x + 12) as i32, 170, "Temperature", TextStyle { font_size: 13.0, left_padding: 2, top_padding: 2 }),
+            (124, 125, btn_w, btn_h, btn_x as i32, 200, "Celsius", TextStyle { font_size: 14.0, left_padding: 10, top_padding: 10 }),
+            (128, 129, btn_w, btn_h, btn_x as i32, 248, "Fahrenheit", TextStyle { font_size: 14.0, left_padding: 10, top_padding: 10 }),
+            (132, 133, card_w.saturating_sub(8), 20, (card_x + 8) as i32, info_y + 2, "System", TextStyle { font_size: 12.0, left_padding: 2, top_padding: 2 }),
+            (136, 137, info_w.saturating_sub(12), 16, (card_x + 8) as i32, info_y + 18, &build_line, TextStyle { font_size: 10.0, left_padding: 2, top_padding: 1 }),
+            (140, 141, 1, 1, -64, -64, &product_line, TextStyle { font_size: 10.0, left_padding: 2, top_padding: 1 }),
+            (144, 145, 1, 1, -64, -64, "build-info + hwinfo", TextStyle { font_size: 10.0, left_padding: 2, top_padding: 1 }),
         ]
     } else {
         vec![
@@ -388,19 +418,21 @@ async fn create_settings_view(root_token: views::ViewCreationToken) -> Result<()
         ]
     };
     for (transform, content, width, height, x, y, text, style) in text_specs {
-        static_text.push(
-            TextSurface::new_with_style(
-                &flatland,
-                &root,
-                flatland::TransformId { value: transform },
-                flatland::ContentId { value: content },
-                fmath::SizeU { width, height },
-                fmath::Vec_ { x, y },
-                text,
-                style,
-            )
-            .await?,
-        );
+        match TextSurface::new_with_style(
+            &flatland,
+            &root,
+            flatland::TransformId { value: transform },
+            flatland::ContentId { value: content },
+            fmath::SizeU { width, height },
+            fmath::Vec_ { x, y },
+            text,
+            style,
+        )
+        .await
+        {
+            Ok(surface) => static_text.push(surface),
+            Err(error) => warn!("Settings label {text:?} skipped: {error}"),
+        }
     }
 
     let theme_value = TextSurface::new_with_style(
@@ -408,8 +440,8 @@ async fn create_settings_view(root_token: views::ViewCreationToken) -> Result<()
         &root,
         flatland::TransformId { value: 200 },
         flatland::ContentId { value: 201 },
-        fmath::SizeU { width: if narrow { 1 } else { 320 }, height: if narrow { 1 } else { 40 } },
-        fmath::Vec_ { x: if narrow { -64 } else { 352 }, y: if narrow { -64 } else { 124 } },
+        fmath::SizeU { width: if narrow { 32 } else { 320 }, height: if narrow { 16 } else { 40 } },
+        fmath::Vec_ { x: if narrow { -80 } else { 352 }, y: if narrow { -80 } else { 124 } },
         &format!("Current: {}", controller.theme().label()),
         TextStyle { font_size: 16.0, left_padding: 8, top_padding: 8 },
     )
@@ -436,14 +468,14 @@ async fn create_settings_view(root_token: views::ViewCreationToken) -> Result<()
         &root,
         flatland::TransformId { value: 208 },
         flatland::ContentId { value: 209 },
-        fmath::SizeU { width: status_w, height: if narrow { 28 } else { 64 } },
-        fmath::Vec_ { x: 16, y: if narrow { status_y } else { size.height.saturating_sub(88) as i32 } },
+        fmath::SizeU { width: status_w, height: status_h },
+        fmath::Vec_ { x: 8, y: if narrow { status_y } else { size.height.saturating_sub(88) as i32 } },
         controller.status(),
         TextStyle { font_size: 16.0, left_padding: 8, top_padding: 15 },
     )
     .await?;
     let mut dynamic = DynamicSurfaces { theme_value, temperature_value, status };
-    refresh_ui(&flatland, &controller, &mut dynamic).await?;
+    refresh_ui(&flatland, &controller, &mut dynamic, metrics).await?;
     info!(
         "Presented Fuchsia Settings at {}x{} theme={} temperature={} hidden={:?}",
         size.width,
@@ -494,7 +526,7 @@ async fn create_settings_view(root_token: views::ViewCreationToken) -> Result<()
                     }
                 }
                 info!("Settings action {action_name}: {}", controller.status());
-                refresh_ui(&flatland, &controller, &mut dynamic).await?;
+                refresh_ui(&flatland, &controller, &mut dynamic, metrics).await?;
             }
             event = flatland_events.next() => match event {
                 Some(Ok(flatland::FlatlandEvent::OnError { error })) => {

@@ -10,6 +10,8 @@ Live 17: tile headers read BRW / FIL / TRM. Settings dropped this shot.
 
 Live 18: Inspect tile_count=4. SET / FIL / TRM readable. BRW clipped.
 
+Live 19: Settings sidebar + Appearance/Temperature cards. Dark/Celsius selected.
+
 **No. The live emulator screen is not production yet.**
 
 It is a real native Fuchsia Workbench session with:
