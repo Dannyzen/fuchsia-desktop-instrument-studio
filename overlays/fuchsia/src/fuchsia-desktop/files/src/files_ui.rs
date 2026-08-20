@@ -6,7 +6,13 @@ pub const TOOLBAR_TOP: f32 = 88.0;
 pub const TOOLBAR_BOTTOM: f32 = 136.0;
 pub const LIST_TOP: f32 = 160.0;
 pub const ROW_HEIGHT: f32 = 64.0;
-pub const MAX_VISIBLE_ROWS: usize = 8;
+pub const MAX_VISIBLE_ROWS: usize = 4;
+pub const GRID_COLS: usize = 2;
+pub const GRID_ROWS: usize = 2;
+pub const GRID_TOP: f32 = 200.0;
+pub const GRID_GAP: f32 = 8.0;
+pub const GRID_PAD: f32 = 10.0;
+pub const CELL_H: f32 = 88.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UiAction {
@@ -22,6 +28,10 @@ pub enum UiAction {
 
 pub fn action_for_point(x: f32, y: f32) -> Option<UiAction> {
     action_for_point_in(x, y, 720.0)
+}
+
+pub fn grid_cell_width(width: f32) -> f32 {
+    ((width - GRID_PAD * 2.0 - GRID_GAP) / GRID_COLS as f32).max(72.0)
 }
 
 pub fn action_for_point_in(x: f32, y: f32, width: f32) -> Option<UiAction> {
@@ -45,12 +55,22 @@ pub fn action_for_point_in(x: f32, y: f32, width: f32) -> Option<UiAction> {
             .into_iter()
             .find_map(|(range, action)| range.contains(&x).then_some(action));
         }
-        let list_top = 200.0;
-        if x < 12.0 || x >= width - 8.0 || y < list_top {
+        let cell_w = grid_cell_width(width);
+        if y < GRID_TOP {
             return None;
         }
-        let row = ((y - list_top) / ROW_HEIGHT) as usize;
-        return (row < MAX_VISIBLE_ROWS).then_some(UiAction::Select(row));
+        let col = ((x - GRID_PAD) / (cell_w + GRID_GAP)).floor() as i32;
+        let row = ((y - GRID_TOP) / (CELL_H + GRID_GAP)).floor() as i32;
+        if col < 0 || row < 0 || col >= GRID_COLS as i32 || row >= GRID_ROWS as i32 {
+            return None;
+        }
+        let local_x = x - GRID_PAD - col as f32 * (cell_w + GRID_GAP);
+        let local_y = y - GRID_TOP - row as f32 * (CELL_H + GRID_GAP);
+        if local_x < 0.0 || local_x >= cell_w || local_y < 0.0 || local_y >= CELL_H {
+            return None;
+        }
+        let index = row as usize * GRID_COLS + col as usize;
+        return (index < MAX_VISIBLE_ROWS).then_some(UiAction::Select(index));
     }
     if (TOOLBAR_TOP..TOOLBAR_BOTTOM).contains(&y) {
         return [
@@ -91,7 +111,7 @@ mod tests {
     fn maps_visible_rows() {
         assert_eq!(action_for_point(100.0, 180.0), Some(UiAction::Select(0)));
         assert_eq!(action_for_point(100.0, 244.0), Some(UiAction::Select(1)));
-        assert_eq!(action_for_point(100.0, 628.0), Some(UiAction::Select(7)));
+        assert_eq!(action_for_point(100.0, 372.0), Some(UiAction::Select(3)));
     }
 
     #[test]
@@ -107,6 +127,15 @@ mod tests {
         assert_eq!(action_for_point_in(40.0, 110.0, 348.0), Some(UiAction::Up));
         assert_eq!(action_for_point_in(40.0, 160.0, 348.0), Some(UiAction::Copy));
         assert_eq!(action_for_point_in(180.0, 160.0, 348.0), Some(UiAction::Delete));
-        assert_eq!(action_for_point_in(40.0, 220.0, 348.0), Some(UiAction::Select(0)));
+    }
+
+    #[test]
+    fn maps_narrow_icon_grid() {
+        // 2x3 grid starting at y=200. Cell ~161x88.
+        assert_eq!(action_for_point_in(40.0, 230.0, 326.0), Some(UiAction::Select(0)));
+        assert_eq!(action_for_point_in(200.0, 230.0, 326.0), Some(UiAction::Select(1)));
+        assert_eq!(action_for_point_in(40.0, 326.0, 326.0), Some(UiAction::Select(2)));
+        assert_eq!(action_for_point_in(200.0, 326.0, 326.0), Some(UiAction::Select(3)));
+        assert_eq!(action_for_point_in(20.0, 190.0, 326.0), None);
     }
 }

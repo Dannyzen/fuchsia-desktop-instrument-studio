@@ -80,6 +80,8 @@ We are building **Instrument Studio** first:
 
 ![Live emulator Settings cards](design/screenshots/19-emulator-settings-cards-live.png)
 
+![Live emulator clean menu text](design/screenshots/20-emulator-menu-text-live.png)
+
 Interactive sketches live under `design/sketches/`.
 
 ## Local rebuild

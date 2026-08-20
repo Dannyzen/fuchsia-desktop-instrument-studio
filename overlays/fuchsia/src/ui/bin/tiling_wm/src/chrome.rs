@@ -170,6 +170,7 @@ fn glyph5(ch: u8) -> [u8; 7] {
         b'X' => [17, 17, 10, 4, 10, 17, 17],
         b'Y' => [17, 17, 10, 4, 4, 4, 4],
         b'Z' => [31, 1, 2, 4, 8, 16, 31],
+        b'a'..=b'z' => glyph5(ch.to_ascii_uppercase()),
         _ => [0, 0, 0, 0b01110, 0, 0, 0],
     }
 }
@@ -189,7 +190,7 @@ fn draw_text(
     let mut cx = x;
     let gap = px.max(1);
     for ch in text.bytes() {
-        let rows = glyph5(ch.to_ascii_uppercase());
+        let rows = glyph5(ch);
         for (ry, row) in rows.iter().enumerate() {
             let mut rx = 0u32;
             while rx < 5 {
@@ -380,25 +381,34 @@ impl ShellChrome {
         self.brand_b.layout(flatland, bx + (mark / 2) as i32, by, mark - mark / 2, mark, violet)?;
 
         let mut li = 0usize;
-        let brand_px = 4u32;
-        let brand_text = if strip.width < 900 { "STUDIO" } else { "WORKBENCH" };
+        // 3px glyphs + reserved chip column so menu words never collide (no OPSOK).
+        let menu_px = if strip.width < 800 { 3u32 } else { 4u32 };
+        let brand_text = if strip.width < 640 { "STUDIO" } else { "Workbench" };
         li = draw_text(
             &self.labels,
             flatland,
             li,
             bx + mark as i32 + 10,
-            by + (mark as i32 - 7 * brand_px as i32) / 2,
+            by + (mark as i32 - 7 * menu_px as i32) / 2,
             brand_text,
-            brand_px,
+            menu_px,
             text,
         )?;
 
-        let pill_h = strip.height.saturating_sub(14).max(18);
-        let pill_w = if strip.width < 800 { 86 } else { 104 };
-        let brand_w = if strip.width < 900 { 6 * 6 * 4 + 16 } else { 9 * 6 * 4 + 16 };
+        let pill_h = strip.height.saturating_sub(16).max(18);
+        let pill_labels = if strip.width < 800 {
+            ["Bld", "Rsh", "Ops"]
+        } else {
+            ["Build", "Research", "Ops"]
+        };
+        let pill_w = if strip.width < 800 { 56 } else { 108 };
+        let brand_chars = brand_text.len() as i32;
+        let brand_w = brand_chars * (5 * menu_px as i32 + menu_px as i32) + 14;
         let mut px = bx + mark as i32 + brand_w;
         let py = (strip.y + (strip.height - pill_h) / 2) as i32;
-        let pill_labels = ["BLD", "RSH", "OPS"];
+        let chip_w = if strip.width < 800 { 52 } else { 72 };
+        let chips_total = 3 * chip_w as i32 + 2 * 8 + 12;
+        let chips_left = (strip.x + strip.width) as i32 - chips_total;
         for i in 0..3 {
             let active = i == 0;
             let fill = if active { cyan_dim } else { elev };
@@ -411,36 +421,41 @@ impl ShellChrome {
                 2,
                 if active { cyan } else { line },
             )?;
-            let tpx = 4u32;
-            let tw = (pill_labels[i].len() as i32) * (5 * tpx as i32 + tpx as i32);
+            let tw = (pill_labels[i].len() as i32) * (5 * menu_px as i32 + menu_px as i32);
             li = draw_text(
                 &self.labels,
                 flatland,
                 li,
-                px + (pill_w as i32 - tw) / 2,
-                py + (pill_h as i32 - 7 * tpx as i32) / 2,
+                px + (pill_w as i32 - tw).max(4) / 2,
+                py + (pill_h as i32 - 7 * menu_px as i32) / 2,
                 pill_labels[i],
-                tpx,
+                menu_px,
                 if active { cyan } else { faint },
             )?;
             px += pill_w as i32 + 8;
         }
+        // Hard stop: never let Ops run into Ok/Foc/Gap.
+        if px > chips_left - 10 {
+            px = chips_left - 10;
+        }
 
-        let chip_w = if strip.width < 800 { 78 } else { 90 };
         let chip_h = pill_h;
         let mut cx = (strip.x + strip.width) as i32 - 12;
         let chips = [
-            (state.tile_count > 0, green, "OK"),
-            (!state.confirmed_focus.is_empty(), cyan, "FOC"),
-            (state.gap_px > 0, violet, "GAP"),
+            (state.tile_count > 0, green, "Ok"),
+            (!state.confirmed_focus.is_empty(), cyan, "Foc"),
+            (state.gap_px > 0, violet, "Gap"),
         ];
         for i in (0..3).rev() {
             cx -= chip_w as i32;
+            if cx < chips_left {
+                cx = chips_left + i as i32 * (chip_w as i32 + 8);
+            }
             self.status_chips[i].layout(flatland, cx, py, chip_w, chip_h, elev)?;
-            let d = 8u32;
+            let d = 7u32;
             self.status_dots[i].layout(
                 flatland,
-                cx + 6,
+                cx + 5,
                 py + (chip_h as i32 - d as i32) / 2,
                 d,
                 d,
@@ -450,10 +465,10 @@ impl ShellChrome {
                 &self.labels,
                 flatland,
                 li,
-                cx + 18,
-                py + (chip_h as i32 - 28) / 2,
+                cx + 16,
+                py + (chip_h as i32 - 7 * menu_px as i32) / 2,
                 chips[i].2,
-                4,
+                menu_px,
                 if chips[i].0 { text } else { faint },
             )?;
             cx -= 8;
@@ -541,8 +556,8 @@ impl ShellChrome {
             li,
             inspector.x as i32 + 10,
             inspector.y as i32 + 8,
-            "INSPECT",
-            4,
+            "Inspect",
+            3,
             cyan,
         )?;
 
@@ -558,7 +573,7 @@ impl ShellChrome {
             meter_color((state.gap_px as f32 / 24.0).clamp(0.15, 1.0), violet, muted),
             meter_color((state.present_count.min(12) as f32) / 12.0, green, muted),
         ];
-        let card_labels = ["TILE", "FOC", "GAP", "LIVE"];
+        let card_labels = ["Tile", "Focus", "Gap", "Live"];
         for i in 0..4 {
             let x = (inspector.x + pad + i as u32 * (card_w + pad)) as i32;
             self.inspector_cards[i].layout(flatland, x, card_y, card_w, card_h, elev)?;
@@ -580,7 +595,7 @@ impl ShellChrome {
                 x + 22,
                 card_y + 10,
                 card_labels[i],
-                4,
+                3,
                 text,
             )?;
         }

@@ -21,6 +21,7 @@ def four_app_gate(tile_count: int, running: dict[str, bool]) -> bool:
 
 def main() -> int:
     assert short_label("tid-settings-1") == "SET"
+    assert short_label("gr3-settings-20260819T231211Z") == "SET"
     assert short_label("tid-files-1") == "FIL"
     assert short_label("tid-browser-1") == "BRW"
     assert short_label("tid-terminal-1") == "TRM"

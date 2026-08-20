@@ -38,6 +38,8 @@ jobs:
           test -f design/screenshots/17-emulator-tile-names-live.png
           test -f design/screenshots/18-emulator-set-restore-live.png
           test -f design/screenshots/19-emulator-settings-cards-live.png
+          test -f design/screenshots/20-emulator-menu-text-live.png
+          test -f docs/evidence/instrument-studio-menu-text-20260820T000156Z/vision-comparison.md
           test -f docs/evidence/instrument-studio-settings-cards-20260819T160901Z/vision-comparison.md
           test -f docs/evidence/instrument-studio-set-restore-20260819T155032Z/vision-comparison.md
           test -f docs/evidence/instrument-studio-tile-names-live-20260819T150408Z/vision-comparison.md

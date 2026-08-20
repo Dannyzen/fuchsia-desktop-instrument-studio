@@ -16,6 +16,19 @@ def regions(width: int, height: int, panel_h=PANEL_H, rail_w=RAIL_W, inspector_h
     return strip, rail, stage, inspector
 
 
+def menu_items_do_not_collide(strip_w: int) -> None:
+    """Portrait FEMU strip: last Build/Research/Ops pill stays left of Ok/Foc/Gap."""
+    mark = 26
+    menu_px = 3 if strip_w < 800 else 4
+    brand = "Workbench" if strip_w >= 640 else "STUDIO"
+    brand_w = len(brand) * (5 * menu_px + menu_px) + 14
+    pill_w = 56 if strip_w < 800 else 108
+    pills_right = 12 + mark + brand_w + 3 * pill_w + 2 * 8
+    chip_w = 52 if strip_w < 800 else 72
+    chips_left = strip_w - (3 * chip_w + 2 * 8 + 12)
+    assert pills_right + 8 <= chips_left, (pills_right, chips_left)
+
+
 def main() -> int:
     strip, rail, stage, inspector = regions(1440, 900)
     assert strip == (0, 0, 1440, 48)
@@ -32,6 +45,7 @@ def main() -> int:
         raise SystemExit("expected tiny display rejection")
     except AssertionError:
         pass
+    menu_items_do_not_collide(720)
     print("desktop_ui_host_contract_ok")
     return 0
 

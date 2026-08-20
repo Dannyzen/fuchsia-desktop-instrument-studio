@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Instrument Studio chrome menu-text pilot</title>
+<style>
+  :root {
+    --bg: #07090d;
+    --panel: #11151c;
+    --elev: #1b212b;
+    --line: rgba(255,255,255,.08);
+    --cyan: #00eaff;
+    --violet: #8b7cff;
+    --green: #3dd68c;
+    --text: #e8eef6;
+    --faint: #8b95a5;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    padding: 28px;
+  }
+  h1 { font-size: 18px; font-weight: 600; letter-spacing: .02em; margin-bottom: 8px; }
+  p { color: var(--faint); font-size: 13px; margin-bottom: 22px; }
+  .row { display: grid; gap: 18px; }
+  .card {
+    background: #0c1016;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .label {
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--faint);
+    padding: 10px 14px 0;
+  }
+  .strip {
+    height: 52px;
+    margin: 12px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 12px;
+    background: var(--panel);
+    position: relative;
+  }
+  .strip:after {
+    content: "";
+    position: absolute; left: 12px; right: 12px; bottom: 0;
+    height: 2px; background: var(--cyan);
+  }
+  .mark { width: 22px; height: 22px; border-radius: 7px; background: linear-gradient(90deg, var(--cyan), var(--violet)); flex: none; }
+  .dirty {
+    font-family: ui-monospace, "IBM Plex Mono", monospace;
+    font-weight: 700;
+    letter-spacing: .28em;
+    font-size: 15px;
+    image-rendering: pixelated;
+    text-transform: uppercase;
+  }
+  .pill {
+    height: 28px; min-width: 72px; padding: 0 12px;
+    border-radius: 999px; display: flex; align-items: center; justify-content: center;
+    background: var(--elev); color: var(--faint); font-size: 13px; font-weight: 600;
+  }
+  .pill.on { background: rgba(0,234,255,.12); color: var(--cyan); box-shadow: inset 0 -2px 0 var(--cyan); }
+  .chips { margin-left: auto; display: flex; gap: 8px; }
+  .chip {
+    height: 28px; padding: 0 10px; border-radius: 999px; background: var(--elev);
+    display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--faint);
+  }
+  .dot { width: 7px; height: 7px; border-radius: 99px; }
+  .inspect {
+    margin: 0 12px 12px; height: 92px; border-radius: 12px; background: var(--panel);
+    display: grid; grid-template-columns: 110px 1fr 1fr 1fr; gap: 8px; padding: 10px;
+    border-top: 2px solid var(--cyan);
+  }
+  .meter { background: var(--elev); border-radius: 10px; padding: 8px 10px; }
+  .bar { height: 6px; border-radius: 99px; margin-top: 28px; }
+  .clean-brand { font-size: 15px; font-weight: 600; letter-spacing: .01em; }
+  .clean-brand span { color: var(--faint); font-weight: 500; }
+</style>
+<body>
+  <h1>Chrome menu text: live vs clean pilot</h1>
+  <p>Live FEMU reads STUDIO / BLD / RSH / OPSOK / FOC / GAP. The clean version uses Workbench Studio, Build / Research / Ops, and un-collided status chips.</p>
+
+  <div class="row">
+    <section class="card">
+      <div class="label">A · Live bitmap (dirty)</div>
+      <div class="strip dirty">
+        <div class="mark"></div>
+        <div>STUDIO</div>
+        <div class="pill on dirty">BLD</div>
+        <div class="pill dirty">RSH</div>
+        <div class="pill dirty">OPSOK</div>
+        <div class="chips">
+          <div class="chip dirty">FOC</div>
+          <div class="chip dirty">GAP</div>
+        </div>
+      </div>
+      <div class="inspect dirty">
+        <div>INSPECT<br>TILE</div>
+        <div class="meter">FOC<div class="bar" style="background:var(--cyan)"></div></div>
+        <div class="meter">GAP<div class="bar" style="background:var(--violet)"></div></div>
+        <div class="meter">LIVE<div class="bar" style="background:var(--green)"></div></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="label">B · Clean Inter-like (chosen)</div>
+      <div class="strip">
+        <div class="mark"></div>
+        <div class="clean-brand">Workbench <span>Studio</span></div>
+        <div class="pill on">Build</div>
+        <div class="pill">Research</div>
+        <div class="pill">Ops</div>
+        <div class="chips">
+          <div class="chip"><span class="dot" style="background:var(--green)"></span>session healthy</div>
+          <div class="chip"><span class="dot" style="background:var(--cyan)"></span>focus confirmed</div>
+          <div class="chip"><span class="dot" style="background:var(--violet)"></span>12px gaps</div>
+        </div>
+      </div>
+      <div class="inspect" style="font-size:13px">
+        <div style="color:var(--cyan);font-weight:650;padding-top:8px">Inspect</div>
+        <div class="meter">Focus<div class="bar" style="background:var(--cyan)"></div></div>
+        <div class="meter">Gap<div class="bar" style="background:var(--violet)"></div></div>
+        <div class="meter">Live<div class="bar" style="background:var(--green)"></div></div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

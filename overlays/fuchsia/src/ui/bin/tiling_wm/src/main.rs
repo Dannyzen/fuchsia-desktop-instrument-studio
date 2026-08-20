@@ -42,6 +42,8 @@ pub struct TileId(pub String);
 
 fn tile_short_label(id: &str) -> &'static str {
     let key = id.to_ascii_lowercase();
+    // "settings" must win before "files": the word settings contains no
+    // "files" substring, but session names can include both tokens.
     if key.contains("settings") {
         "SET"
     } else if key.contains("files") {

@@ -20,7 +20,7 @@ mod files_ui;
 mod text_surface;
 
 use files_core::{Entry, EntryKind, FilesController, RootedFiles};
-use files_ui::{action_for_point, UiAction, MAX_VISIBLE_ROWS};
+use files_ui::{action_for_point_in, UiAction, MAX_VISIBLE_ROWS, CELL_H, GRID_COLS, GRID_GAP, GRID_PAD, GRID_TOP};
 use text_surface::{TextStyle, TextSurface};
 
 const BACKGROUND: flatland::ColorRgba =
@@ -119,16 +119,14 @@ async fn watch_touch_source(
 
 fn row_label(entry: Option<&Entry>) -> String {
     match entry {
-        Some(entry) if entry.kind == EntryKind::Directory => format!("[DIR] {}", entry.name),
-        Some(entry) if entry.kind == EntryKind::File => format!("{}  ({} B)", entry.name, entry.size),
-        Some(entry) => format!("[OTHER] {}", entry.name),
+        Some(entry) => entry.name.clone(),
         None => String::new(),
     }
 }
 
 struct DynamicSurfaces {
-    path: TextSurface,
-    status: TextSurface,
+    path: Option<TextSurface>,
+    status: Option<TextSurface>,
     rows: Vec<TextSurface>,
 }
 
@@ -137,24 +135,32 @@ async fn refresh_dynamic_ui(
     controller: &FilesController,
     surfaces: &mut DynamicSurfaces,
     status_override: Option<&str>,
+    size_w: u32,
 ) -> Result<(), Error> {
     let current = controller.current_directory();
     let path = if current.is_empty() { "Files /".to_string() } else { format!("Files /{current}") };
-    surfaces.path.update(flatland, &path).await?;
+    if let Some(surface) = surfaces.path.as_mut() {
+        let _ = surface.update(flatland, &path).await;
+    }
+    let cell_w = ((size_w.saturating_sub((GRID_PAD * 2.0 + GRID_GAP) as u32)) / GRID_COLS as u32).max(72);
     for index in 0..MAX_VISIBLE_ROWS {
         let entry = controller.entries().get(index);
-        surfaces.rows[index].update(flatland, &row_label(entry)).await?;
+        if let Some(surface) = surfaces.rows.get_mut(index) {
+            let _ = surface.update(flatland, &row_label(entry)).await;
+        }
         let selected = entry
             .map(|entry| Some(entry.name.as_str()) == controller.selected_name())
             .unwrap_or(false);
-        flatland.set_solid_fill(
+        let _ = flatland.set_solid_fill(
             &flatland::ContentId { value: 201 + index as u64 * 2 },
             if selected { &SELECTED } else { &SURFACE },
-            &fmath::SizeU { width: 672, height: 56 },
-        )?;
+            &fmath::SizeU { width: cell_w, height: CELL_H as u32 },
+        );
     }
     let status = status_override.unwrap_or_else(|| controller.status());
-    surfaces.status.update(flatland, status).await?;
+    if let Some(surface) = surfaces.status.as_mut() {
+        let _ = surface.update(flatland, status).await;
+    }
     flatland.set_solid_fill(
         &flatland::ContentId { value: 33 },
         if controller.status().starts_with("Confirm delete") { &DANGER } else { &SURFACE },
@@ -263,31 +269,62 @@ async fn create_files_view(root_token: views::ViewCreationToken) -> Result<(), E
             fmath::SizeU { width: *width, height: 48 },
             fmath::Vec_ { x: *x, y: by },
         )?;
-        static_text.push(
-            TextSurface::new_with_style(
-                &flatland,
-                &root,
-                flatland::TransformId { value: 100 + index as u64 * 4 },
-                flatland::ContentId { value: 101 + index as u64 * 4 },
-                fmath::SizeU { width: *width, height: 48 },
-                fmath::Vec_ { x: *x, y: by },
-                label,
-                TextStyle { font_size: 15.0, left_padding: 8, top_padding: 11 },
-            )
-            .await?,
-        );
+        match TextSurface::new_with_style(
+            &flatland,
+            &root,
+            flatland::TransformId { value: 100 + index as u64 * 4 },
+            flatland::ContentId { value: 101 + index as u64 * 4 },
+            fmath::SizeU { width: *width, height: 48 },
+            fmath::Vec_ { x: *x, y: by },
+            label,
+            TextStyle { font_size: 15.0, left_padding: 8, top_padding: 11 },
+        )
+        .await
+        {
+            Ok(surface) => static_text.push(surface),
+            Err(error) => warn!("Files toolbar label {label} skipped: {error}"),
+        }
+    }
+    if let Err(error) = flatland.present(flatland::PresentArgs::default()) {
+        warn!("Files toolbar present failed: {error:?}");
     }
 
+    let cell_w = if narrow {
+        size.width.saturating_sub((GRID_PAD * 2.0 + GRID_GAP) as u32) / GRID_COLS as u32
+    } else {
+        size.width.saturating_sub(24).max(80)
+    };
     for index in 0..MAX_VISIBLE_ROWS {
+        let (x, y) = if narrow {
+            let col = (index % GRID_COLS) as u32;
+            let row = (index / GRID_COLS) as u32;
+            (
+                GRID_PAD as i32 + (col as f32 * (cell_w as f32 + GRID_GAP)) as i32,
+                GRID_TOP as i32 + (row as f32 * (CELL_H + GRID_GAP)) as i32,
+            )
+        } else {
+            (12, 160 + index as i32 * 64)
+        };
         create_rect(
             &flatland,
             &root,
             200 + index as u64 * 2,
             201 + index as u64 * 2,
             &SURFACE,
-            fmath::SizeU { width: size.width.saturating_sub(24).max(80), height: 56 },
-            fmath::Vec_ { x: 12, y: (if narrow { 200 } else { 160 }) + index as i32 * 64 },
+            fmath::SizeU { width: if narrow { cell_w.max(72) } else { size.width.saturating_sub(24).max(80) }, height: if narrow { CELL_H as u32 } else { 56 } },
+            fmath::Vec_ { x, y },
         )?;
+        if narrow {
+            create_rect(
+                &flatland,
+                &root,
+                700 + index as u64 * 2,
+                701 + index as u64 * 2,
+                &PANEL,
+                fmath::SizeU { width: 36, height: 36 },
+                fmath::Vec_ { x: x + (cell_w as i32 - 36) / 2, y: y + 8 },
+            )?;
+        }
     }
     create_rect(
         &flatland,
@@ -298,9 +335,20 @@ async fn create_files_view(root_token: views::ViewCreationToken) -> Result<(), E
         fmath::SizeU { width: size.width.saturating_sub(32), height: 64 },
         fmath::Vec_ { x: 16, y: size.height.saturating_sub(80) as i32 },
     )?;
+    // Grid geometry first so a later TextSurface failure still shows icon cells.
+    if let Err(error) = flatland.present(flatland::PresentArgs::default()) {
+        warn!("Files geometry present failed: {error:?}");
+    }
+    info!("Presented Files geometry at {}x{}", size.width, size.height);
 
-    let mut controller = FilesController::new("/data").map_err(|error| anyhow!(error))?;
-    let title = TextSurface::new_with_style(
+    let mut controller = match FilesController::new("/data") {
+        Ok(controller) => Some(controller),
+        Err(error) => {
+            warn!("Files controller failed; geometry-only view stays up: {error}");
+            None
+        }
+    };
+    let title = match TextSurface::new_with_style(
         &flatland,
         &root,
         flatland::TransformId { value: 504 },
@@ -310,8 +358,15 @@ async fn create_files_view(root_token: views::ViewCreationToken) -> Result<(), E
         "Files",
         TextStyle { font_size: 24.0, left_padding: 8, top_padding: 5 },
     )
-    .await?;
-    let path_surface = TextSurface::new_with_style(
+    .await
+    {
+        Ok(surface) => Some(surface),
+        Err(error) => {
+            warn!("Files title skipped: {error}");
+            None
+        }
+    };
+    let path_surface = match TextSurface::new_with_style(
         &flatland,
         &root,
         flatland::TransformId { value: 500 },
@@ -321,36 +376,64 @@ async fn create_files_view(root_token: views::ViewCreationToken) -> Result<(), E
         "Files /",
         TextStyle::ADDRESS,
     )
-    .await?;
-    let status_surface = TextSurface::new_with_style(
+    .await
+    {
+        Ok(surface) => Some(surface),
+        Err(error) => {
+            warn!("Files path skipped: {error}");
+            None
+        }
+    };
+    let status_surface = match TextSurface::new_with_style(
         &flatland,
         &root,
         flatland::TransformId { value: 508 },
         flatland::ContentId { value: 509 },
         fmath::SizeU { width: size.width.saturating_sub(48), height: 48 },
         fmath::Vec_ { x: 24, y: size.height.saturating_sub(72) as i32 },
-        controller.status(),
+        controller.as_ref().map(|c| c.status()).unwrap_or("Ready"),
         TextStyle { font_size: 16.0, left_padding: 8, top_padding: 10 },
     )
-    .await?;
+    .await
+    {
+        Ok(surface) => Some(surface),
+        Err(error) => {
+            warn!("Files status skipped: {error}");
+            None
+        }
+    };
     let mut row_surfaces = Vec::new();
     for index in 0..MAX_VISIBLE_ROWS {
-        row_surfaces.push(
-            TextSurface::new_with_style(
-                &flatland,
-                &root,
-                flatland::TransformId { value: 300 + index as u64 * 4 },
-                flatland::ContentId { value: 301 + index as u64 * 4 },
-                fmath::SizeU { width: size.width.saturating_sub(32).max(72), height: 56 },
-                fmath::Vec_ { x: 16, y: (if narrow { 200 } else { 160 }) + index as i32 * 64 },
-                &row_label(controller.entries().get(index)),
-                TextStyle { font_size: 19.0, left_padding: 8, top_padding: 12 },
-            )
-            .await?,
-        );
+        let (x, y, w, h, font, pad_top) = if narrow {
+            let col = (index % GRID_COLS) as u32;
+            let row = (index / GRID_COLS) as u32;
+            let cx = GRID_PAD as i32 + (col as f32 * (cell_w as f32 + GRID_GAP)) as i32;
+            let cy = GRID_TOP as i32 + (row as f32 * (CELL_H + GRID_GAP)) as i32;
+            (cx + 4, cy + 48, cell_w.saturating_sub(8).max(48), 32, 11.0, 6)
+        } else {
+            (16, 160 + index as i32 * 64, size.width.saturating_sub(32).max(72), 56, 19.0, 12)
+        };
+        match TextSurface::new_with_style(
+            &flatland,
+            &root,
+            flatland::TransformId { value: 300 + index as u64 * 4 },
+            flatland::ContentId { value: 301 + index as u64 * 4 },
+            fmath::SizeU { width: w, height: h },
+            fmath::Vec_ { x, y },
+            &row_label(controller.as_ref().and_then(|c| c.entries().get(index))),
+            TextStyle { font_size: font, left_padding: 4, top_padding: pad_top },
+        )
+        .await
+        {
+            Ok(surface) => row_surfaces.push(surface),
+            Err(error) => warn!("Files label {index} skipped: {error}"),
+        }
+
     }
     let mut dynamic = DynamicSurfaces { path: path_surface, status: status_surface, rows: row_surfaces };
-    flatland.present(flatland::PresentArgs::default())?;
+    if let Err(error) = flatland.present(flatland::PresentArgs::default()) {
+        warn!("Files label present failed: {error:?}");
+    }
     info!("Presented Fuchsia Files at {}x{} with bounded /data storage", size.width, size.height);
     let outside_probe = RootedFiles::new("/data")
         .and_then(|files| files.read_text("../outside"))
@@ -365,22 +448,28 @@ async fn create_files_view(root_token: views::ViewCreationToken) -> Result<(), E
     loop {
         futures::select! {
             position = touch_events.next() => {
-                let Some([x, y]) = position else { break };
-                if let Some(action) = action_for_point(x, y) {
+                // TouchSource close is not view death. Stay presented.
+                let Some([x, y]) = position else { continue };
+                if let Some(action) = action_for_point_in(x, y, size.width as f32) {
+                    let Some(controller) = controller.as_mut() else {
+                        warn!("Files action ignored: controller unavailable");
+                        continue;
+                    };
                     let action_name = format!("{action:?}");
-                    let result = apply_action(&mut controller, action);
+                    let result = apply_action(controller, action);
                     match result {
                         Ok(()) => {
                             info!("Files action {action_name}: {}", controller.status());
-                            refresh_dynamic_ui(&flatland, &controller, &mut dynamic, None).await?;
+                            refresh_dynamic_ui(&flatland, controller, &mut dynamic, None, size.width).await?;
                         }
                         Err(error) => {
                             warn!("Files action {action_name} failed: {error}");
                             refresh_dynamic_ui(
                                 &flatland,
-                                &controller,
+                                controller,
                                 &mut dynamic,
                                 Some(&format!("Error: {error}")),
+                                size.width,
                             )
                             .await?;
                         }
@@ -389,11 +478,14 @@ async fn create_files_view(root_token: views::ViewCreationToken) -> Result<(), E
             }
             event = flatland_events.next() => match event {
                 Some(Ok(flatland::FlatlandEvent::OnError { error })) => {
-                    return Err(anyhow!("Flatland error: {error:?}"));
+                    warn!("Files Flatland error (keeping view): {error:?}");
                 }
                 Some(Ok(_)) => {}
-                Some(Err(error)) => return Err(error.into()),
-                None => break,
+                Some(Err(error)) => warn!("Files Flatland stream error (keeping view): {error}"),
+                None => {
+                    warn!("Files Flatland stream closed; parking");
+                    futures::future::pending::<()>().await;
+                }
             },
         }
     }
@@ -408,7 +500,9 @@ async fn serve_view_provider(mut stream: ViewProviderRequestStream) -> Result<()
                 let token = args
                     .view_creation_token
                     .ok_or_else(|| anyhow!("CreateView2 omitted view_creation_token"))?;
-                Box::pin(create_files_view(token)).await?;
+                if let Err(error) = Box::pin(create_files_view(token)).await {
+                    warn!("Files create_view failed; staying running: {error:#}");
+                }
             }
             other => warn!("Unsupported ViewProvider request: {other:?}"),
         }
