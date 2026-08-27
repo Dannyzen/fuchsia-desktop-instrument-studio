@@ -84,6 +84,8 @@ We are building **Instrument Studio** first:
 
 ![Live emulator native fonts and Material icons](design/screenshots/21-emulator-font-icons-live.png)
 
+![Live emulator built-in help and readable headers](design/screenshots/22-emulator-studio-help-live.png)
+
 Interactive sketches live under `design/sketches/`.
 
 ## Local rebuild
@@ -176,7 +178,7 @@ See `docs/observability-feedback-loop.md` for the Inspect tree and design checks
 
 ## Linux terminal
 
-Workbench terminal bridges to Alpine/Linux via Starnix. See `docs/linux-terminal.md`.
+Workbench terminal bridges to Alpine/Linux via Starnix and installs a bounded `fuchsia-studio` help, health, and manual command inside the Linux console. See `docs/linux-terminal.md`.
 
 ## Production status
 
@@ -186,6 +188,7 @@ See `docs/production-status.md` for an honest done/not-done gate.
 
 Rebuild proof + vision notes:
 
+- `docs/evidence/instrument-studio-help-20260827T062745Z/`
 - `docs/evidence/instrument-studio-20260818T220823Z/`
 - Live Inspect: 4 tiles, confirmed focus, gap/border config
 - Remaining gap: Instrument Studio chrome (strip/rail/inspector)

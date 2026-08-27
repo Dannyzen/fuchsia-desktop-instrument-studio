@@ -1,29 +1,37 @@
 # Linux terminal wiring
 
-Updated: 20260819T010224Z
+Updated: 2026-08-27
 
-The Instrument Studio / Workbench terminal tile now launches:
+The Workbench Terminal launches the in-tree Fuchsia terminal and bridges its console to Alpine/Linux through Starnix:
 
-```
+```text
 /pkg/bin/terminal /pkg/bin/linux_console_bridge /bin/bash -l
 ```
 
-`linux_console_bridge` connects to `fuchsia.starnix.container.Controller`
-exposed by the session child `linux_container`
-(`fuchsia-pkg://fuchsia.com/alpine#meta/alpine_container.cm`) and calls
-`SpawnConsole` for Alpine bash.
+`linux_console_bridge` connects to `fuchsia.starnix.container.Controller` from the session child `linux_container`, calls `SpawnConsole`, installs the bounded Fuchsia Studio help assets into writable Alpine `/usr/local`, and enters interactive Bash.
 
-Fallback remains packaged zxsh at `/pkg/bin/sh` if bridge/controller fails
-(terminal will error rather than silently using zxsh unless args are changed).
+## Built-in help
 
-Prove:
+Inside the Terminal:
 
-```bash
-# on device/session
-ffx component show core/session-manager/session:session/linux_container
-ffx session add --name linux-term fuchsia-pkg://fuchsia.com/fuchsia_terminal#meta/fuchsia_terminal.cm
+```sh
+fuchsia-studio help
+fuchsia-studio health
+fuchsia-studio man
+health.sh
+man fuchsia-studio
 ```
 
-## Live proof (20260819T010820Z)
+The help page explains the visible Workbench screen language. The health command checks the Linux CLI/runtime boundary and points desktop state to the Inspect surface rather than inventing WM state inside Linux.
 
-See `docs/evidence/linux-terminal-wire-20260819T010820Z/`.
+## Authority boundary
+
+- The exact Terminal URL runs in `terminal_elements`.
+- Only that collection receives the Starnix Controller route.
+- The keyboard acceptance driver remains a fixed one-shot child. It types only `fuchsia-studio help\n` and is not a general input service.
+- Generic elements do not inherit Terminal process or Controller authority.
+
+## Live proof
+
+- Latest: `docs/evidence/instrument-studio-help-20260827T062745Z/`
+- Original Linux wiring: `docs/evidence/linux-terminal-wire-20260819T010820Z/`
