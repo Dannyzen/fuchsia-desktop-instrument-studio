@@ -65,7 +65,7 @@ fi
 "$FFX" target screenshot -d "$out"
 mv "$out/screenshot.png" "$out/baseline.png"
 
-# The fixed Workbench child types only `echo terminalok\n` through the standard
+# The fixed Workbench child types only `fuchsia-studio help\n` through the standard
 # UI test-input registry. The Terminal receives no injection capability.
 "$FFX" component start   core/session-manager/session:session/terminal_input_driver   >"$out/input-driver-start.log" 2>&1
 

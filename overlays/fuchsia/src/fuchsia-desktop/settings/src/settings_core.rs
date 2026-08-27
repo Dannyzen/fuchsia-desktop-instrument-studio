@@ -104,7 +104,7 @@ impl SettingsController {
                 }
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                (AppTheme::Dark, "Ready".to_string())
+                (AppTheme::Dark, "Dark theme active".to_string())
             }
             Err(error) => return Err(format!("read saved preferences: {error}")),
         };

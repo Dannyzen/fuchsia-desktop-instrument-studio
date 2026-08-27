@@ -21,7 +21,7 @@ async fn main() -> Result<()> {
         .context("register synthetic keyboard")?;
     keyboard
         .simulate_us_ascii_text_entry(&KeyboardSimulateUsAsciiTextEntryRequest {
-            text: Some("echo terminalok\n".to_string()),
+            text: Some("fuchsia-studio help\n".to_string()),
             ..Default::default()
         })
         .await

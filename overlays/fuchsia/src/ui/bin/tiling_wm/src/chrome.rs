@@ -6,7 +6,7 @@
 
 use crate::chrome_text::{ChromeTextSurface, TextRun};
 
-use anyhow::{Context, Error, anyhow};
+use anyhow::{Context, Error};
 use desktop_ui::{ChromeRegion, InstrumentStudioLayout};
 use fidl_fuchsia_math as fmath;
 use fidl_fuchsia_ui_composition as ui_comp;
@@ -100,41 +100,32 @@ fn rgba(r: f32, g: f32, b: f32, a: f32) -> ui_comp::ColorRgba {
     }
 }
 
-const TILE_NAME_PARTS: usize = 128;
-
 pub struct TileName {
-    parts: [Bar; TILE_NAME_PARTS],
+    _surface: ChromeTextSurface,
 }
 
 impl TileName {
-    pub fn create(
+    pub async fn create(
         flatland: &ui_comp::FlatlandProxy,
         ids: &mut IdGenerator,
         parent: &ui_comp::TransformId,
-    ) -> Result<Self, Error> {
-        let mut parts = Vec::with_capacity(TILE_NAME_PARTS);
-        for _ in 0..TILE_NAME_PARTS {
-            parts.push(Bar::create_on(flatland, ids, parent)?);
-        }
-        Ok(Self {
-            parts: parts.try_into().map_err(|_| anyhow!("tile name parts"))?,
-        })
-    }
-
-    pub fn layout(
-        &self,
-        flatland: &ui_comp::FlatlandProxy,
         label: &str,
-        title_h: u32,
-    ) -> Result<(), Error> {
-        for p in &self.parts {
-            p.hide(flatland)?;
-        }
-        let px = 4u32;
-        let text = rgba(0.96, 0.97, 0.98, 1.0);
-        let y = (title_h as i32 - 7 * px as i32) / 2;
-        let _ = draw_text(&self.parts, flatland, 0, 16, y.max(2), label, px, text)?;
-        Ok(())
+    ) -> Result<Self, Error> {
+        let runs = [TextRun::text(label, 16, 3, 22.0, TEXT_PRIMARY)];
+        let surface = ChromeTextSurface::new(
+            flatland,
+            ids,
+            parent,
+            fmath::SizeU {
+                width: 240,
+                height: 28,
+            },
+            fmath::Vec_ { x: 0, y: 0 },
+            &runs,
+            "tiling-wm-tile-name",
+        )
+        .await?;
+        Ok(Self { _surface: surface })
     }
 }
 
@@ -144,100 +135,6 @@ const TEXT_SECONDARY: [u8; 4] = [150, 164, 181, 255];
 const CYAN_TEXT: [u8; 4] = [0, 224, 255, 255];
 const VIOLET_TEXT: [u8; 4] = [139, 124, 255, 255];
 
-fn glyph5(ch: u8) -> [u8; 7] {
-    match ch {
-        b' ' => [0, 0, 0, 0, 0, 0, 0],
-        b'-' => [0, 0, 0, 31, 0, 0, 0],
-        b'.' => [0, 0, 0, 0, 0, 4, 4],
-        b'/' => [1, 2, 2, 4, 8, 8, 16],
-        b'0' => [14, 17, 19, 21, 25, 17, 14],
-        b'1' => [4, 12, 4, 4, 4, 4, 14],
-        b'2' => [14, 17, 1, 2, 4, 8, 31],
-        b'3' => [30, 1, 1, 14, 1, 1, 30],
-        b'4' => [2, 6, 10, 18, 31, 2, 2],
-        b'5' => [31, 16, 30, 1, 1, 17, 14],
-        b'6' => [6, 8, 16, 30, 17, 17, 14],
-        b'7' => [31, 1, 2, 4, 8, 8, 8],
-        b'8' => [14, 17, 17, 14, 17, 17, 14],
-        b'9' => [14, 17, 17, 15, 1, 2, 12],
-        b':' => [0, 4, 4, 0, 4, 4, 0],
-        b'A' => [14, 17, 17, 31, 17, 17, 17],
-        b'B' => [30, 17, 17, 30, 17, 17, 30],
-        b'C' => [14, 17, 16, 16, 16, 17, 14],
-        b'D' => [30, 17, 17, 17, 17, 17, 30],
-        b'E' => [31, 16, 16, 30, 16, 16, 31],
-        b'F' => [31, 16, 16, 30, 16, 16, 16],
-        b'G' => [14, 17, 16, 23, 17, 17, 14],
-        b'H' => [17, 17, 17, 31, 17, 17, 17],
-        b'I' => [14, 4, 4, 4, 4, 4, 14],
-        b'J' => [7, 2, 2, 2, 2, 18, 12],
-        b'K' => [17, 18, 20, 24, 20, 18, 17],
-        b'L' => [16, 16, 16, 16, 16, 16, 31],
-        b'M' => [17, 27, 21, 17, 17, 17, 17],
-        b'N' => [17, 25, 21, 19, 17, 17, 17],
-        b'O' => [14, 17, 17, 17, 17, 17, 14],
-        b'P' => [30, 17, 17, 30, 16, 16, 16],
-        b'Q' => [14, 17, 17, 17, 21, 18, 13],
-        b'R' => [30, 17, 17, 30, 20, 18, 17],
-        b'S' => [15, 16, 16, 14, 1, 1, 30],
-        b'T' => [31, 4, 4, 4, 4, 4, 4],
-        b'U' => [17, 17, 17, 17, 17, 17, 14],
-        b'V' => [17, 17, 17, 17, 17, 10, 4],
-        b'W' => [17, 17, 17, 21, 21, 21, 10],
-        b'X' => [17, 17, 10, 4, 10, 17, 17],
-        b'Y' => [17, 17, 10, 4, 4, 4, 4],
-        b'Z' => [31, 1, 2, 4, 8, 16, 31],
-        b'a'..=b'z' => glyph5(ch.to_ascii_uppercase()),
-        _ => [0, 0, 0, 0b01110, 0, 0, 0],
-    }
-}
-
-/// Draw ASCII uppercase labels using 5x7 bitmaps packed into horizontal runs.
-/// Run-length bars keep label parts bounded when glyph scale is 3-4px.
-fn draw_text(
-    parts: &[Bar],
-    flatland: &ui_comp::FlatlandProxy,
-    mut cursor: usize,
-    x: i32,
-    y: i32,
-    text: &str,
-    px: u32,
-    color: ui_comp::ColorRgba,
-) -> Result<usize, Error> {
-    let mut cx = x;
-    let gap = px.max(1);
-    for ch in text.bytes() {
-        let rows = glyph5(ch);
-        for (ry, row) in rows.iter().enumerate() {
-            let mut rx = 0u32;
-            while rx < 5 {
-                if (row >> (4 - rx)) & 1 == 0 {
-                    rx += 1;
-                    continue;
-                }
-                let start = rx;
-                while rx < 5 && (row >> (4 - rx)) & 1 == 1 {
-                    rx += 1;
-                }
-                if cursor >= parts.len() {
-                    return Ok(cursor);
-                }
-                parts[cursor].layout(
-                    flatland,
-                    cx + (start as i32) * px as i32,
-                    y + (ry as i32) * px as i32,
-                    (rx - start) * px,
-                    px,
-                    color,
-                )?;
-                cursor += 1;
-            }
-        }
-        cx += (5 * px as i32) + gap as i32;
-    }
-    Ok(cursor)
-}
-
 pub struct ShellChrome {
     strip: Bar,
     strip_accent: Bar,
@@ -245,8 +142,6 @@ pub struct ShellChrome {
     brand_b: Bar,
     pills: [Bar; 3],
     pill_accents: [Bar; 3],
-    status_chips: [Bar; 3],
-    status_dots: [Bar; 3],
     rail: Bar,
     rail_edge: Bar,
     rail_slots: [Bar; RAIL_SLOTS],
@@ -277,8 +172,6 @@ impl ShellChrome {
         let brand_b = mk(flatland, ids)?;
         let pills = [mk(flatland, ids)?, mk(flatland, ids)?, mk(flatland, ids)?];
         let pill_accents = [mk(flatland, ids)?, mk(flatland, ids)?, mk(flatland, ids)?];
-        let status_chips = [mk(flatland, ids)?, mk(flatland, ids)?, mk(flatland, ids)?];
-        let status_dots = [mk(flatland, ids)?, mk(flatland, ids)?, mk(flatland, ids)?];
         let rail = mk(flatland, ids)?;
         let rail_edge = mk(flatland, ids)?;
         let rail_slots = [
@@ -364,8 +257,6 @@ impl ShellChrome {
             brand_b,
             pills,
             pill_accents,
-            status_chips,
-            status_dots,
             rail,
             rail_edge,
             rail_slots,
@@ -397,7 +288,6 @@ impl ShellChrome {
             1.0,
         );
         let muted = rgba(0.20, 0.23, 0.28, 1.0);
-        let faint = rgba(0.42, 0.48, 0.55, 1.0);
         let cyan = rgba(0.0, 0.918, 1.0, 1.0);
         let violet = rgba(0.545, 0.486, 1.0, 1.0);
         let green = rgba(0.239, 0.839, 0.549, 1.0);
@@ -443,9 +333,6 @@ impl ShellChrome {
         let brand_w = if strip.width < 800 { 176 } else { 230 };
         let mut px = bx + mark as i32 + brand_w;
         let py = (strip.y + (strip.height - pill_h) / 2) as i32;
-        let chip_w = if strip.width < 800 { 52 } else { 72 };
-        let chips_total = 3 * chip_w as i32 + 2 * 8 + 12;
-        let chips_left = (strip.x + strip.width) as i32 - chips_total;
         for i in 0..3 {
             let active = i == 0;
             let fill = if active { cyan_dim } else { elev };
@@ -459,30 +346,6 @@ impl ShellChrome {
                 if active { cyan } else { line },
             )?;
             px += pill_w as i32 + 8;
-        }
-        let chip_h = pill_h;
-        let mut cx = (strip.x + strip.width) as i32 - 12;
-        let chips = [
-            (state.tile_count > 0, green),
-            (!state.confirmed_focus.is_empty(), cyan),
-            (state.gap_px > 0, violet),
-        ];
-        for i in (0..3).rev() {
-            cx -= chip_w as i32;
-            if cx < chips_left {
-                cx = chips_left + i as i32 * (chip_w as i32 + 8);
-            }
-            self.status_chips[i].layout(flatland, cx, py, chip_w, chip_h, elev)?;
-            let d = 7u32;
-            self.status_dots[i].layout(
-                flatland,
-                cx + 5,
-                py + (chip_h as i32 - d as i32) / 2,
-                d,
-                d,
-                if chips[i].0 { chips[i].1 } else { faint },
-            )?;
-            cx -= 8;
         }
         self.rail.layout(
             flatland,
@@ -584,8 +447,6 @@ fn top_text_runs(shell: &InstrumentStudioLayout) -> Vec<TextRun<'static>> {
     let brand_w = if narrow { 176 } else { 230 };
     let mut pill_x = bx + mark as i32 + brand_w;
     let pill_y = ((strip.height - pill_h) / 2) as i32;
-    let chip_w = if narrow { 52 } else { 72 };
-    let chips_left = strip.width as i32 - (3 * chip_w as i32 + 2 * 8 + 12);
     let mut runs = vec![TextRun::text(
         "Workbench Studio",
         bx + mark as i32 + 10,
@@ -607,23 +468,6 @@ fn top_text_runs(shell: &InstrumentStudioLayout) -> Vec<TextRun<'static>> {
             },
         ));
         pill_x += pill_w as i32 + 8;
-    }
-    let status_font = if narrow { 10.0 } else { 12.0 };
-    let mut chip_x = strip.width as i32 - 12;
-    let labels = ["Ready", "Focus", "Gaps"];
-    for index in (0..3).rev() {
-        chip_x -= chip_w as i32;
-        if chip_x < chips_left {
-            chip_x = chips_left + index as i32 * (chip_w as i32 + 8);
-        }
-        runs.push(TextRun::text(
-            labels[index],
-            chip_x + 16,
-            pill_y + (pill_h as i32 - status_font as i32) / 2 - 1,
-            status_font,
-            TEXT_PRIMARY,
-        ));
-        chip_x -= 8;
     }
     runs
 }
@@ -661,10 +505,10 @@ fn inspector_text_runs(shell: &InstrumentStudioLayout) -> Vec<TextRun<'static>> 
         / 4;
     let card_y = pad as i32 + 12;
     let labels = [
-        ("\u{e871}", "Tiles"),
-        ("\u{e8b6}", "Focus"),
-        ("\u{e86f}", "Gap"),
-        ("\u{e80b}", "Live"),
+        ("\u{e871}", "Windows"),
+        ("\u{e8b6}", "Active view"),
+        ("\u{e86f}", "Spacing"),
+        ("\u{e80b}", "WM health"),
     ];
     let mut runs = vec![TextRun::text("Inspect", 10, 6, 14.0, CYAN_TEXT)];
     for (index, (icon, label)) in labels.iter().enumerate() {

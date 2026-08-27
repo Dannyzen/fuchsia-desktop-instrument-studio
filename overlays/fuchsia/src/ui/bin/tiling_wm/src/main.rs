@@ -281,7 +281,9 @@ impl TilingWm {
                     &self.flatland,
                     &mut self.id_generator,
                     &title_transform_id,
-                )?;
+                    tile_short_label(&new_tile_id.0),
+                )
+                .await?;
 
                 let new_tile = ChildView {
                     border_transform_id,
@@ -728,7 +730,6 @@ impl TilingWm {
                 &view.accent_transform_id,
                 &fidl_fuchsia_math::Vec_ { x: 0, y: 0 },
             )?;
-            view.name.layout(&self.flatland, tile_short_label(id), title_h)?;
             let viewport_size = fidl_fuchsia_math::SizeU {
                 width: inner_w,
                 height: inner_h.saturating_sub(title_h).max(1),
