@@ -81,7 +81,8 @@ jobs:
           fi
       - name: Shell syntax
         run: |
-          bash -n scripts/*.sh
+          python3 scripts/check-shell-syntax.py
+          python3 scripts/test-shell-syntax-gate.py
       - name: Python compile
         run: |
           python3 -m py_compile scripts/*.py
