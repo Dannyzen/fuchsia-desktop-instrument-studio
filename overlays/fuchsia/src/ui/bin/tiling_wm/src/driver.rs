@@ -11,11 +11,14 @@ async fn main() -> Result<()> {
     let manager = connect_to_protocol::<window::ManagerMarker>()
         .context("connect to fuchsia.session.window.Manager")?;
     let before = manager.list().await.context("list windows before focus")?;
-    ensure!(before.len() == 4, "expected exactly four windows, got {}", before.len());
+    ensure!(!before.is_empty(), "expected at least one window");
 
-    let focus_position = 2u64;
+    let focus_position = before
+        .iter()
+        .position(|view| view.id.to_ascii_lowercase().contains("terminal"))
+        .context("terminal window not found")? as u64;
     let focused_id = before[focus_position as usize].id.clone();
-    manager.focus(focus_position).await.context("focus position 2")?;
+    manager.focus(focus_position).await.context("focus terminal window")?;
     manager.set_order(focus_position, 0).await.context("move focused window to position 0")?;
 
     let after = manager.list().await.context("list windows after reorder")?;

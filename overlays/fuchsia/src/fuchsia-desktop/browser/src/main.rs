@@ -513,7 +513,7 @@ async fn create_browser_view(
         flatland::ContentId { value: 61 },
         fmath::SizeU { width: if narrow { address_width.min(160) } else { 104 }, height: 16 },
         fmath::Vec_ { x: if narrow { 8 } else { 116 }, y: if narrow { 8 } else { 1 } },
-        if narrow { "Browser" } else { "Tab 1" },
+        if narrow { "Address" } else { "Tab 1" },
         TextStyle::TAB,
     )
     .await?;

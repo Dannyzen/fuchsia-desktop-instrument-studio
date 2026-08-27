@@ -1,0 +1,121 @@
+#!/bin/sh
+set -u
+
+program=${0##*/}
+command_name=${1:-help}
+
+case "$program" in
+    health.sh)
+        command_name=health
+        ;;
+    man)
+        if [ "${1:-}" = "fuchsia-studio" ]; then
+            command_name=man
+        else
+            printf 'No manual entry for %s\n' "${1:-missing topic}" >&2
+            exit 1
+        fi
+        ;;
+    *)
+        if [ "$#" -gt 0 ]; then
+            shift
+        fi
+        ;;
+esac
+
+show_help() {
+    cat <<'EOF'
+FUCHSIA STUDIO
+Fuchsia workspace + Linux tools.
+SCREEN
+Workspaces   Build, Research, Ops
+Left rail    Add, Overview, Files
+             Browser, Terminal
+             Settings
+Highlight    Cyan means active
+Windows      Visible app tiles
+Active view  Keyboard target
+Spacing      Tile gap in pixels
+WM health    Window rendering
+
+COMMANDS
+fuchsia-studio health
+fuchsia-studio man
+EOF
+}
+
+show_health() {
+    if [ "${1:-}" = "--brief" ]; then
+        printf '[OK] Studio CLI + Linux shell\n'
+        printf '[INFO] Desktop health: Inspect\n'
+        return 0
+    fi
+
+    printf '[OK] Fuchsia Studio CLI installed\n'
+    if [ -x /bin/sh ]; then
+        printf '[OK] Linux shell available\n'
+    else
+        printf '[FAIL] Linux shell unavailable\n' >&2
+        return 1
+    fi
+    if [ -r /etc/alpine-release ]; then
+        printf '[OK] Alpine userspace detected\n'
+    else
+        printf '[INFO] Alpine identity unavailable\n'
+    fi
+    if [ "${FUCHSIA_STUDIO_RUNTIME:-}" = "starnix" ]; then
+        printf '[OK] Fuchsia Starnix bridge active\n'
+    else
+        printf '[INFO] Starnix identity unavailable\n'
+    fi
+    printf '[INFO] Desktop state is reported by Inspect\n'
+}
+
+show_man() {
+    cat <<'EOF'
+FUCHSIA-STUDIO(1)
+
+NAME
+    fuchsia-studio - explain and check Workbench Studio
+
+SYNOPSIS
+    fuchsia-studio help
+    fuchsia-studio health [--brief]
+    fuchsia-studio man
+    health.sh
+    man fuchsia-studio
+
+COMMANDS
+    help    Explain visible regions and screen language.
+    health  Check this Linux CLI and runtime boundary.
+    man     Print this manual without a pager.
+
+SCREEN LANGUAGE
+    Workspaces select Build, Research, or Ops context.
+    The left rail launches apps; highlight means active.
+    Windows is the visible tile count.
+    Active view receives keyboard input.
+    Spacing is the pixel gap between tiles.
+    WM health reports window-manager render activity.
+
+LIMITS
+    Linux health does not invent desktop state. Inspect is
+    the authoritative visible desktop diagnostics surface.
+EOF
+}
+
+case "$command_name" in
+    help|-h|--help)
+        show_help
+        ;;
+    health)
+        show_health "${1:-}"
+        ;;
+    man)
+        show_man
+        ;;
+    *)
+        printf 'Usage: fuchsia-studio {help|health|man}\n' >&2
+        exit 2
+        ;;
+esac

@@ -1,69 +1,47 @@
 # Workbench Studio production status
 
-Updated: 2026-08-19
+Updated: 2026-08-27
 
 ## Short answer
 
-Live 16 (`875b46ad…`) is a 2x2 of colored app cards (amber Browser, violet Files, cyan Settings, green Terminal). Still not production Instrument Studio.
-
-Live 17: tile headers read BRW / FIL / TRM. Settings dropped this shot.
-
-Live 18: Inspect tile_count=4. SET / FIL / TRM readable. BRW clipped.
-
-Live 19: Settings sidebar + Appearance/Temperature cards. Dark/Celsius selected.
-
-Live 20: chrome menu words no longer collide. WORKBENCH BLD RSH OPS / OK FOC GAP.
-
 **No. The live emulator screen is not production yet.**
 
-It is a real native Fuchsia Workbench session with:
+Live 22 is a real native Fuchsia Workbench session with readable Roboto shell/tile headers, Material icons, a working Alpine/Starnix Terminal help command, Inspect health `OK`, and exact built/live package identity. It is an honest three-window proof because Files remains absent.
 
-- Inspect-backed tiling WM
-- Instrument Studio chrome regions
-- Design-derived multi-rect iconography
-- 4 live apps in a 2x2 stage
+## Live trail
 
-It is **not** yet the polished production Workbench Studio UI from the design screenshot.
+- Live 16: colored app cards.
+- Live 17: first bitmap tile abbreviations.
+- Live 18: four-tile Inspect proof with clipped titles.
+- Live 19: Settings sidebar and cards.
+- Live 20: chrome menu collision cleanup.
+- Live 21: packaged Roboto shell words and Material icons; three visible apps.
+- Live 22: packaged Roboto tile headers; duplicate top status chips removed; built-in `fuchsia-studio` help/health/manual; unwrapped narrative screenshot.
 
 ## Done
 
-- Chrome bitmap label path (brand/pills/chips/inspector) live-proven
-- 3px/RLE label scale attempt live-proven (still not OCR-clean)
-- Narrow-tile stacked Settings/Files (Browser clip residual)
-- OCR-readable chrome labels (4px, labels-on-top): STUDIO / BLD RSH OPS / OK FOC GAP / INSPECT TILE FOC GAP LIVE
+- Packaged Roboto renders Workbench Studio, workspace labels, Inspect labels, and full Terminal / Browser / Settings tile headers.
+- The legacy 5x7 bitmap tile-title renderer and its 128-bar pool are removed.
+- Packaged Material Icons render launcher rail and Inspect symbols.
+- `fuchsia-studio help`, `health`, and `man` run inside Alpine through the existing Starnix console bridge.
+- `health.sh` and `man fuchsia-studio` aliases are installed.
+- The fixed keyboard driver demonstrates the help command in actual FEMU pixels.
+- Live 22 Inspect reports health `OK`, `tile_count=3`, and confirmed Terminal focus before input.
+- Controller route reports `Success`.
+- Built/live merkles match for Terminal (`ff68d52c…`) and tiling WM (`080c7307…`).
+- The final screenshot has no mid-word Terminal help wrap and retains visible health lines.
 
-- Terminal tile wired to Alpine/Linux via Starnix Controller bridge
+## Not done
 
-- Native tiling foundation + confirmed focus
-- Live DF/Inspect feedback loop
-- Shell chrome geometry (strip/rail/inspector)
-- Density language (pills/chips/cards)
-- Production-closer rail icon set (launcher/overview/files/browser/terminal/settings)
-- Screenshot + vision evidence trail
+1. Restore Files PresentView and prove Inspect `tile_count=4`.
+2. Add in-place rail labels or tooltips so symbols do not require the help page.
+3. Show numeric/current values in the Inspect cards rather than category labels and bars only.
+4. Repair Browser toolbar/page clipping and replace prototype content.
+5. Finish app-card polish, radius/glow fidelity, accessibility, recovery, rollback, and release packaging.
 
-## Not done (blocks “production”)
-
-Screenshot-ranked (2026-08-19 vs `01-instrument-studio.png`):
-1. App tiles are gray slabs, not Instrument Studio cards (`8vg0.1`)
-2. Settings is stacked buttons, not sidebar+cards (`8vg0.2`)
-3. Files is a list, not an icon grid (`8vg0.3`)
-4. Browser URL/page still clips (`8vg0.6`)
-5. Terminal is an empty `localhost:/#` box (`8vg0.4`)
-6. Rail glyphs are rect approximations (`8vg0.5`)
-7. True fonts / radius / glow / release packaging
-
-
-1. True font/vector typography (bitmap labels now readable, not production type)
-2. True icon assets/glyphs (beyond rect approximations)
-3. App chrome restyle to Instrument Studio cards
-4. Terminal content density and overall polish/glow/radius fidelity
-5. Product packaging/release gate beyond lab emulator proof
-
-4-app Inspect gate: session-add Running is not enough. Live 15 fail-closed at tile_count=1.
-
-Planning matrix: `docs/design-vision-bead-matrix.md` (two-round visual/IA + function validation).
+A component reporting `Running` is not a four-window proof. The acceptance gate remains Inspect `tile_count=4`.
 
 ## Latest live proof
 
-- `design/screenshots/07-emulator-icons-live.png`
-- `docs/evidence/instrument-studio-icons-20260819T001859Z/`
+- `design/screenshots/22-emulator-studio-help-live.png`
+- `docs/evidence/instrument-studio-help-20260827T062745Z/`

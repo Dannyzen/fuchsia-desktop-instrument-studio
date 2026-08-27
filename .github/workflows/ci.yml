@@ -49,6 +49,8 @@ jobs:
           test -f docs/evidence/instrument-studio-parity-20260819T113247Z/vision-comparison.md
           python3 scripts/test-narrow-app-layout.py
           python3 scripts/test-tile-identity.py
+          PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-font-chrome-source.py
+          PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-fuchsia-studio-help.py
           test -f docs/evidence/instrument-studio-responsive-20260819T030934Z/vision-comparison.md
           test -f docs/evidence/instrument-studio-ocr-labels-20260819T025833Z/vision-comparison.md
           test -f docs/evidence/instrument-studio-readable-labels-20260819T024408Z/vision-comparison.md

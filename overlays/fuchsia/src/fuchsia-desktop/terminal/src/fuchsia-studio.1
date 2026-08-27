@@ -1,0 +1,29 @@
+.TH FUCHSIA-STUDIO 1
+.SH NAME
+fuchsia-studio \- explain and check Workbench Studio
+.SH SYNOPSIS
+.B fuchsia-studio
+.RI { help | health | man }
+.br
+.B health.sh
+.br
+.B man fuchsia-studio
+.SH COMMANDS
+.TP
+.B help
+Explain visible regions and screen language.
+.TP
+.B health
+Check the Linux CLI and runtime boundary.
+.TP
+.B man
+Print the manual without requiring a pager.
+.SH SCREEN LANGUAGE
+Workspaces select Build, Research, or Ops context.
+The left rail launches apps; highlight means active.
+Windows is the visible tile count.
+Active view receives keyboard input.
+Spacing is the pixel gap between tiles.
+WM health reports window-manager render activity.
+.SH LIMITS
+Linux health does not invent desktop state. Inspect is the authoritative visible desktop diagnostics surface.

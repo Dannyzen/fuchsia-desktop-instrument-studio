@@ -14,6 +14,23 @@ use std::io::{Read as _, Write as _};
 use std::os::fd::FromRawFd;
 use zx;
 
+const FUCHSIA_STUDIO_TOOL: &str = include_str!("fuchsia-studio");
+const FUCHSIA_STUDIO_MANPAGE: &str = include_str!("fuchsia-studio.1");
+const FUCHSIA_STUDIO_BOOTSTRAP: &str = r#"
+set -eu
+mkdir -p /usr/local/bin /usr/local/share/man/man1
+printf '%s' "$FUCHSIA_STUDIO_TOOL" > /usr/local/bin/fuchsia-studio
+printf '%s' "$FUCHSIA_STUDIO_MANPAGE" > /usr/local/share/man/man1/fuchsia-studio.1
+chmod 0755 /usr/local/bin/fuchsia-studio
+ln -sf fuchsia-studio /usr/local/bin/health.sh
+ln -sf fuchsia-studio /usr/local/bin/man
+export FUCHSIA_STUDIO_RUNTIME=starnix
+fuchsia-studio health --brief
+printf 'Try: man fuchsia-studio\n'
+export PS1='studio:/# '
+exec /bin/bash -il
+"#;
+
 fn forward_stdin_to_socket(local_tx: zx::Socket) {
     std::thread::spawn(move || {
         let mut executor = fasync::LocalExecutor::default();
@@ -64,10 +81,16 @@ async fn main() -> Result<(), Error> {
         argv = vec!["/bin/bash".into(), "-l".into()];
     }
     let binary_path = argv[0].clone();
+    if binary_path == "/bin/bash" {
+        argv = vec![
+            binary_path.clone(),
+            "-lc".into(),
+            FUCHSIA_STUDIO_BOOTSTRAP.into(),
+        ];
+    }
 
-    let controller = connect_to_protocol::<fstarcontainer::ControllerMarker>().context(
-        "connect fuchsia.starnix.container.Controller (linux_container must be routed)",
-    )?;
+    let controller = connect_to_protocol::<fstarcontainer::ControllerMarker>()
+        .context("connect fuchsia.starnix.container.Controller (linux_container must be routed)")?;
 
     let (local_in, remote_in) = zx::Socket::create_stream();
     let (local_out, remote_out) = zx::Socket::create_stream();
@@ -85,6 +108,9 @@ async fn main() -> Result<(), Error> {
             "HOME=/root".into(),
             "USER=root".into(),
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin".into(),
+            format!("FUCHSIA_STUDIO_TOOL={FUCHSIA_STUDIO_TOOL}"),
+            format!("FUCHSIA_STUDIO_MANPAGE={FUCHSIA_STUDIO_MANPAGE}"),
+            "FUCHSIA_STUDIO_RUNTIME=starnix".into(),
         ]),
         window_size: Some(fstarcontainer::ConsoleWindowSize {
             rows: 24,

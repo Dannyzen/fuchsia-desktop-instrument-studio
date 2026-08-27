@@ -43,6 +43,10 @@ rustc_binary("linux_console_bridge_bin") {
   edition = "2024"
   source_root = "src/linux_console_bridge.rs"
   sources = [ "src/linux_console_bridge.rs" ]
+  inputs = [
+    "src/fuchsia-studio",
+    "src/fuchsia-studio.1",
+  ]
   deps = [
     "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container_rust",
     "//sdk/rust/zx",

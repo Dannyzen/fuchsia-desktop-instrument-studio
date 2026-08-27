@@ -1,0 +1,39 @@
+{
+  "artifact_id": "instrument-studio-help-20260827T062745Z",
+  "built_live_merkle_equal": true,
+  "controller_route": "Success",
+  "implementation_sha": "ac5f93b90230ca35c45328925614631e4e931b02",
+  "inspect": {
+    "confirmed_focus_contains": "terminal",
+    "health": "OK",
+    "tile_count": 3
+  },
+  "merkles": {
+    "terminal": "ff68d52cb9f2fe823d9dfa035f7e77ee68c0a8208043c151c8ec731e3d4c2eeb",
+    "tiling_wm": "080c7307bafd8563bd5e15729f2476f84350d550a0450b80be0395f7f354591c"
+  },
+  "residuals": [
+    "rail icons have no in-place labels or tooltips",
+    "Inspect bars show categories without numeric values",
+    "Files is absent from the three-window proof",
+    "Browser remains prototype content with toolbar clipping"
+  ],
+  "screenshot": {
+    "path": "emulator-studio-help.png",
+    "raw_sha256": "3d3e417730fd429ca7963620288bb9484b895ba2e8227ab4fd9558d91a554516",
+    "sha256": "21fea48ac054103800c5815a660c50a8aa7b225ce2cc151beba64843a2ced28f"
+  },
+  "terminal_delta": {
+    "bright_pixels": 133589,
+    "changed_pixels": 19617,
+    "text_bands": 3,
+    "unique_colors": 2590
+  },
+  "visual_verdicts": {
+    "crystal_clear_overall": "CONDITIONAL",
+    "duplicate_visible_status": "PASS",
+    "narrative_demonstration": "PASS",
+    "production_ready": false,
+    "readable_typography": "PASS"
+  }
+}
