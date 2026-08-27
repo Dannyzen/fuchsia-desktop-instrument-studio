@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Instrument Studio chrome: multi-rect iconography + 5x7 bitmap labels.
+//! Instrument Studio chrome: readable font labels + semantic Material icons.
 
-use anyhow::{anyhow, Context, Error};
+use crate::chrome_text::{ChromeTextSurface, TextRun};
+
+use anyhow::{Context, Error, anyhow};
 use desktop_ui::{ChromeRegion, InstrumentStudioLayout};
 use fidl_fuchsia_math as fmath;
 use fidl_fuchsia_ui_composition as ui_comp;
@@ -49,10 +51,18 @@ impl Bar {
     ) -> Result<Self, Error> {
         let transform = ids.next_transform_id();
         let content = ids.next_content_id();
-        flatland.create_transform(&transform).context("chrome create transform")?;
-        flatland.create_filled_rect(&content).context("chrome create rect")?;
-        flatland.set_content(&transform, &content).context("chrome set content")?;
-        flatland.add_child(parent, &transform).context("chrome add child")?;
+        flatland
+            .create_transform(&transform)
+            .context("chrome create transform")?;
+        flatland
+            .create_filled_rect(&content)
+            .context("chrome create rect")?;
+        flatland
+            .set_content(&transform, &content)
+            .context("chrome set content")?;
+        flatland
+            .add_child(parent, &transform)
+            .context("chrome add child")?;
         Ok(Self { transform, content })
     }
 
@@ -82,11 +92,15 @@ impl Bar {
 }
 
 fn rgba(r: f32, g: f32, b: f32, a: f32) -> ui_comp::ColorRgba {
-    ui_comp::ColorRgba { red: r, green: g, blue: b, alpha: a }
+    ui_comp::ColorRgba {
+        red: r,
+        green: g,
+        blue: b,
+        alpha: a,
+    }
 }
 
-
-const TILE_NAME_PARTS: usize = 32;
+const TILE_NAME_PARTS: usize = 128;
 
 pub struct TileName {
     parts: [Bar; TILE_NAME_PARTS],
@@ -102,7 +116,9 @@ impl TileName {
         for _ in 0..TILE_NAME_PARTS {
             parts.push(Bar::create_on(flatland, ids, parent)?);
         }
-        Ok(Self { parts: parts.try_into().map_err(|_| anyhow!("tile name parts"))? })
+        Ok(Self {
+            parts: parts.try_into().map_err(|_| anyhow!("tile name parts"))?,
+        })
     }
 
     pub fn layout(
@@ -122,10 +138,11 @@ impl TileName {
     }
 }
 
-const GLYPH_PARTS: usize = 64;
 const RAIL_SLOTS: usize = 6;
-const PARTS_PER_ICON: usize = 8;
-const LABEL_PARTS: usize = 420;
+const TEXT_PRIMARY: [u8; 4] = [245, 247, 250, 255];
+const TEXT_SECONDARY: [u8; 4] = [150, 164, 181, 255];
+const CYAN_TEXT: [u8; 4] = [0, 224, 255, 255];
+const VIOLET_TEXT: [u8; 4] = [139, 124, 255, 255];
 
 fn glyph5(ch: u8) -> [u8; 7] {
     match ch {
@@ -233,22 +250,25 @@ pub struct ShellChrome {
     rail: Bar,
     rail_edge: Bar,
     rail_slots: [Bar; RAIL_SLOTS],
-    rail_parts: [Bar; GLYPH_PARTS],
     inspector: Bar,
     inspector_accent: Bar,
     inspector_cards: [Bar; 4],
     inspector_card_bars: [Bar; 4],
-    inspector_card_icons: [Bar; 8],
-    labels: [Bar; LABEL_PARTS],
+    _top_text: ChromeTextSurface,
+    _rail_icons: ChromeTextSurface,
+    _inspector_text: ChromeTextSurface,
 }
 
 impl ShellChrome {
-    pub fn create(
+    pub async fn create(
         flatland: &ui_comp::FlatlandProxy,
         ids: &mut IdGenerator,
         root: &ui_comp::TransformId,
+        shell: &InstrumentStudioLayout,
     ) -> Result<Self, Error> {
-        let mk = |flatland: &ui_comp::FlatlandProxy, ids: &mut IdGenerator| Bar::create(flatland, ids, root);
+        let mk = |flatland: &ui_comp::FlatlandProxy, ids: &mut IdGenerator| {
+            Bar::create(flatland, ids, root)
+        };
         // Create chrome surfaces first, then labels last so Flatland paints
         // wordmarks above strip/pills/cards instead of under them.
         let strip = mk(flatland, ids)?;
@@ -269,13 +289,6 @@ impl ShellChrome {
             mk(flatland, ids)?,
             mk(flatland, ids)?,
         ];
-        let rail_parts = {
-            let mut v = Vec::with_capacity(GLYPH_PARTS);
-            for _ in 0..GLYPH_PARTS {
-                v.push(mk(flatland, ids)?);
-            }
-            v.try_into().map_err(|_| anyhow!("rail_parts len"))?
-        };
         let inspector = mk(flatland, ids)?;
         let inspector_accent = mk(flatland, ids)?;
         let inspector_cards = [
@@ -290,20 +303,60 @@ impl ShellChrome {
             mk(flatland, ids)?,
             mk(flatland, ids)?,
         ];
-        let inspector_card_icons = [
-            mk(flatland, ids)?,
-            mk(flatland, ids)?,
-            mk(flatland, ids)?,
-            mk(flatland, ids)?,
-            mk(flatland, ids)?,
-            mk(flatland, ids)?,
-            mk(flatland, ids)?,
-            mk(flatland, ids)?,
-        ];
-        let mut labels = Vec::with_capacity(LABEL_PARTS);
-        for _ in 0..LABEL_PARTS {
-            labels.push(mk(flatland, ids)?);
-        }
+        let strip_region = shell.region_rect(ChromeRegion::WorkspaceStrip);
+        let top_runs = top_text_runs(shell);
+        let top_text = ChromeTextSurface::new(
+            flatland,
+            ids,
+            root,
+            fmath::SizeU {
+                width: strip_region.width,
+                height: strip_region.height,
+            },
+            fmath::Vec_ {
+                x: strip_region.x as i32,
+                y: strip_region.y as i32,
+            },
+            &top_runs,
+            "WorkbenchChromeTop",
+        )
+        .await?;
+        let rail_region = shell.region_rect(ChromeRegion::LauncherRail);
+        let rail_runs = rail_icon_runs(shell);
+        let rail_icons = ChromeTextSurface::new(
+            flatland,
+            ids,
+            root,
+            fmath::SizeU {
+                width: rail_region.width,
+                height: rail_region.height,
+            },
+            fmath::Vec_ {
+                x: rail_region.x as i32,
+                y: rail_region.y as i32,
+            },
+            &rail_runs,
+            "WorkbenchChromeRailIcons",
+        )
+        .await?;
+        let inspector_region = shell.region_rect(ChromeRegion::Inspector);
+        let inspector_runs = inspector_text_runs(shell);
+        let inspector_text = ChromeTextSurface::new(
+            flatland,
+            ids,
+            root,
+            fmath::SizeU {
+                width: inspector_region.width,
+                height: inspector_region.height,
+            },
+            fmath::Vec_ {
+                x: inspector_region.x as i32,
+                y: inspector_region.y as i32,
+            },
+            &inspector_runs,
+            "WorkbenchChromeInspector",
+        )
+        .await?;
         Ok(Self {
             strip,
             strip_accent,
@@ -316,13 +369,13 @@ impl ShellChrome {
             rail,
             rail_edge,
             rail_slots,
-            rail_parts,
             inspector,
             inspector_accent,
             inspector_cards,
             inspector_card_bars,
-            inspector_card_icons,
-            labels: labels.try_into().map_err(|_| anyhow!("labels len"))?,
+            _top_text: top_text,
+            _rail_icons: rail_icons,
+            _inspector_text: inspector_text,
         })
     }
 
@@ -345,7 +398,6 @@ impl ShellChrome {
         );
         let muted = rgba(0.20, 0.23, 0.28, 1.0);
         let faint = rgba(0.42, 0.48, 0.55, 1.0);
-        let text = rgba(0.96, 0.97, 0.98, 1.0);
         let cyan = rgba(0.0, 0.918, 1.0, 1.0);
         let violet = rgba(0.545, 0.486, 1.0, 1.0);
         let green = rgba(0.239, 0.839, 0.549, 1.0);
@@ -354,17 +406,14 @@ impl ShellChrome {
         let elev = rgba(0.082, 0.106, 0.141, 1.0);
         let rail_bg = rgba(0.039, 0.055, 0.078, 1.0);
 
-        for p in &self.labels {
-            p.hide(flatland)?;
-        }
-        for p in &self.rail_parts {
-            p.hide(flatland)?;
-        }
-        for p in &self.inspector_card_icons {
-            p.hide(flatland)?;
-        }
-
-        self.strip.layout(flatland, strip.x as i32, strip.y as i32, strip.width, strip.height, panel)?;
+        self.strip.layout(
+            flatland,
+            strip.x as i32,
+            strip.y as i32,
+            strip.width,
+            strip.height,
+            panel,
+        )?;
         self.strip_accent.layout(
             flatland,
             strip.x as i32,
@@ -377,33 +426,21 @@ impl ShellChrome {
         let mark = strip.height.saturating_sub(12).clamp(22, 30);
         let bx = (strip.x + 12) as i32;
         let by = (strip.y + (strip.height - mark) / 2) as i32;
-        self.brand_a.layout(flatland, bx, by, mark / 2, mark, cyan)?;
-        self.brand_b.layout(flatland, bx + (mark / 2) as i32, by, mark - mark / 2, mark, violet)?;
-
-        let mut li = 0usize;
-        // 3px glyphs + reserved chip column so menu words never collide (no OPSOK).
-        let menu_px = if strip.width < 800 { 3u32 } else { 4u32 };
-        let brand_text = if strip.width < 640 { "STUDIO" } else { "Workbench" };
-        li = draw_text(
-            &self.labels,
+        self.brand_a
+            .layout(flatland, bx, by, mark / 2, mark, cyan)?;
+        self.brand_b.layout(
             flatland,
-            li,
-            bx + mark as i32 + 10,
-            by + (mark as i32 - 7 * menu_px as i32) / 2,
-            brand_text,
-            menu_px,
-            text,
+            bx + (mark / 2) as i32,
+            by,
+            mark - mark / 2,
+            mark,
+            violet,
         )?;
 
+        // Geometry remains stateful; words are painted once by ChromeTextSurface.
         let pill_h = strip.height.saturating_sub(16).max(18);
-        let pill_labels = if strip.width < 800 {
-            ["Bld", "Rsh", "Ops"]
-        } else {
-            ["Build", "Research", "Ops"]
-        };
         let pill_w = if strip.width < 800 { 56 } else { 108 };
-        let brand_chars = brand_text.len() as i32;
-        let brand_w = brand_chars * (5 * menu_px as i32 + menu_px as i32) + 14;
+        let brand_w = if strip.width < 800 { 176 } else { 230 };
         let mut px = bx + mark as i32 + brand_w;
         let py = (strip.y + (strip.height - pill_h) / 2) as i32;
         let chip_w = if strip.width < 800 { 52 } else { 72 };
@@ -421,30 +458,14 @@ impl ShellChrome {
                 2,
                 if active { cyan } else { line },
             )?;
-            let tw = (pill_labels[i].len() as i32) * (5 * menu_px as i32 + menu_px as i32);
-            li = draw_text(
-                &self.labels,
-                flatland,
-                li,
-                px + (pill_w as i32 - tw).max(4) / 2,
-                py + (pill_h as i32 - 7 * menu_px as i32) / 2,
-                pill_labels[i],
-                menu_px,
-                if active { cyan } else { faint },
-            )?;
             px += pill_w as i32 + 8;
         }
-        // Hard stop: never let Ops run into Ok/Foc/Gap.
-        if px > chips_left - 10 {
-            px = chips_left - 10;
-        }
-
         let chip_h = pill_h;
         let mut cx = (strip.x + strip.width) as i32 - 12;
         let chips = [
-            (state.tile_count > 0, green, "Ok"),
-            (!state.confirmed_focus.is_empty(), cyan, "Foc"),
-            (state.gap_px > 0, violet, "Gap"),
+            (state.tile_count > 0, green),
+            (!state.confirmed_focus.is_empty(), cyan),
+            (state.gap_px > 0, violet),
         ];
         for i in (0..3).rev() {
             cx -= chip_w as i32;
@@ -461,20 +482,16 @@ impl ShellChrome {
                 d,
                 if chips[i].0 { chips[i].1 } else { faint },
             )?;
-            li = draw_text(
-                &self.labels,
-                flatland,
-                li,
-                cx + 16,
-                py + (chip_h as i32 - 7 * menu_px as i32) / 2,
-                chips[i].2,
-                menu_px,
-                if chips[i].0 { text } else { faint },
-            )?;
             cx -= 8;
         }
-
-        self.rail.layout(flatland, rail.x as i32, rail.y as i32, rail.width, rail.height, rail_bg)?;
+        self.rail.layout(
+            flatland,
+            rail.x as i32,
+            rail.y as i32,
+            rail.width,
+            rail.height,
+            rail_bg,
+        )?;
         self.rail_edge.layout(
             flatland,
             (rail.x + rail.width.saturating_sub(1)) as i32,
@@ -497,43 +514,14 @@ impl ShellChrome {
             Some(_) | None => 0,
         };
         for i in 0..RAIL_SLOTS {
-            let is_active = i == highlight;
-            let slot_bg = if is_active {
-                rgba(1.0, 1.0, 1.0, 0.05)
-            } else {
-                rgba(0.0, 0.0, 0.0, 0.0)
-            };
-            let slot_border = if is_active {
-                rgba(0.0, 0.918, 1.0, 0.35)
+            let slot_bg = if i == highlight {
+                rgba(0.0, 0.918, 1.0, 0.16)
             } else {
                 rgba(0.0, 0.0, 0.0, 0.0)
             };
             self.rail_slots[i].layout(flatland, ix, iy, slot, slot, slot_bg)?;
-            let base = i * PARTS_PER_ICON;
-            let ink = if is_active { cyan } else { faint };
-            if is_active {
-                self.rail_parts[base].layout(flatland, ix, iy, slot, 1, slot_border)?;
-                self.rail_parts[base + 1].layout(flatland, ix, iy + slot as i32 - 1, slot, 1, slot_border)?;
-                self.rail_parts[base + 2].layout(flatland, ix, iy, 1, slot, slot_border)?;
-                self.rail_parts[base + 3].layout(flatland, ix + slot as i32 - 1, iy, 1, slot, slot_border)?;
-                draw_rail_glyph(
-                    &self.rail_parts[base + 4..base + PARTS_PER_ICON],
-                    flatland,
-                    ix,
-                    iy,
-                    slot,
-                    i,
-                    ink,
-                )?;
-            } else {
-                draw_rail_glyph(&self.rail_parts[base..base + 4], flatland, ix, iy, slot, i, ink)?;
-                for p in &self.rail_parts[base + 4..base + PARTS_PER_ICON] {
-                    p.hide(flatland)?;
-                }
-            }
             iy += (slot + gap) as i32;
         }
-
         self.inspector.layout(
             flatland,
             inspector.x as i32,
@@ -550,17 +538,6 @@ impl ShellChrome {
             2,
             cyan,
         )?;
-        li = draw_text(
-            &self.labels,
-            flatland,
-            li,
-            inspector.x as i32 + 10,
-            inspector.y as i32 + 8,
-            "Inspect",
-            3,
-            cyan,
-        )?;
-
         let pad = 10u32;
         let card_count = 4u32;
         let usable = inspector.width.saturating_sub(pad * 2);
@@ -569,11 +546,14 @@ impl ShellChrome {
         let card_y = (inspector.y + pad + 12) as i32;
         let fills = [
             meter_color(state.tile_count.min(4) as f32 / 4.0, cyan, muted),
-            if !state.confirmed_focus.is_empty() { cyan } else { muted },
+            if !state.confirmed_focus.is_empty() {
+                cyan
+            } else {
+                muted
+            },
             meter_color((state.gap_px as f32 / 24.0).clamp(0.15, 1.0), violet, muted),
             meter_color((state.present_count.min(12) as f32) / 12.0, green, muted),
         ];
-        let card_labels = ["Tile", "Focus", "Gap", "Live"];
         for i in 0..4 {
             let x = (inspector.x + pad + i as u32 * (card_w + pad)) as i32;
             self.inspector_cards[i].layout(flatland, x, card_y, card_w, card_h, elev)?;
@@ -586,189 +566,113 @@ impl ShellChrome {
                 bar_h,
                 fills[i],
             )?;
-            let ip = &self.inspector_card_icons[i * 2..i * 2 + 2];
-            draw_inspector_mini_icon(ip, flatland, x + 8, card_y + 8, i, fills[i], faint)?;
-            li = draw_text(
-                &self.labels,
-                flatland,
-                li,
-                x + 22,
-                card_y + 10,
-                card_labels[i],
-                3,
-                text,
-            )?;
         }
-        let _ = li;
         // Tile names are drawn on each tile header (TileName), not the chrome pool.
         Ok(())
     }
 }
 
-fn draw_rail_glyph(
-    parts: &[Bar],
-    flatland: &ui_comp::FlatlandProxy,
-    slot_x: i32,
-    slot_y: i32,
-    slot: u32,
-    kind: usize,
-    ink: ui_comp::ColorRgba,
-) -> Result<(), Error> {
-    let g = slot.saturating_sub(16).clamp(16, 22);
-    let gx = slot_x + ((slot - g) / 2) as i32;
-    let gy = slot_y + ((slot - g) / 2) as i32;
-    for p in parts {
-        p.hide(flatland)?;
+fn top_text_runs(shell: &InstrumentStudioLayout) -> Vec<TextRun<'static>> {
+    let strip = shell.region_rect(ChromeRegion::WorkspaceStrip);
+    let mark = strip.height.saturating_sub(12).clamp(22, 30);
+    let bx = strip.x as i32 + 12;
+    let by = (strip.y + (strip.height - mark) / 2) as i32;
+    let narrow = strip.width < 800;
+    let menu_font = if narrow { 12.0 } else { 14.0 };
+    let pill_h = strip.height.saturating_sub(16).max(18);
+    let pill_w = if narrow { 56 } else { 108 };
+    let brand_w = if narrow { 176 } else { 230 };
+    let mut pill_x = bx + mark as i32 + brand_w;
+    let pill_y = ((strip.height - pill_h) / 2) as i32;
+    let chip_w = if narrow { 52 } else { 72 };
+    let chips_left = strip.width as i32 - (3 * chip_w as i32 + 2 * 8 + 12);
+    let mut runs = vec![TextRun::text(
+        "Workbench Studio",
+        bx + mark as i32 + 10,
+        by + (mark as i32 - menu_font as i32) / 2 - 2,
+        menu_font,
+        TEXT_PRIMARY,
+    )];
+    for (index, label) in ["Build", "Research", "Ops"].iter().enumerate() {
+        let estimated_width = label.len() as i32 * if narrow { 7 } else { 8 };
+        runs.push(TextRun::text(
+            label,
+            pill_x + (pill_w as i32 - estimated_width).max(4) / 2,
+            pill_y + (pill_h as i32 - menu_font as i32) / 2 - 2,
+            menu_font,
+            if index == 0 {
+                CYAN_TEXT
+            } else {
+                TEXT_SECONDARY
+            },
+        ));
+        pill_x += pill_w as i32 + 8;
     }
-    match kind {
-        0 => {
-            if parts.len() >= 3 {
-                let t = (g / 5).max(2);
-                parts[0].layout(flatland, gx + (g as i32 - t as i32) / 2, gy + 2, t, g - 4, ink)?;
-                parts[1].layout(flatland, gx + 2, gy + (g as i32 - t as i32) / 2, g - 4, t, ink)?;
-                let k = (g / 3).max(3);
-                parts[2].layout(
-                    flatland,
-                    gx + (g as i32 - k as i32) / 2,
-                    gy + (g as i32 - k as i32) / 2,
-                    k,
-                    k,
-                    ink,
-                )?;
-            }
+    let status_font = if narrow { 10.0 } else { 12.0 };
+    let mut chip_x = strip.width as i32 - 12;
+    let labels = ["Ready", "Focus", "Gaps"];
+    for index in (0..3).rev() {
+        chip_x -= chip_w as i32;
+        if chip_x < chips_left {
+            chip_x = chips_left + index as i32 * (chip_w as i32 + 8);
         }
-        1 => {
-            if parts.len() >= 4 {
-                let cell = (g / 2).saturating_sub(2).max(4);
-                let gap = 2i32;
-                parts[0].layout(flatland, gx, gy, cell, cell, ink)?;
-                parts[1].layout(flatland, gx + cell as i32 + gap, gy, cell, cell, ink)?;
-                parts[2].layout(flatland, gx, gy + cell as i32 + gap, cell, cell, ink)?;
-                parts[3].layout(
-                    flatland,
-                    gx + cell as i32 + gap,
-                    gy + cell as i32 + gap,
-                    cell,
-                    cell,
-                    ink,
-                )?;
-            }
-        }
-        2 => {
-            if parts.len() >= 4 {
-                parts[0].layout(flatland, gx + 3, gy + 1, g - 6, g - 2, ink)?;
-                let f = (g / 3).max(4);
-                parts[1].layout(
-                    flatland,
-                    gx + g as i32 - 3 - f as i32,
-                    gy + 1,
-                    f,
-                    f,
-                    rgba(0.039, 0.055, 0.078, 1.0),
-                )?;
-                let lw = g - 12;
-                parts[2].layout(
-                    flatland,
-                    gx + 6,
-                    gy + g as i32 / 2,
-                    lw,
-                    2,
-                    rgba(0.039, 0.055, 0.078, 1.0),
-                )?;
-                parts[3].layout(
-                    flatland,
-                    gx + 6,
-                    gy + g as i32 / 2 + 4,
-                    lw.saturating_sub(3),
-                    2,
-                    rgba(0.039, 0.055, 0.078, 1.0),
-                )?;
-            }
-        }
-        3 => {
-            if parts.len() >= 4 {
-                parts[0].layout(flatland, gx, gy, g, 2, ink)?;
-                parts[1].layout(flatland, gx, gy + g as i32 - 2, g, 2, ink)?;
-                parts[2].layout(flatland, gx, gy, 2, g, ink)?;
-                parts[3].layout(flatland, gx + g as i32 - 2, gy, 2, g, ink)?;
-            }
-        }
-        4 => {
-            if parts.len() >= 4 {
-                let t = 3u32;
-                parts[0].layout(flatland, gx + 3, gy + 4, t, t, ink)?;
-                parts[1].layout(flatland, gx + 6, gy + (g as i32 / 2) - 1, t + 1, t, ink)?;
-                parts[2].layout(flatland, gx + 3, gy + g as i32 - 7, t, t, ink)?;
-                parts[3].layout(flatland, gx + g as i32 / 2, gy + g as i32 - 6, g / 2 - 2, 3, ink)?;
-            }
-        }
-        _ => {
-            if parts.len() >= 4 {
-                let hub = (g / 2).max(6);
-                parts[0].layout(
-                    flatland,
-                    gx + (g as i32 - hub as i32) / 2,
-                    gy + (g as i32 - hub as i32) / 2,
-                    hub,
-                    hub,
-                    ink,
-                )?;
-                let n = 3u32;
-                parts[1].layout(flatland, gx + (g as i32 - n as i32) / 2, gy, n, n + 1, ink)?;
-                parts[2].layout(
-                    flatland,
-                    gx + (g as i32 - n as i32) / 2,
-                    gy + g as i32 - n as i32 - 1,
-                    n,
-                    n + 1,
-                    ink,
-                )?;
-                parts[3].layout(flatland, gx, gy + (g as i32 - n as i32) / 2, n + 1, n, ink)?;
-            }
-        }
+        runs.push(TextRun::text(
+            labels[index],
+            chip_x + 16,
+            pill_y + (pill_h as i32 - status_font as i32) / 2 - 1,
+            status_font,
+            TEXT_PRIMARY,
+        ));
+        chip_x -= 8;
     }
-    Ok(())
+    runs
 }
-
-fn draw_inspector_mini_icon(
-    parts: &[Bar],
-    flatland: &ui_comp::FlatlandProxy,
-    x: i32,
-    y: i32,
-    kind: usize,
-    hot: ui_comp::ColorRgba,
-    cold: ui_comp::ColorRgba,
-) -> Result<(), Error> {
-    for p in parts {
-        p.hide(flatland)?;
+fn rail_icon_runs(shell: &InstrumentStudioLayout) -> Vec<TextRun<'static>> {
+    let rail = shell.region_rect(ChromeRegion::LauncherRail);
+    let slot = rail.width.saturating_sub(14).clamp(34, 42);
+    let gap = 8u32;
+    let icon_size = 24.0;
+    let icon_x = ((rail.width.saturating_sub(icon_size as u32)) / 2) as i32;
+    let icons = [
+        "\u{e145}", "\u{e871}", "\u{e2c7}", "\u{e80b}", "\u{e86f}", "\u{e8b8}",
+    ];
+    icons
+        .iter()
+        .enumerate()
+        .map(|(index, icon)| {
+            let slot_y = 14 + index as i32 * (slot + gap) as i32;
+            TextRun::icon(
+                icon,
+                icon_x,
+                slot_y + (slot as i32 - icon_size as i32) / 2 - 2,
+                icon_size,
+                TEXT_SECONDARY,
+            )
+        })
+        .collect()
+}
+fn inspector_text_runs(shell: &InstrumentStudioLayout) -> Vec<TextRun<'static>> {
+    let inspector = shell.region_rect(ChromeRegion::Inspector);
+    let pad = 10u32;
+    let card_w = inspector
+        .width
+        .saturating_sub(pad * 2)
+        .saturating_sub(pad * 3)
+        / 4;
+    let card_y = pad as i32 + 12;
+    let labels = [
+        ("\u{e871}", "Tiles"),
+        ("\u{e8b6}", "Focus"),
+        ("\u{e86f}", "Gap"),
+        ("\u{e80b}", "Live"),
+    ];
+    let mut runs = vec![TextRun::text("Inspect", 10, 6, 14.0, CYAN_TEXT)];
+    for (index, (icon, label)) in labels.iter().enumerate() {
+        let x = (pad + index as u32 * (card_w + pad)) as i32;
+        runs.push(TextRun::icon(icon, x + 8, card_y + 6, 16.0, VIOLET_TEXT));
+        runs.push(TextRun::text(label, x + 30, card_y + 8, 12.0, TEXT_PRIMARY));
     }
-    match kind {
-        0 => {
-            if parts.len() >= 2 {
-                parts[0].layout(flatland, x, y, 5, 5, hot)?;
-                parts[1].layout(flatland, x + 7, y + 7, 5, 5, cold)?;
-            }
-        }
-        1 => {
-            if parts.len() >= 2 {
-                parts[0].layout(flatland, x, y, 12, 12, hot)?;
-                parts[1].layout(flatland, x + 3, y + 3, 6, 6, rgba(0.082, 0.106, 0.141, 1.0))?;
-            }
-        }
-        2 => {
-            if parts.len() >= 2 {
-                parts[0].layout(flatland, x, y + 2, 12, 3, hot)?;
-                parts[1].layout(flatland, x, y + 8, 12, 3, cold)?;
-            }
-        }
-        _ => {
-            if parts.len() >= 2 {
-                parts[0].layout(flatland, x + 3, y + 3, 6, 6, hot)?;
-                parts[1].layout(flatland, x + 5, y + 5, 2, 2, rgba(0.07, 0.09, 0.12, 1.0))?;
-            }
-        }
-    }
-    Ok(())
+    runs
 }
 
 fn active_rail_index(state: &ChromeState) -> Option<usize> {

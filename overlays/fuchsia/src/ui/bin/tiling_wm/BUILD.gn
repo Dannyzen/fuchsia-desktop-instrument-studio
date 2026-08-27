@@ -11,9 +11,15 @@ rustc_binary("bin") {
   with_unit_tests = true
   edition = "2024"
 
+  inputs = [
+    "//prebuilt/third_party/fonts/material/MaterialIcons-Regular.ttf",
+    "//prebuilt/third_party/fonts/roboto/Roboto-Regular.ttf",
+  ]
+
   deps = [
     ":tiling_wm_config",
     "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
+    "//sdk/fidl/fuchsia.images2:fuchsia.images2_rust",
     "//sdk/fidl/fuchsia.math:fuchsia.math_rust",
     "//sdk/fidl/fuchsia.session.scene:fuchsia.session.scene_rust",
     "//sdk/fidl/fuchsia.session.window:fuchsia.session.window_rust",
@@ -25,12 +31,15 @@ rustc_binary("bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/lib/ui/carnelian",
+    "//src/lib/ui/fuchsia-framebuffer",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/fuchsia-desktop/desktop_ui",
     "//src/lib/ui/fuchsia-scenic",
     "//src/lib/ui/fidl_fuchsia_ui_views_ext:lib",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:euclid",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
     "//third_party/rust_crates:rand",
@@ -38,6 +47,7 @@ rustc_binary("bin") {
 
   sources = [
     "src/chrome.rs",
+    "src/chrome_text.rs",
     "src/main.rs",
     "src/observability.rs",
     "src/policy.rs",

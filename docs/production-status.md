@@ -1,6 +1,6 @@
 # Workbench Studio production status
 
-Updated: 2026-08-19
+Updated: 2026-08-27
 
 ## Short answer
 
@@ -14,6 +14,8 @@ Live 19: Settings sidebar + Appearance/Temperature cards. Dark/Celsius selected.
 
 Live 20: chrome menu words no longer collide. WORKBENCH BLD RSH OPS / OK FOC GAP.
 
+Live 21: packaged Roboto renders full shell words and packaged Material Icons renders semantic rail/inspector glyphs. Full SETTINGS / TERMINAL / BROWSER tile titles are readable. Inspect is healthy and built merkle equals live merkle, but Files is absent under the existing `8vg0.3` PresentView failure, so this is an honest three-tile proof.
+
 **No. The live emulator screen is not production yet.**
 
 It is a real native Fuchsia Workbench session with:
@@ -21,12 +23,16 @@ It is a real native Fuchsia Workbench session with:
 - Inspect-backed tiling WM
 - Instrument Studio chrome regions
 - Design-derived multi-rect iconography
-- 4 live apps in a 2x2 stage
+- an Inspect-backed stage; Live 21 shows three apps because Files exited during PresentView
 
 It is **not** yet the polished production Workbench Studio UI from the design screenshot.
 
 ## Done
 
+- Native Roboto shell labels live-proven: Workbench Studio / Build / Research / Ops / Ready / Focus / Gaps / Inspect
+- Native Material Icons live-proven for rail and inspector constructs
+- Full Settings / Files / Browser / Terminal title source, with Settings / Terminal / Browser visible in Live 21
+- Built `tiling_wm` merkle matches live (`90f336fb…`), Inspect health `OK`
 - Chrome bitmap label path (brand/pills/chips/inspector) live-proven
 - 3px/RLE label scale attempt live-proven (still not OCR-clean)
 - Narrow-tile stacked Settings/Files (Browser clip residual)
@@ -49,15 +55,15 @@ Screenshot-ranked (2026-08-19 vs `01-instrument-studio.png`):
 3. Files is a list, not an icon grid (`8vg0.3`)
 4. Browser URL/page still clips (`8vg0.6`)
 5. Terminal is an empty `localhost:/#` box (`8vg0.4`)
-6. Rail glyphs are rect approximations (`8vg0.5`)
-7. True fonts / radius / glow / release packaging
+6. Files PresentView still removes the Files tile (`8vg0.3`)
+7. Tile-title font path, radius, glow, and release packaging remain
 
 
-1. True font/vector typography (bitmap labels now readable, not production type)
-2. True icon assets/glyphs (beyond rect approximations)
-3. App chrome restyle to Instrument Studio cards
-4. Terminal content density and overall polish/glow/radius fidelity
-5. Product packaging/release gate beyond lab emulator proof
+1. Move tile-title text from the large bitmap renderer to the native font surface
+2. Fix the clipped/ghost title fragment below the top strip
+3. Restore Files PresentView for a true four-app frame (`8vg0.3`)
+4. Add optional rail labels/tooltips for ambiguous symbols
+5. App chrome, terminal density, glow/radius fidelity, and release packaging
 
 4-app Inspect gate: session-add Running is not enough. Live 15 fail-closed at tile_count=1.
 
@@ -65,5 +71,5 @@ Planning matrix: `docs/design-vision-bead-matrix.md` (two-round visual/IA + func
 
 ## Latest live proof
 
-- `design/screenshots/07-emulator-icons-live.png`
-- `docs/evidence/instrument-studio-icons-20260819T001859Z/`
+- `design/screenshots/21-emulator-font-icons-live.png`
+- `docs/evidence/instrument-studio-font-icons-20260827T051537Z/`

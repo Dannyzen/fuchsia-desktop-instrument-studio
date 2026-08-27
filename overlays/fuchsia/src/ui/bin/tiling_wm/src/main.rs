@@ -26,6 +26,7 @@ use rand::rng;
 use std::collections::HashMap;
 
 mod chrome;
+mod chrome_text;
 mod observability;
 mod policy;
 
@@ -45,13 +46,13 @@ fn tile_short_label(id: &str) -> &'static str {
     // "settings" must win before "files": the word settings contains no
     // "files" substring, but session names can include both tokens.
     if key.contains("settings") {
-        "SET"
+        "Settings"
     } else if key.contains("files") {
-        "FIL"
+        "Files"
     } else if key.contains("browser") {
-        "BRW"
+        "Browser"
     } else if key.contains("terminal") {
-        "TRM"
+        "Terminal"
     } else {
         "APP"
     }
@@ -603,7 +604,11 @@ impl TilingWm {
         let layout_info = parent_viewport_watcher.get_layout().await?;
         Self::watch_layout(parent_viewport_watcher, internal_sender.clone());
 
-        let chrome = ShellChrome::create(&flatland, &mut id_generator, &root_transform_id)?;
+        let logical_size = layout_info.logical_size.context("missing initial root logical size")?;
+        let shell = InstrumentStudioLayout::new(logical_size.width, logical_size.height)
+            .map_err(anyhow::Error::msg)?;
+        let chrome =
+            ShellChrome::create(&flatland, &mut id_generator, &root_transform_id, &shell).await?;
         Ok(TilingWm {
             internal_sender,
             flatland,

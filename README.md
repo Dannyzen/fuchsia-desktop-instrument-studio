@@ -82,6 +82,8 @@ We are building **Instrument Studio** first:
 
 ![Live emulator clean menu text](design/screenshots/20-emulator-menu-text-live.png)
 
+![Live emulator native fonts and Material icons](design/screenshots/21-emulator-font-icons-live.png)
+
 Interactive sketches live under `design/sketches/`.
 
 ## Local rebuild

@@ -332,6 +332,8 @@
         {
             protocol: [
                 "fuchsia.session.scene.Manager",
+                "fuchsia.sysmem2.Allocator",
+                "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.focus.FocusChainListenerRegistry",
             ],
