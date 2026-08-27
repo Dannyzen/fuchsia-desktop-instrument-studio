@@ -20,6 +20,7 @@ SETTINGS = ROOT / "overlays/fuchsia/src/fuchsia-desktop/settings/src/settings_co
 INPUT_DRIVER = TERMINAL / "src/input_driver.rs"
 WM_DRIVER = ROOT / "overlays/fuchsia/src/ui/bin/tiling_wm/src/driver.rs"
 LIVE_VERIFIER = ROOT / "scripts/verify-fuchsia-studio-help-live.sh"
+README = ROOT / "README.md"
 
 
 def invoke(executable: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -163,5 +164,13 @@ live_verifier = LIVE_VERIFIER.read_text()
 require("component start core/session-manager/session:session/tiling_wm_driver", live_verifier)
 require("confirmed", live_verifier)
 require("terminal", live_verifier)
+
+readme = README.read_text()
+require("Latest Live 22:", readme)
+require("three visible tiles. Files is absent.", readme)
+require("Historical Live 4:", readme)
+require("proves four tiles", readme)
+assert "- Live Inspect: 4 tiles" not in readme
+assert "Remaining gap: Instrument Studio chrome" not in readme
 
 print("fuchsia_studio_help_contract_ok")

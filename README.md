@@ -188,11 +188,13 @@ See `docs/production-status.md` for an honest done/not-done gate.
 
 Rebuild proof + vision notes:
 
-- `docs/evidence/instrument-studio-help-20260827T062745Z/`
-- `docs/evidence/instrument-studio-20260818T220823Z/`
-- Live Inspect: 4 tiles, confirmed focus, gap/border config
-- Remaining gap: Instrument Studio chrome (strip/rail/inspector)
+- Latest Live 22: `docs/evidence/instrument-studio-help-20260827T062745Z/`
+  proves the new chrome, built-in help, Inspect health, confirmed Terminal focus,
+  and three visible tiles. Files is absent.
+- Historical Live 4: `docs/evidence/instrument-studio-20260818T220823Z/`
+  proves four tiles, confirmed focus, and gap/border configuration before the
+  current typography and help changes.
 
 ## Status
 
-Interactive tiling WM foundation is proven on the pinned detached source identity above. Richer Instrument Studio UI implementation is the next build phase tracked from this public package.
+The interactive tiling WM, Instrument Studio shell chrome, readable typography, semantic icons, and Linux help surface are proven on their cited source identities. The next proof is to restore Files and re-establish an exact-current four-tile stage before release-polish claims.
