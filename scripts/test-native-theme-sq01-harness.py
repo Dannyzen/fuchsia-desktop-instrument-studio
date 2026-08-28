@@ -86,6 +86,25 @@ class Sq01HarnessTests(unittest.TestCase):
             with self.subTest(argv=argv):
                 self.assertFalse(self.h.allowed_subprocess(argv, ROOT))
 
+    def test_git_diff_allowlist_requires_exact_pinned_ref_shape(self):
+        source_sha = "1" * 40
+        command = ["git", "diff", "--binary", self.h.BASE_SHA, source_sha]
+        self.assertTrue(self.h.allowed_subprocess(command, ROOT))
+        denied = (
+            ["git", "diff", "--binary", source_sha],
+            ["git", "diff", "--binary", self.h.BASE_SHA],
+            command + ["--stat"],
+            ["git", "diff", "--binary", "HEAD", source_sha],
+            ["git", "diff", "--binary", self.h.BASE_SHA, "HEAD"],
+            ["git", "clone", "https://example.invalid/repository"],
+            ["git", "fetch", "origin"],
+            ["git", "push", "origin", "HEAD"],
+            ["git", "describe", "--always"],
+        )
+        for argv in denied:
+            with self.subTest(argv=argv):
+                self.assertFalse(self.h.allowed_subprocess(argv, ROOT))
+
     def test_receipt_shape_canonicality_and_hash_are_enforced(self):
         receipt = {"schema_version": "1.0.0", "status": "PASS"}
         raw = self.h.canonical_json_bytes(receipt)

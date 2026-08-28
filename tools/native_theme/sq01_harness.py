@@ -175,7 +175,9 @@ def allowed_subprocess(argv: object, root: Path) -> bool:
     if argv[0] == "git":
         return list(argv[1:]) in (["rev-parse", "HEAD"], ["rev-parse", "HEAD^{tree}"],
                                  ["status", "--porcelain=v1", "--untracked-files=all"],
-                                 ["ls-files"]) or (len(argv) == 4 and argv[1:3] == ["diff", "--binary"])
+                                 ["ls-files"]) or (len(argv) == 5 and
+                                                   argv[1:4] == ["diff", "--binary", BASE_SHA] and
+                                                   re.fullmatch(r"[0-9a-f]{40}", argv[4]) is not None)
     return False
 
 
