@@ -182,13 +182,13 @@ class Sq01HarnessTests(unittest.TestCase):
             for name in self.h.VERDICT_INPUT_RECEIPTS
         }), "FAIL")
 
-    def test_mutation_inventory_executes_strict_json_and_declared_bounds(self):
+    def test_mutation_inventory_executes_all_required_cases(self):
         receipt = self.h.execute_mutations(ROOT)
         cases = receipt["cases"]
         self.assertEqual({case["id"] for case in cases}, set(self.h.REQUIRED_MUTATIONS))
         executed = [case for case in cases if not case["skipped"]]
         skipped = [case for case in cases if case["skipped"]]
-        self.assertEqual(len(executed), 7)
+        self.assertEqual(len(executed), 34)
         self.assertEqual({case["id"] for case in executed if case["expected_layer"] == "bounds"},
                          {"bounds.overlong-string", "bounds.deep-nesting", "bounds.oversized-input"})
         self.assertEqual(receipt["skipped_required"], len(skipped))
@@ -199,7 +199,8 @@ class Sq01HarnessTests(unittest.TestCase):
         self.assertEqual(receipt["total"], len(cases))
         self.assertEqual(receipt["passed"], sum(case["pass"] for case in cases))
         self.assertEqual(receipt["failed"], sum(not case["pass"] for case in cases))
-        self.assertEqual(receipt["status"], "FAIL")
+        self.assertEqual(skipped, [])
+        self.assertEqual(receipt["status"], "PASS")
 
     def test_schema_receipt_executes_all_three_bounds(self):
         class Draft202012Validator:
@@ -217,6 +218,30 @@ class Sq01HarnessTests(unittest.TestCase):
                          {"E_LIMIT_STRING", "E_LIMIT_NESTING", "E_LIMIT_SOURCE"})
         self.assertEqual(receipt["skipped_required"], 0)
         self.assertEqual(receipt["status"], "PASS")
+
+    def test_contract_mutations_execute_real_production_validator(self):
+        receipt = self.h.execute_mutations(ROOT)
+        cases = {case["id"]: case for case in receipt["cases"]}
+        self.assertEqual(set(cases), set(self.h.REQUIRED_MUTATIONS))
+        self.assertEqual((receipt["total"], receipt["passed"], receipt["failed"],
+                          receipt["skipped_required"], receipt["status"]),
+                         (34, 34, 0, 0, "PASS"))
+        for case_id, (layer, code) in self.h.REQUIRED_MUTATIONS.items():
+            with self.subTest(case_id=case_id):
+                case = cases[case_id]
+                self.assertTrue(case["pass"])
+                self.assertEqual((case["actual_layer"], case["actual_code"]), (layer, code))
+                self.assertIsNotNone(case["input_hash"])
+                self.assertFalse(case["skipped"])
+
+    def test_unconditional_contract_acceptance_exposes_exact_survivors(self):
+        def accept(_root, _raw, _kind):
+            return 0, "accepted", None, None
+        receipt = self.h.execute_mutations(ROOT, contract_executor=accept)
+        survivors = [case for case in receipt["cases"] if case["id"].startswith("contract.") and not case["pass"]]
+        self.assertEqual(len(survivors), 27)
+        self.assertEqual(receipt["passed"], 7)
+        self.assertEqual(receipt["status"], "FAIL")
 
     def test_public_scan_finds_private_identifiers_paths_and_credentials(self):
         with tempfile.TemporaryDirectory() as td:

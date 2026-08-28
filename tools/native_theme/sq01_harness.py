@@ -6,6 +6,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import importlib.metadata
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -299,8 +300,79 @@ def _bound_inputs() -> dict[str, bytes]:
     }
 
 
-def execute_mutations(root: Path, executor=None) -> dict[str, Any]:
+def _contract_mutation_inputs(root: Path) -> dict[str, tuple[bytes, str]]:
+    package = _strict_load(root / "tools/native_theme/fixtures/native-theme-v1-package.json")
+    cases: dict[str, tuple[bytes, str]] = {}
+
+    def package_case(case_id: str, mutate) -> None:
+        candidate = json.loads(json.dumps(package))
+        mutate(candidate)
+        cases[case_id] = (canonical_json_bytes(candidate), "package")
+
+    package_case("contract.required-field", lambda value: value.pop("theme"))
+    package_case("contract.forbidden-field", lambda value: value.__setitem__("command", "run-me"))
+    package_case("contract.required-version", lambda value: value.__setitem__("schema_version", "2.0.0"))
+    package_case("contract.required-variant", lambda value: value["variants"].pop("light"))
+    package_case("contract.required-domain", lambda value: value["variants"]["dark"].pop("typography"))
+    package_case("contract.required-layer", lambda value: value["variants"]["dark"].__setitem__("primitives", {}))
+    package_case("contract.semantic-roles", lambda value: value["variants"]["dark"]["semantic"].pop("window.urgent"))
+    package_case("contract.color-canonical", lambda value: value["variants"]["dark"]["primitives"].__setitem__("accent", "#FFFFFF"))
+    package_case("contract.focus-distinct", lambda value: value["variants"]["dark"]["semantic"].__setitem__(
+        "interaction.selection", value["variants"]["dark"]["semantic"]["border.focusConfirmed"]))
+    package_case("contract.typography", lambda value: value["variants"]["dark"].__setitem__("typography", {}))
+    package_case("contract.geometry", lambda value: value["variants"]["dark"].__setitem__("geometry", {}))
+    package_case("contract.elevation", lambda value: value["variants"]["dark"].__setitem__("elevation", {}))
+    package_case("contract.opacity", lambda value: value["variants"]["dark"].__setitem__("opacity", {}))
+    package_case("contract.motion", lambda value: value["variants"]["dark"].__setitem__("motion", {}))
+    package_case("contract.reduced-motion", lambda value: value["variants"]["dark"]["motion"].__setitem__(
+        "reduced", {"duration_ms": 1, "essential_only": True, "substitution": "instant"}))
+    package_case("contract.asset-metadata", lambda value: value["variants"]["dark"]["assets"]["items"]["status.error"].pop("spdx"))
+    package_case("contract.asset-path", lambda value: value["variants"]["dark"]["assets"]["items"]["status.error"].__setitem__("path", "../escape.svg"))
+    package_case("contract.license", lambda value: value["metadata"].__setitem__("license", {}))
+    package_case("contract.provenance", lambda value: value["metadata"]["provenance"].pop("attribution"))
+    package_case("contract.fallback", lambda value: value["fallback"].pop("built_in_theme_id"))
+    package_case("contract.compatibility", lambda value: value["policy"]["compatibility"].__setitem__("window", "N/N-2"))
+    package_case("contract.extension-namespace", lambda value: value["metadata"].__setitem__("extensions", {"com.example.private": True}))
+    package_case("contract.status-noncolor", lambda value: value["variants"]["dark"]["assets"]["items"].pop("status.error"))
+    package_case("contract.contrast-normal", lambda value: value["variants"]["dark"]["semantic"].__setitem__(
+        "text.normal", value["variants"]["dark"]["semantic"]["surface.canvas"]))
+    package_case("contract.contrast-ui", lambda value: value["variants"]["dark"]["semantic"].__setitem__(
+        "border.focusConfirmed", value["variants"]["dark"]["semantic"]["surface.canvas"]))
+    package_case("contract.terminal-ansi", lambda value: value["variants"]["dark"]["terminal"].pop("ansi15"))
+    profile = _strict_load(root / "tools/native_theme/fixtures/profiles/dtcg-positive.json")
+    profile["declared_layer"] = "runtime"
+    cases["contract.profile-layer"] = (canonical_json_bytes(profile), "profile")
+    return cases
+
+
+def _load_contract_validator(root: Path):
+    path = root / "tools/native_theme/native_theme_v1.py"
+    spec = importlib.util.spec_from_file_location("sq01_native_theme_contract", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("cannot load NativeThemeV1 contract validator")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _contract_executor(root: Path, raw: bytes, kind: str) -> tuple[int, str, str | None, str | None]:
+    validator = _load_contract_validator(root)
+    try:
+        value = json.loads(raw)
+        if kind == "profile":
+            validator.validate_profile_fixture(value)
+        else:
+            validator.validate_package(value)
+    except validator.ContractError as exc:
+        return 2, "rejected", "contract", str(exc).split(":", 1)[0]
+    except (UnicodeError, ValueError, TypeError, KeyError) as exc:
+        return 3, "executor-error", "harness", type(exc).__name__
+    return 0, "accepted", None, None
+
+
+def execute_mutations(root: Path, executor=None, contract_executor=None) -> dict[str, Any]:
     executor = executor or _strict_bytes_executor
+    contract_executor = contract_executor or _contract_executor
     specs = [("duplicate-key", b'{"a":1,"a":2}', "E_JSON_DUPLICATE"),
              ("invalid-utf8", b'\xff', "E_UTF8"), ("nan", b'{"a":NaN}', "E_NUMBER_NONFINITE"),
              ("infinity", b'{"a":Infinity}', "E_NUMBER_NONFINITE")]
@@ -313,25 +385,32 @@ def execute_mutations(root: Path, executor=None) -> dict[str, Any]:
                                  execution_return=ret, actual_layer=layer, actual_code=actual,
                                  execution_result=result))
     bound_inputs = _bound_inputs()
+    contract_inputs = _contract_mutation_inputs(root)
     for case_id, (layer, code) in REQUIRED_MUTATIONS.items():
         if case_id in {case["id"] for case in cases}:
             continue
         if case_id in bound_inputs:
             raw = bound_inputs[case_id]
             ret, result, actual_layer, actual = _bounds_executor(raw, case_id)
-            cases.append(case_result(case_id=case_id, requirement_ids=[case_id],
-                                     validator_name="sq01-declared-bounds-executor", validator_version="1",
-                                     input_bytes=raw, expected_layer=layer, expected_code=code,
-                                     execution_return=ret, actual_layer=actual_layer, actual_code=actual,
-                                     execution_result=result))
+            validator_name = "sq01-declared-bounds-executor"
+        elif case_id in contract_inputs:
+            raw, kind = contract_inputs[case_id]
+            ret, result, actual_layer, actual = contract_executor(root, raw, kind)
+            validator_name = "native-theme-v1-contract-validator"
+        else:
+            cases.append({"id": case_id, "requirement_ids": [case_id],
+                          "validator_name": None, "validator_version": None,
+                          "input_hash": None, "expected_layer": layer,
+                          "expected_code": code, "actual_layer": None,
+                          "actual_code": None, "execution_return": None,
+                          "execution_result": "not-executed", "pass": False,
+                          "skipped": True, "skipped_required": 1})
             continue
-        cases.append({"id": case_id, "requirement_ids": [case_id],
-                      "validator_name": None, "validator_version": None,
-                      "input_hash": None, "expected_layer": layer,
-                      "expected_code": code, "actual_layer": None,
-                      "actual_code": None, "execution_return": None,
-                      "execution_result": "not-executed", "pass": False,
-                      "skipped": True, "skipped_required": 1})
+        cases.append(case_result(case_id=case_id, requirement_ids=[case_id],
+                                 validator_name=validator_name, validator_version="1",
+                                 input_bytes=raw, expected_layer=layer, expected_code=code,
+                                 execution_return=ret, actual_layer=actual_layer, actual_code=actual,
+                                 execution_result=result))
     passed = sum(case["pass"] for case in cases)
     skipped = sum(case["skipped_required"] for case in cases)
     return {"schema_version": "1.0.0", "status": "PASS" if passed == len(cases) and not skipped else "FAIL",
