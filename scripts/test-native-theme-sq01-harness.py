@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
+import shutil
 import tempfile
 import types
 import unittest
@@ -48,14 +49,29 @@ class Sq01HarnessTests(unittest.TestCase):
 
     def test_symlink_output_escape_is_rejected(self):
         with tempfile.TemporaryDirectory() as td:
-            link = ROOT / "artifacts/quality/sq-01"
-            link.parent.mkdir(parents=True, exist_ok=True)
-            link.symlink_to(Path(td), target_is_directory=True)
-            try:
-                with self.assertRaisesRegex(ValueError, "symlink"):
-                    self.h.validate_output_path(ROOT, link)
-            finally:
-                link.unlink()
+            safe = Path(td) / "safe"
+            safe.mkdir()
+            target = Path(td) / "target"
+            target.mkdir()
+            link = safe / "receipts"
+            link.symlink_to(target, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "symlink"):
+                self.h.validate_output_path(ROOT, link, safe_temp_root=safe)
+
+    def test_helper_suite_does_not_collide_with_existing_canonical_output(self):
+        canonical = ROOT / "artifacts/quality/sq-01"
+        self.assertFalse(canonical.exists(), "test requires a clean output baseline")
+        canonical.mkdir(parents=True)
+        try:
+            for name, raw in self.h.build_synthetic_bundle(self.h.synthetic_test_context("1" * 40)).items():
+                (canonical / name).write_bytes(raw)
+            self.assertEqual({p.name for p in canonical.iterdir()}, set(self.h.ALL_RECEIPTS))
+            with tempfile.TemporaryDirectory() as td:
+                safe = Path(td)
+                self.assertEqual(self.h.validate_output_path(ROOT, safe / "receipts", safe_temp_root=safe),
+                                 safe / "receipts")
+        finally:
+            shutil.rmtree(canonical)
 
     def test_source_identity_rejects_wrong_dirty_and_moving(self):
         clean = self.h.SourceIdentity("a" * 40, "b" * 40, ())
@@ -166,13 +182,15 @@ class Sq01HarnessTests(unittest.TestCase):
             for name in self.h.VERDICT_INPUT_RECEIPTS
         }), "FAIL")
 
-    def test_mutation_inventory_is_complete_and_only_four_execute(self):
+    def test_mutation_inventory_executes_strict_json_and_declared_bounds(self):
         receipt = self.h.execute_mutations(ROOT)
         cases = receipt["cases"]
         self.assertEqual({case["id"] for case in cases}, set(self.h.REQUIRED_MUTATIONS))
         executed = [case for case in cases if not case["skipped"]]
         skipped = [case for case in cases if case["skipped"]]
-        self.assertEqual(len(executed), 4)
+        self.assertEqual(len(executed), 7)
+        self.assertEqual({case["id"] for case in executed if case["expected_layer"] == "bounds"},
+                         {"bounds.overlong-string", "bounds.deep-nesting", "bounds.oversized-input"})
         self.assertEqual(receipt["skipped_required"], len(skipped))
         self.assertTrue(all(not case["pass"] and case["execution_result"] == "not-executed"
                             and case["validator_name"] is None and case["actual_layer"] is None
@@ -183,7 +201,7 @@ class Sq01HarnessTests(unittest.TestCase):
         self.assertEqual(receipt["failed"], sum(not case["pass"] for case in cases))
         self.assertEqual(receipt["status"], "FAIL")
 
-    def test_schema_receipt_has_exact_three_required_skips_and_fails(self):
+    def test_schema_receipt_executes_all_three_bounds(self):
         class Draft202012Validator:
             @staticmethod
             def check_schema(_schema): pass
@@ -192,11 +210,13 @@ class Sq01HarnessTests(unittest.TestCase):
         fake = types.SimpleNamespace(Draft202012Validator=Draft202012Validator)
         with mock.patch.dict("sys.modules", {"jsonschema": fake}):
             receipt = self.h._schema_validation(ROOT)
-        skipped = [case for case in receipt["negative_cases"] if case.get("skipped")]
-        self.assertEqual([case["id"] for case in skipped], ["overlong", "deep", "oversized"])
-        self.assertEqual(sum(case["skipped_required"] for case in skipped), 3)
-        self.assertEqual(receipt["skipped_required"], 3)
-        self.assertEqual(receipt["status"], "FAIL")
+        bounds = [case for case in receipt["negative_cases"] if case["id"] in {"overlong", "deep", "oversized"}]
+        self.assertEqual(len(bounds), 3)
+        self.assertTrue(all(case["pass"] and not case["skipped"] for case in bounds))
+        self.assertEqual({case["actual_code"] for case in bounds},
+                         {"E_LIMIT_STRING", "E_LIMIT_NESTING", "E_LIMIT_SOURCE"})
+        self.assertEqual(receipt["skipped_required"], 0)
+        self.assertEqual(receipt["status"], "PASS")
 
     def test_public_scan_finds_private_identifiers_paths_and_credentials(self):
         with tempfile.TemporaryDirectory() as td:
@@ -306,11 +326,15 @@ class Sq01HarnessTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("sq-01 network denied", result.stderr)
 
-    def test_structural_bounds_are_not_hard_coded_passes(self):
+    def test_structural_bounds_are_executed_and_mutants_survive(self):
         receipt = self.h.execute_mutations(ROOT)
-        self.assertFalse(any(case["id"] in {"overlong", "deep", "oversized"} and
-                             case["pass"] and case["validator_name"] == "none"
-                             for case in receipt["cases"]))
+        bounds = [case for case in receipt["cases"] if case["expected_layer"] == "bounds"]
+        self.assertEqual(len(bounds), 3)
+        self.assertTrue(all(case["pass"] and case["validator_name"] == "sq01-declared-bounds-executor"
+                            for case in bounds))
+        for case_id, raw in self.h._bound_inputs().items():
+            self.assertEqual(self.h._bounds_executor(b'{}', case_id)[1], "accepted")
+            self.assertEqual(self.h._bounds_executor(raw, case_id)[1], "rejected")
 
     def test_repair_exact_roles_match_every_package_variant(self):
         semantic = load_module(ROOT / "tools/native_theme/sq01_semantic_validator.py", "sq01_roles")

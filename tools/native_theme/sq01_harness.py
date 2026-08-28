@@ -261,6 +261,44 @@ def _strict_bytes_executor(raw: bytes, _case: str) -> tuple[int, str, str | None
     return 0, "accepted", None, None
 
 
+def _bounds_executor(raw: bytes, case: str) -> tuple[int, str, str | None, str | None]:
+    """Execute the three declared limits against the supplied bytes/value."""
+    try:
+        value = json.loads(raw)
+        if case == "bounds.overlong-string":
+            if not isinstance(value.get("value"), str) or len(value["value"].encode("utf-8")) <= 4096:
+                return 0, "accepted", None, None
+            code = "E_LIMIT_STRING"
+        elif case == "bounds.deep-nesting":
+            depth, cursor = 0, value.get("value")
+            while isinstance(cursor, list) and cursor:
+                depth += 1
+                cursor = cursor[0]
+            if depth <= 32:
+                return 0, "accepted", None, None
+            code = "E_LIMIT_NESTING"
+        elif case == "bounds.oversized-input":
+            if len(raw) <= 1024 * 1024:
+                return 0, "accepted", None, None
+            code = "E_LIMIT_SOURCE"
+        else:
+            return 0, "accepted", None, None
+        return 2, "rejected", "bounds", code
+    except (UnicodeError, ValueError, TypeError):
+        return 2, "rejected", "bounds", "E_BOUND_EXECUTOR"
+
+
+def _bound_inputs() -> dict[str, bytes]:
+    nested: Any = "leaf"
+    for _ in range(33):
+        nested = [nested]
+    return {
+        "bounds.overlong-string": canonical_json_bytes({"value": "x" * 4097}),
+        "bounds.deep-nesting": canonical_json_bytes({"value": nested}),
+        "bounds.oversized-input": canonical_json_bytes({"chunks": ["x" * 1024] * 1025}),
+    }
+
+
 def execute_mutations(root: Path, executor=None) -> dict[str, Any]:
     executor = executor or _strict_bytes_executor
     specs = [("duplicate-key", b'{"a":1,"a":2}', "E_JSON_DUPLICATE"),
@@ -274,8 +312,18 @@ def execute_mutations(root: Path, executor=None) -> dict[str, Any]:
                                  input_bytes=raw, expected_layer="json", expected_code=code,
                                  execution_return=ret, actual_layer=layer, actual_code=actual,
                                  execution_result=result))
+    bound_inputs = _bound_inputs()
     for case_id, (layer, code) in REQUIRED_MUTATIONS.items():
         if case_id in {case["id"] for case in cases}:
+            continue
+        if case_id in bound_inputs:
+            raw = bound_inputs[case_id]
+            ret, result, actual_layer, actual = _bounds_executor(raw, case_id)
+            cases.append(case_result(case_id=case_id, requirement_ids=[case_id],
+                                     validator_name="sq01-declared-bounds-executor", validator_version="1",
+                                     input_bytes=raw, expected_layer=layer, expected_code=code,
+                                     execution_return=ret, actual_layer=actual_layer, actual_code=actual,
+                                     execution_result=result))
             continue
         cases.append({"id": case_id, "requirement_ids": [case_id],
                       "validator_name": None, "validator_version": None,
@@ -421,10 +469,19 @@ def _schema_validation(root: Path) -> dict[str, Any]:
         except (UnicodeError, ValueError):
             rejected = True
         cases.append({"id": case_id, "expected_layer": "json", "expected_code": "E_INPUT", "rejected": rejected})
-    for case_id in ("overlong", "deep", "oversized"):
-        cases.append({"id": case_id, "validator_name": None, "expected_layer": "bounds",
-                      "expected_code": "E_BOUND", "rejected": False, "pass": False,
-                      "skipped": True, "skipped_required": 1})
+    bound_names = {"overlong": "bounds.overlong-string", "deep": "bounds.deep-nesting",
+                   "oversized": "bounds.oversized-input"}
+    for case_id, mutation_id in bound_names.items():
+        raw = _bound_inputs()[mutation_id]
+        ret, result, layer, code = _bounds_executor(raw, mutation_id)
+        expected = REQUIRED_MUTATIONS[mutation_id][1]
+        cases.append({"id": case_id, "validator_name": "sq01-declared-bounds-executor",
+                      "validator_version": "1", "input_hash": sha256(raw),
+                      "expected_layer": "bounds", "expected_code": expected,
+                      "actual_layer": layer, "actual_code": code,
+                      "execution_return": ret, "execution_result": result,
+                      "rejected": result == "rejected", "pass": result == "rejected" and code == expected,
+                      "skipped": False, "skipped_required": 0})
     if not all(c["rejected"] for c in cases): errors.append({"code": "E_NEGATIVE_ACCEPTED", "detail": "structural negative"})
     skipped = sum(case.get("skipped_required", 0) for case in cases)
     return {"schema_version": "1.0.0", "status": "PASS" if not errors and not skipped else "FAIL",
