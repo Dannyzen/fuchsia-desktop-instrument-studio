@@ -248,6 +248,18 @@ class NativeThemeV1ContractTests(unittest.TestCase):
                     semantic["interaction.selection"][1:7], semantic["surface.canvas"][1:7])
                 self.assertGreaterEqual(ratio, target, f"{name} selection contrast {ratio} below {target}")
 
+    def test_complete_package_bright_ansi_matches_base24_and_omarchy(self):
+        package = contract.load_json_strict(self.FIXTURES / "native-theme-v1-package.json")
+        base24 = contract.load_json_strict(self.FIXTURES / "profiles/base24-positive.json")
+        omarchy = contract.load_json_strict(self.FIXTURES / "profiles/omarchy-positive.json")
+        base24_bright = ["#" + base24["tokens"][f"base{i:02X}"].lower() + "ff" for i in range(0x10, 0x18)]
+        omarchy_bright = [color.lower() + "ff" for color in omarchy["tokens"]["ansi.bright"]]
+        self.assertEqual(base24_bright, omarchy_bright)
+        for name, variant in package["variants"].items():
+            with self.subTest(variant=name):
+                actual = [variant["terminal"][f"ansi{i}"] for i in range(8, 16)]
+                self.assertEqual(actual, base24_bright)
+
     def test_contract_rejections_have_stable_codes(self):
         package = contract.load_json_strict(self.FIXTURES / "native-theme-v1-package.json")
         cases = [
