@@ -3,12 +3,22 @@ use fidl_fuchsia_instrumentstudio_theme as ftheme;
 use fuchsia_inspect::{Node, UintProperty};
 use futures::TryStreamExt;
 use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use theme_model::NativeThemeV1;
+
+pub mod persistence;
 
 pub const FALLBACK_THEME_ID: &str = "instrument-studio-builtin";
 pub const MAX_DIAGNOSTIC_ERROR_BYTES: usize = 96;
 pub const E_DUPLICATE_THEME_ID: &str = "E_DUPLICATE_THEME_ID";
+pub const E_SELECTED_IDENTITY_INVALID: &str = "E_SELECTED_IDENTITY_INVALID";
+pub const E_SELECTION_HISTORY_INVALID: &str = "E_SELECTION_HISTORY_INVALID";
+pub const SELECTION_CATALOG_DEFAULT: &str = "catalog-default";
+pub const SELECTION_BUILTIN_DEFAULT: &str = "built-in-default";
+pub const SELECTION_SELECTED: &str = "selected";
+pub const SELECTION_LAST_KNOWN_GOOD: &str = "last-known-good";
+pub const SELECTION_BUILTIN_RESTORED: &str = "built-in-restored";
+pub const SELECTION_BUILTIN_RECOVERY: &str = "built-in-recovery";
 
 fn bounded_diagnostic_error(error: &str) -> &str {
     &error[..error.len().min(MAX_DIAGNOSTIC_ERROR_BYTES)]
@@ -65,6 +75,7 @@ pub struct Snapshot {
     pub display_name: String,
     pub revision: u64,
     pub semantic_sha256: [u8; 32],
+    pub variant: persistence::Variant,
     pub canonical_package: Arc<[u8]>,
 }
 
@@ -76,6 +87,7 @@ impl Snapshot {
             display_name: "Built-in".into(),
             revision: 0,
             semantic_sha256: [0; 32],
+            variant: persistence::Variant::Dark,
             canonical_package: Arc::from([]),
         }
     }
@@ -86,6 +98,8 @@ pub struct Authority {
     themes: BTreeMap<String, Snapshot>,
     current: Snapshot,
     load_error_code: Option<&'static str>,
+    selection_source: &'static str,
+    selection_error_code: Option<&'static str>,
 }
 
 impl Authority {
@@ -101,6 +115,7 @@ impl Authority {
                         display_name: theme.display_name().into(),
                         revision: theme.revision(),
                         semantic_sha256: theme.semantic_sha256(),
+                        variant: persistence::Variant::Dark,
                         canonical_package: Arc::from(bytes),
                     };
                     if let Some(existing) = themes.get_mut(&snapshot.id) {
@@ -136,7 +151,60 @@ impl Authority {
             themes,
             current,
             load_error_code,
+            selection_source: SELECTION_CATALOG_DEFAULT,
+            selection_error_code: None,
         }
+    }
+
+    /// Startup recovery order is selected -> last-known-good -> built-in.
+    pub fn from_packaged_and_state<'a>(
+        packages: impl IntoIterator<Item = &'a [u8]>,
+        state_bytes: Option<&[u8]>,
+    ) -> Self {
+        let mut authority = Self::from_packaged(packages);
+        let (chosen, selection_source, selection_error_code) = match state_bytes {
+            None => (None, SELECTION_BUILTIN_DEFAULT, None),
+            Some(bytes) => match persistence::decode(bytes) {
+                Err(error) => (
+                    None,
+                    SELECTION_BUILTIN_RECOVERY,
+                    Some(error.code()),
+                ),
+                Ok(state) => match state.pending.as_ref() {
+                    None => (None, SELECTION_BUILTIN_RESTORED, None),
+                    Some(identity) => match authority.snapshot_for(identity) {
+                        Some(snapshot) => (Some(snapshot), SELECTION_SELECTED, None),
+                        None => match authority.snapshot_for(&state.last_known_good) {
+                            Some(snapshot) => (
+                                Some(snapshot),
+                                SELECTION_LAST_KNOWN_GOOD,
+                                Some(E_SELECTED_IDENTITY_INVALID),
+                            ),
+                            None => (
+                                None,
+                                SELECTION_BUILTIN_RECOVERY,
+                                Some(E_SELECTION_HISTORY_INVALID),
+                            ),
+                        },
+                    },
+                },
+            },
+        };
+        authority.current = chosen.unwrap_or_else(Snapshot::fallback);
+        authority.selection_source = selection_source;
+        authority.selection_error_code = selection_error_code;
+        authority
+    }
+
+    fn snapshot_for(&self, identity: &persistence::Identity) -> Option<Snapshot> {
+        self.themes
+            .get(&identity.theme_id)
+            .filter(|snapshot| snapshot.semantic_sha256 == identity.semantic_sha256)
+            .cloned()
+            .map(|mut snapshot| {
+                snapshot.variant = identity.variant;
+                snapshot
+            })
     }
 
     pub fn current(&self) -> Snapshot {
@@ -148,6 +216,162 @@ impl Authority {
     pub fn load_error_code(&self) -> Option<&'static str> {
         self.load_error_code
     }
+    pub fn selection_source(&self) -> &'static str {
+        self.selection_source
+    }
+    pub fn selection_error_code(&self) -> Option<&'static str> {
+        self.selection_error_code
+    }
+}
+
+pub struct SettingsControl {
+    authority: Arc<Authority>,
+    store: Mutex<persistence::AtomicStore>,
+}
+
+impl SettingsControl {
+    pub fn new(authority: Arc<Authority>, state_path: impl Into<std::path::PathBuf>) -> Self {
+        Self {
+            authority,
+            store: Mutex::new(persistence::AtomicStore::new(state_path)),
+        }
+    }
+    fn active_identity(&self) -> persistence::Identity {
+        let current = self.authority.current();
+        persistence::Identity {
+            theme_id: current.id,
+            variant: current.variant,
+            semantic_sha256: current.semantic_sha256,
+        }
+    }
+    fn validate(&self, identity: &persistence::Identity) -> Result<(), zx_status::Status> {
+        let Some(snapshot) = self.authority.themes.get(&identity.theme_id) else {
+            return Err(zx_status::Status::NOT_FOUND);
+        };
+        if snapshot.semantic_sha256 != identity.semantic_sha256 {
+            return Err(zx_status::Status::INVALID_ARGS);
+        }
+        Ok(())
+    }
+    pub fn state(&self) -> persistence::PersistedState {
+        self.store
+            .lock()
+            .unwrap()
+            .load()
+            .ok()
+            .flatten()
+            .unwrap_or_else(|| persistence::PersistedState {
+                pending: None,
+                last_known_good: self.active_identity(),
+            })
+    }
+    pub fn record_active_as_last_known_good(&self) {
+        let active = self.active_identity();
+        let mut store = self.store.lock().unwrap();
+        let Ok(Some(mut state)) = store.load() else {
+            return;
+        };
+        if state.pending.as_ref() == Some(&active) && state.last_known_good != active {
+            state.last_known_good = active;
+            let _ = store.commit(&state);
+        }
+    }
+    pub fn select(&self, identity: persistence::Identity) -> Result<(), zx_status::Status> {
+        self.validate(&identity)?;
+        self.store
+            .lock()
+            .unwrap()
+            .select(identity, self.active_identity())
+            .map(|_| ())
+            .map_err(|_| zx_status::Status::IO)
+    }
+    pub fn restore(&self) -> Result<(), zx_status::Status> {
+        self.store
+            .lock()
+            .unwrap()
+            .restore(self.active_identity())
+            .map(|_| ())
+            .map_err(|_| zx_status::Status::IO)
+    }
+    pub fn migrate_legacy(&self, identity: persistence::Identity) -> Result<(), zx_status::Status> {
+        self.validate(&identity)?;
+        let mut store = self.store.lock().unwrap();
+        match store.load() {
+            Ok(None) => store
+                .select(identity, self.active_identity())
+                .map(|_| ())
+                .map_err(|_| zx_status::Status::IO),
+            Ok(Some(state)) if state.pending.as_ref() == Some(&identity) => Ok(()),
+            Ok(Some(_)) => Err(zx_status::Status::ALREADY_EXISTS),
+            Err(_) => Err(zx_status::Status::IO_DATA_INTEGRITY),
+        }
+    }
+}
+
+fn from_fidl_identity(identity: ftheme::ThemeIdentity) -> persistence::Identity {
+    persistence::Identity {
+        theme_id: identity.theme_id,
+        variant: match identity.variant {
+            ftheme::ThemeVariant::Light => persistence::Variant::Light,
+            ftheme::ThemeVariant::Dark => persistence::Variant::Dark,
+            ftheme::ThemeVariant::HighContrast => persistence::Variant::HighContrast,
+        },
+        semantic_sha256: identity.semantic_sha256,
+    }
+}
+
+fn fidl_identity(identity: &persistence::Identity) -> ftheme::ThemeIdentity {
+    ftheme::ThemeIdentity {
+        theme_id: identity.theme_id.clone(),
+        variant: match identity.variant {
+            persistence::Variant::Light => ftheme::ThemeVariant::Light,
+            persistence::Variant::Dark => ftheme::ThemeVariant::Dark,
+            persistence::Variant::HighContrast => ftheme::ThemeVariant::HighContrast,
+        },
+        semantic_sha256: identity.semantic_sha256,
+    }
+}
+
+pub async fn serve_native_theme_settings(
+    control: Arc<SettingsControl>,
+    mut stream: ftheme::NativeThemeSettingsRequestStream,
+) -> Result<(), fidl::Error> {
+    while let Some(request) = stream.try_next().await? {
+        match request {
+            ftheme::NativeThemeSettingsRequest::GetState { responder } => {
+                let state = control.state();
+                responder.send(&ftheme::NativeThemeSettingsState {
+                    active: fidl_identity(&control.active_identity()),
+                    pending: state.pending.as_ref().map(fidl_identity).map(Box::new),
+                    last_known_good: Some(Box::new(fidl_identity(&state.last_known_good))),
+                })?;
+            }
+            ftheme::NativeThemeSettingsRequest::Select {
+                identity,
+                responder,
+            } => {
+                responder.send(
+                    control
+                        .select(from_fidl_identity(identity))
+                        .map_err(|s| s.into_raw()),
+                )?;
+            }
+            ftheme::NativeThemeSettingsRequest::RestoreBuiltIn { responder } => {
+                responder.send(control.restore().map_err(|s| s.into_raw()))?;
+            }
+            ftheme::NativeThemeSettingsRequest::MigrateLegacy {
+                identity,
+                responder,
+            } => {
+                responder.send(
+                    control
+                        .migrate_legacy(from_fidl_identity(identity))
+                        .map_err(|s| s.into_raw()),
+                )?;
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Serves one generated-FIDL connection using connection-local hanging-get state.
@@ -224,6 +448,11 @@ impl Diagnostics {
         );
         let error = authority.load_error_code.unwrap_or("none");
         node.record_string("load_error_code", bounded_diagnostic_error(error));
+        node.record_string("selection_source", authority.selection_source());
+        node.record_string(
+            "selection_error_code",
+            bounded_diagnostic_error(authority.selection_error_code().unwrap_or("none")),
+        );
         Self {
             _node: node,
             _generation: generation,
@@ -239,6 +468,15 @@ pub fn to_fidl(snapshot: &Snapshot) -> ftheme::ThemeSnapshot {
             id: snapshot.id.clone(),
             display_name: snapshot.display_name.clone(),
             revision: snapshot.revision,
+            semantic_sha256: snapshot.semantic_sha256,
+        },
+        identity: ftheme::ThemeIdentity {
+            theme_id: snapshot.id.clone(),
+            variant: match snapshot.variant {
+                persistence::Variant::Light => ftheme::ThemeVariant::Light,
+                persistence::Variant::Dark => ftheme::ThemeVariant::Dark,
+                persistence::Variant::HighContrast => ftheme::ThemeVariant::HighContrast,
+            },
             semantic_sha256: snapshot.semantic_sha256,
         },
         canonical_package: snapshot.canonical_package.to_vec(),
@@ -267,6 +505,21 @@ mod tests {
     fn production_authority() -> Arc<Authority> {
         Arc::new(Authority::from_packaged([BASE16, BASE24, DTCG, OMARCHY]))
     }
+    fn identity(variant: persistence::Variant) -> persistence::Identity {
+        let snapshot = Authority::from_packaged([DTCG]).current();
+        persistence::Identity {
+            theme_id: snapshot.id,
+            variant,
+            semantic_sha256: snapshot.semantic_sha256,
+        }
+    }
+    fn state(pending: Option<persistence::Identity>, lkg: persistence::Identity) -> Vec<u8> {
+        persistence::encode(&persistence::PersistedState {
+            pending,
+            last_known_good: lkg,
+        })
+        .unwrap()
+    }
 
     fn proxy(authority: Arc<Authority>) -> ftheme::NativeThemeProxy {
         let (proxy, stream) = create_proxy_and_stream::<ftheme::NativeThemeMarker>();
@@ -277,6 +530,34 @@ mod tests {
         })
         .detach();
         proxy
+    }
+    fn control_proxy(control: Arc<SettingsControl>) -> ftheme::NativeThemeSettingsProxy {
+        let (proxy, stream) = create_proxy_and_stream::<ftheme::NativeThemeSettingsMarker>();
+        fuchsia_async::Task::local(async move {
+            serve_native_theme_settings(control, stream).await.unwrap();
+        })
+        .detach();
+        proxy
+    }
+    fn test_control() -> (std::path::PathBuf, Arc<SettingsControl>) {
+        let path = std::env::temp_dir().join(format!(
+            "theme-control-{}-{:?}.v1",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_file(&path);
+        (
+            path.clone(),
+            Arc::new(SettingsControl::new(production_authority(), path)),
+        )
+    }
+    fn fidl_id(variant: ftheme::ThemeVariant) -> ftheme::ThemeIdentity {
+        let snapshot = production_authority().current();
+        ftheme::ThemeIdentity {
+            theme_id: snapshot.id,
+            variant,
+            semantic_sha256: snapshot.semantic_sha256,
+        }
     }
 
     #[test]
@@ -404,6 +685,170 @@ mod tests {
         assert_eq!(authority.current().id, FALLBACK_THEME_ID);
         assert_eq!(authority.themes().count(), 0);
         assert_eq!(authority.load_error_code(), Some(E_DUPLICATE_THEME_ID));
+    }
+
+    #[test]
+    fn corrupt_state_reports_recovery_diagnostics() {
+        let authority = Authority::from_packaged_and_state([DTCG], Some(b"corrupt"));
+        assert_eq!(authority.current().id, FALLBACK_THEME_ID);
+        assert_eq!(authority.selection_source(), SELECTION_BUILTIN_RECOVERY);
+        assert_eq!(authority.selection_error_code(), Some("E_STATE_CORRUPT"));
+    }
+    #[test]
+    fn invalid_selected_reports_lkg_recovery() {
+        let mut invalid = identity(persistence::Variant::Light);
+        invalid.theme_id = "missing-theme".into();
+        let bytes = state(Some(invalid), identity(persistence::Variant::HighContrast));
+        let authority = Authority::from_packaged_and_state([DTCG], Some(&bytes));
+        assert_eq!(authority.current().variant, persistence::Variant::HighContrast);
+        assert_eq!(authority.selection_source(), SELECTION_LAST_KNOWN_GOOD);
+        assert_eq!(
+            authority.selection_error_code(),
+            Some(E_SELECTED_IDENTITY_INVALID)
+        );
+    }
+    #[test]
+    fn startup_uses_valid_selected_identity() {
+        let selected = identity(persistence::Variant::HighContrast);
+        let bytes = state(Some(selected), identity(persistence::Variant::Dark));
+        let authority = Authority::from_packaged_and_state([DTCG], Some(&bytes));
+        assert_eq!(
+            authority.current().variant,
+            persistence::Variant::HighContrast
+        );
+    }
+    #[test]
+    fn startup_falls_back_to_valid_lkg() {
+        let mut selected = identity(persistence::Variant::Light);
+        selected.semantic_sha256[0] ^= 1;
+        let bytes = state(Some(selected), identity(persistence::Variant::Dark));
+        assert_eq!(
+            Authority::from_packaged_and_state([DTCG], Some(&bytes))
+                .current()
+                .variant,
+            persistence::Variant::Dark
+        );
+    }
+    #[test]
+    fn startup_falls_back_to_builtin() {
+        assert_eq!(
+            Authority::from_packaged_and_state([DTCG], Some(b"corrupt"))
+                .current()
+                .id,
+            FALLBACK_THEME_ID
+        );
+    }
+    #[test]
+    fn restart_after_restore_uses_builtin() {
+        let bytes = state(None, identity(persistence::Variant::Dark));
+        assert_eq!(
+            Authority::from_packaged_and_state([DTCG], Some(&bytes))
+                .current()
+                .id,
+            FALLBACK_THEME_ID
+        );
+    }
+    #[test]
+    fn selection_does_not_change_current_snapshot() {
+        let (path, control) = test_control();
+        let before = control.authority.current();
+        control
+            .select(identity(persistence::Variant::HighContrast))
+            .unwrap();
+        assert_eq!(control.authority.current(), before);
+        assert_eq!(
+            control.state().pending.unwrap().variant,
+            persistence::Variant::HighContrast
+        );
+        let _ = std::fs::remove_file(path);
+    }
+    #[test]
+    fn selection_does_not_change_generation_or_watch() {
+        let (path, control) = test_control();
+        let generation = control.authority.current().generation;
+        let mut watch = ConnectionWatch::default();
+        assert_eq!(
+            watch.observe(generation, control.authority.current().generation, 7),
+            WatchAction::Parked
+        );
+        control
+            .select(identity(persistence::Variant::Light))
+            .unwrap();
+        assert_eq!(control.authority.current().generation, generation);
+        assert_eq!(
+            watch.drain_if_changed(control.authority.current().generation),
+            None
+        );
+        let _ = std::fs::remove_file(path);
+    }
+    #[fuchsia::test]
+    async fn control_proxy_queries_and_selects_pending() {
+        let (path, control) = test_control();
+        let proxy = control_proxy(control);
+        proxy
+            .select(&fidl_id(ftheme::ThemeVariant::HighContrast))
+            .await
+            .unwrap()
+            .unwrap();
+        let state = proxy.get_state().await.unwrap();
+        assert_eq!(
+            state.pending.unwrap().variant,
+            ftheme::ThemeVariant::HighContrast
+        );
+        let _ = std::fs::remove_file(path);
+    }
+    #[test]
+    fn control_rejects_unknown_id() {
+        let (p, c) = test_control();
+        let mut id = identity(persistence::Variant::Dark);
+        id.theme_id = "missing".into();
+        assert_eq!(c.select(id), Err(zx_status::Status::NOT_FOUND));
+        let _ = std::fs::remove_file(p);
+    }
+    #[test]
+    fn control_rejects_semantic_hash_mismatch() {
+        let (p, c) = test_control();
+        let mut id = identity(persistence::Variant::Dark);
+        id.semantic_sha256[0] ^= 1;
+        assert_eq!(c.select(id), Err(zx_status::Status::INVALID_ARGS));
+        let _ = std::fs::remove_file(p);
+    }
+    #[fuchsia::test]
+    async fn concurrent_settings_callers_are_serialized() {
+        let (p, c) = test_control();
+        let a = control_proxy(c.clone());
+        let b = control_proxy(c);
+        let (x, y) = futures::join!(
+            a.select(&fidl_id(ftheme::ThemeVariant::Light)),
+            b.select(&fidl_id(ftheme::ThemeVariant::Dark))
+        );
+        assert!(x.unwrap().is_ok());
+        assert!(y.unwrap().is_ok());
+        let _ = std::fs::remove_file(p);
+    }
+    #[test]
+    fn control_restore_is_idempotent() {
+        let (p, c) = test_control();
+        assert!(c.restore().is_ok());
+        assert!(c.restore().is_ok());
+        let _ = std::fs::remove_file(p);
+    }
+    #[test]
+    fn legacy_migration_is_guarded() {
+        let (p, c) = test_control();
+        assert!(
+            c.migrate_legacy(identity(persistence::Variant::Dark))
+                .is_ok()
+        );
+        assert!(
+            c.migrate_legacy(identity(persistence::Variant::Dark))
+                .is_ok()
+        );
+        assert_eq!(
+            c.migrate_legacy(identity(persistence::Variant::Light)),
+            Err(zx_status::Status::ALREADY_EXISTS)
+        );
+        let _ = std::fs::remove_file(p);
     }
 
     #[fuchsia::test]

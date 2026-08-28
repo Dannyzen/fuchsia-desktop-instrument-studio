@@ -13,7 +13,10 @@ rustc_library("theme_service_core") {
   edition = "2024"
   with_unit_tests = true
   source_root = "src/authority.rs"
-  sources = [ "src/authority.rs" ]
+  sources = [
+    "src/authority.rs",
+    "src/persistence.rs",
+  ]
   inputs = [
     "../theme_model/testdata/native-theme-v1-package.json",
     "testdata/instrument-studio-conflict.package.json",
@@ -47,9 +50,9 @@ rustc_binary("bin") {
     "//src/fuchsia-desktop/theme_catalog/catalog/instrument-studio-omarchy.package.json",
   ]
   deps = [
+    ":fuchsia.instrumentstudio.theme_rust",
     ":theme_service_core",
     "//src/lib/fuchsia",
-    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/diagnostics/inspect/rust:fuchsia-inspect",
     "//third_party/rust_crates:anyhow",

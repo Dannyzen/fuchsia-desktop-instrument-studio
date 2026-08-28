@@ -32,7 +32,7 @@ Feature: Choose a NativeTheme and keep it across restart
     Then its optional consumer route does not block shell startup
     And consumers retain their built-in fallback
 
-  @planned @p3-s2
+  @implemented @p3-s2
   Scenario: Settings stores the named theme for the next restart
     Given Settings is the sole writer of a named catalog identity for the next restart
     When writing a newly chosen identity succeeds

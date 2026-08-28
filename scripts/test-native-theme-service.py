@@ -22,9 +22,10 @@ class NativeThemeServiceContract(unittest.TestCase):
         self.assertIn("// found in the LICENSE file.", fidl)
         self.assertIn("@available(added=HEAD)\nlibrary fuchsia.instrumentstudio.theme;", fidl)
         self.assertIn("closed protocol NativeTheme", fidl)
-        methods = re.findall(r"strict ([A-Z][A-Za-z0-9]+)\(", fidl)
+        public = fidl.split("closed protocol NativeTheme {", 1)[1].split("};", 1)[0]
+        methods = re.findall(r"strict ([A-Z][A-Za-z0-9]+)\(", public)
         self.assertEqual(methods, ["ListThemes", "GetTheme", "GetCurrent", "WatchCurrent"])
-        self.assertNotRegex(fidl, r"(?i)\b(set|select|activate|write|persist|store|save)[A-Za-z]*\s*\(")
+        self.assertNotRegex(public, r"(?i)\b(set|select|activate|write|persist|store|save)[A-Za-z]*\s*\(")
         self.assertIn("vector<uint8>:MAX_SNAPSHOT_BYTES", fidl)
         self.assertIn("const MAX_SNAPSHOT_BYTES uint32 = 524288;", fidl)
 
@@ -91,7 +92,7 @@ class NativeThemeServiceContract(unittest.TestCase):
         self.assertIn('"../theme_model/testdata/native-theme-v1-package.json"', core)
         self.assertIn('":theme_service_core"', binary)
         self.assertIn('"//third_party/rust_crates:futures"', binary)
-        self.assertNotIn('":fuchsia.instrumentstudio.theme_rust"', binary)
+        self.assertIn('":fuchsia.instrumentstudio.theme_rust"', binary)
         self.assertIn('"//src/lib/diagnostics/inspect/rust:fuchsia-inspect"', binary)
         self.assertIn("test_deps = [", core)
         self.assertIn('"//src/lib/fuchsia"', core.split("test_deps = [", 1)[1])
@@ -172,7 +173,7 @@ class NativeThemeServiceContract(unittest.TestCase):
         self.assertEqual(feature.count("@implemented @p3-s1"), 4)
         for scenario in ["READ-ONLY", "WATCH", "FALLBACK", "OPTIONAL"]:
             self.assertIn(f"@scenario:P3S1-{scenario}", feature)
-        self.assertIn("@planned @p3-s2", feature)
+        self.assertIn("@implemented @p3-s2", feature)
         self.assertIn("@planned @p4", feature)
         self.assertEqual(feature.count("@planned @p6"), 2)
         self.assertNotIn("@p3-s3", feature)
