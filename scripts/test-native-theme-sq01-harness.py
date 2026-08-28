@@ -312,6 +312,41 @@ class Sq01HarnessTests(unittest.TestCase):
         self.assertEqual(inventory["status"], "FAIL")
         self.assertEqual(len(inventory["uncovered"]), len(inventory["rows"]))
 
+    def test_executed_registry_is_complete_and_deterministic(self):
+        first = self.h._inventory(ROOT)
+        second = self.h._inventory(ROOT)
+        self.assertEqual(self.h.canonical_json_bytes(first), self.h.canonical_json_bytes(second))
+        self.assertEqual((len(first["rows"]), first["completeness_percent"], first["uncovered"],
+                          first["skipped_required"], first["status"]),
+                         (234, 100, [], 0, "PASS"))
+        self.assertEqual(first["category_counts"], {"derivation": 8, "diagnostic": 19,
+                         "layer": 3, "profile": 5, "role": 105, "schema": 86,
+                         "type": 5, "variant": 3})
+        self.assertEqual(first["executed_counts"], {"negative": 234, "positive": 234})
+        self.assertEqual(len(first["case_registry"]), 468)
+        self.assertTrue(all(c["pass"] and not c["skipped"] for c in first["case_registry"]))
+
+    def test_deleting_each_category_polarity_exposes_exactly_one_row(self):
+        receipt = self.h._inventory(ROOT)
+        examples = {}
+        for row in receipt["rows"]:
+            examples.setdefault(row["id"].split(".", 1)[0], row)
+        self.assertEqual(set(examples), {"schema", "role", "diagnostic", "derivation",
+                                        "profile", "type", "layer", "variant"})
+        for category, row in examples.items():
+            for polarity in ("positive", "negative"):
+                mutated = json.loads(json.dumps(receipt["case_registry"]))
+                target = row[polarity + "_case_ids"][0]
+                mutated = [case for case in mutated if case["id"] != target]
+                checked = self.h.attach_registry_evidence(self.h.build_requirements_inventory(ROOT)["rows"], mutated)
+                self.assertEqual(checked["uncovered"], [row["id"]], (category, polarity))
+
+    def test_raw_negative_catalog_marker_never_dispatches_diagnostic(self):
+        raw = json.loads((ROOT / "tools/native_theme/fixtures/profiles/dtcg-negative-cases.json").read_text())
+        for item in raw if isinstance(raw, list) else raw.values():
+            if isinstance(item, dict):
+                self.assertIsNone(self.h.execute_diagnostic_rule("E_ALIAS_CYCLE", item))
+
     def test_inventory_resolves_roles_not_role_map_characters(self):
         inventory = self.h.build_requirements_inventory(ROOT)
         ids = {row["id"] for row in inventory["rows"]}

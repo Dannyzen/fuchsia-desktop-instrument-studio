@@ -204,22 +204,32 @@ def run_child_network_probe(root: Path) -> subprocess.CompletedProcess:
         return run_allowed(argv, root, env=env, capture_output=True, text=True, _audit_probe=True)
 
 
-def _schema_property_rows(schema: dict[str, Any], definition: str) -> list[str]:
-    rows: list[str] = []
-    def walk(node: Any, path: str) -> None:
+def _schema_property_rows(schema: dict[str, Any], definition: str) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    def display(path: list[str]) -> str:
+        result = "root"
+        for part in path:
+            result += "[]" if part == "[]" else "." + part
+        return result
+    def add(row_id: str, path: list[str], mode: str) -> None:
+        rows.append({"id": row_id, "_definition": definition,
+                     "_property_path": path, "_mode": mode})
+    def walk(node: Any, path: list[str]) -> None:
         if not isinstance(node, dict): return
         properties = node.get("properties", {})
         required = set(node.get("required", []))
         for name, child in sorted(properties.items()):
-            child_path = f"{path}.{name}"
-            rows.append(f"schema.{definition}.{child_path}:{'required' if name in required else 'optional'}")
+            child_path = path + [name]
+            mode = "required" if name in required else "optional"
+            add(f"schema.{definition}.{display(child_path)}:{mode}", child_path, mode)
             walk(child, child_path)
         if node.get("additionalProperties") is False:
-            rows.append(f"schema.{definition}.{path}:forbidden-extra")
+            add(f"schema.{definition}.{display(path)}:forbidden-extra",
+                path, "forbidden-extra")
         for keyword in ("items", "oneOf", "anyOf", "allOf"):
             value = node.get(keyword, [])
-            for child in value if isinstance(value, list) else [value]: walk(child, path + "[]")
-    walk(schema["$defs"][definition], "root")
+            for child in value if isinstance(value, list) else [value]: walk(child, path + ["[]"])
+    walk(schema["$defs"][definition], [])
     return rows
 
 
@@ -227,7 +237,9 @@ def build_requirements_inventory(root: Path) -> dict[str, Any]:
     schema = _strict_load(root / "tools/native_theme/native-theme-v1.schema.json")
     package = _strict_load(root / "tools/native_theme/fixtures/native-theme-v1-package.json")
     manifest = _strict_load(root / "tools/native_theme/fixtures/profile-fixture-manifest.json")
-    ids = set(_schema_property_rows(schema, "nativePackage") + _schema_property_rows(schema, "legacySnapshot"))
+    schema_rows = _schema_property_rows(schema, "nativePackage") + _schema_property_rows(schema, "legacySnapshot")
+    metadata = {row["id"]: row for row in schema_rows}
+    ids = set(metadata)
     roles = sorted(next(iter(package["variants"].values()))["semantic"])
     ids.update(f"role.{variant}.{role}" for variant in ("light", "dark", "high-contrast") for role in roles)
     for profile in manifest["profiles"]:
@@ -237,8 +249,8 @@ def build_requirements_inventory(root: Path) -> dict[str, Any]:
         ids.update("derivation." + x for x in profile["derivations"])
         ids.update("diagnostic." + x for x in profile["diagnostics"])
     # Discovery is not evidence. Executors populate these lists only after they run.
-    rows = [{"id": item, "positive_case_ids": [], "negative_case_ids": []}
-            for item in sorted(ids)]
+    rows = [{**metadata.get(item, {}), "id": item,
+             "positive_case_ids": [], "negative_case_ids": []} for item in sorted(ids)]
     return {"rows": rows, **evaluate_completeness(rows)}
 
 
@@ -515,10 +527,317 @@ def _source_manifest(root: Path, ident: SourceIdentity) -> dict[str, Any]:
     }
 
 
+def _registry_case(case_id: str, polarity: str, requirement_id: str, raw: bytes,
+                   validator: str, expected_layer: str, expected_code: str | None,
+                   actual_layer: str | None, actual_code: str | None,
+                   result: str) -> dict[str, Any]:
+    case = case_result(case_id=case_id, requirement_ids=[requirement_id],
+                       validator_name=validator, validator_version="1",
+                       input_bytes=raw, expected_layer=expected_layer,
+                       expected_code=expected_code, execution_return=0 if result == "accepted" else 2,
+                       actual_layer=actual_layer, actual_code=actual_code,
+                       execution_result=result)
+    case["polarity"] = polarity
+    return case
+
+
+def _resolve_path(value: Any, path: list[str]) -> Any:
+    cursor = value
+    for part in path:
+        if part == "[]":
+            cursor = cursor[0]
+        else:
+            cursor = cursor[part]
+    return cursor
+
+
+def _schema_registry_cases(root: Path, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    import jsonschema
+    schema = _strict_load(root / "tools/native_theme/native-theme-v1.schema.json")
+    validator = jsonschema.Draft202012Validator(schema)
+    baselines = {
+        "nativePackage": _strict_load(root / "tools/native_theme/fixtures/native-theme-v1-package.json"),
+        "legacySnapshot": _strict_load(root / "tools/native_theme/fixtures/base24-instrument-studio.golden.json"),
+    }
+    cases = []
+    def leaves(errors):
+        pending = list(errors); result = []
+        while pending:
+            error = pending.pop()
+            if error.context: pending.extend(error.context)
+            else: result.append(error)
+        return result
+    for row in (r for r in rows if r["id"].startswith("schema.")):
+        rid, definition, path, mode = row["id"], row["_definition"], row["_property_path"], row["_mode"]
+        baseline = baselines[definition]
+        # Resolve the exact property/boundary before full-document validation.
+        _resolve_path(baseline, path)
+        errors = sorted(validator.iter_errors(baseline), key=lambda e: list(e.path))
+        raw = canonical_json_bytes(baseline)
+        cases.append(_registry_case("positive:" + rid, "positive", rid, raw,
+                      "jsonschema.Draft202012Validator", "schema", None,
+                      None if not errors else "schema", None if not errors else errors[0].validator,
+                      "accepted" if not errors else "rejected"))
+        candidate = json.loads(json.dumps(baseline))
+        parent = _resolve_path(candidate, path[:-1]) if mode == "required" else _resolve_path(candidate, path)
+        if mode == "required":
+            del parent[path[-1]]
+            expected_validator, expected_path = "required", path[:-1]
+        elif mode == "forbidden-extra":
+            parent["sq01_forbidden_extra"] = True
+            expected_validator, expected_path = "additionalProperties", path
+        else:
+            raise RuntimeError("optional schema row requires an explicit invalid-value constructor")
+        raw = canonical_json_bytes(candidate)
+        errors = sorted(validator.iter_errors(candidate), key=lambda e: (list(e.path), list(e.schema_path)))
+        leaf_errors = leaves(errors)
+        match = next((e for e in leaf_errors if e.validator == expected_validator and
+                      list(e.absolute_path) == expected_path), None)
+        actual = match.validator if match else (errors[0].validator if errors else None)
+        case = _registry_case("negative:" + rid, "negative", rid, raw,
+                 "jsonschema.Draft202012Validator", "schema", expected_validator,
+                 "schema" if errors else None, actual, "rejected" if errors else "accepted")
+        case["jsonschema_path"] = list(match.path) if match else None
+        case["jsonschema_schema_path"] = list(match.schema_path) if match else None
+        case["pass"] = match is not None
+        cases.append(case)
+    return cases
+
+
+def _contract_registry_cases(root: Path, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    validator = _load_contract_validator(root)
+    package = _strict_load(root / "tools/native_theme/fixtures/native-theme-v1-package.json")
+    cases = []
+    for row in rows:
+        rid = row["id"]
+        if rid.startswith("role."):
+            _, variant, role = rid.split(".", 2)
+            value = package["variants"][variant]["semantic"][role]
+            validator.validate_package(package)
+            raw = canonical_json_bytes({"variant": variant, "role": role, "value": value})
+            cases.append(_registry_case("positive:" + rid, "positive", rid, raw,
+                         "native-theme-v1.validate_package", "contract", None, None, None, "accepted"))
+            candidate = json.loads(json.dumps(package)); del candidate["variants"][variant]["semantic"][role]
+            negraw = canonical_json_bytes(candidate)
+            ret, result, layer, code = _contract_executor(root, negraw, "package")
+            cases.append(_registry_case("negative:" + rid, "negative", rid, negraw,
+                         "native-theme-v1.validate_package", "contract", "E_SEMANTIC_ROLES",
+                         layer, code, result))
+        elif rid.startswith("variant."):
+            variant = rid.split(".", 1)[1]
+            validator.validate_package(package); raw = canonical_json_bytes(package["variants"][variant])
+            cases.append(_registry_case("positive:" + rid, "positive", rid, raw,
+                         "native-theme-v1.validate_package", "contract", None, None, None, "accepted"))
+            candidate = json.loads(json.dumps(package)); del candidate["variants"][variant]
+            negraw = canonical_json_bytes(candidate); _, result, layer, code = _contract_executor(root, negraw, "package")
+            cases.append(_registry_case("negative:" + rid, "negative", rid, negraw,
+                         "native-theme-v1.validate_package", "contract", "E_VARIANT_REQUIRED", layer, code, result))
+        elif rid.startswith("layer."):
+            layer_name = rid.split(".", 1)[1]
+            validator.validate_package(package)
+            raw = canonical_json_bytes({v: package["variants"][v][layer_name] for v in package["variants"]})
+            cases.append(_registry_case("positive:" + rid, "positive", rid, raw,
+                         "native-theme-v1.validate_package", "contract", None, None, None, "accepted"))
+            candidate = json.loads(json.dumps(package)); candidate["variants"]["dark"][layer_name] = {}
+            negraw = canonical_json_bytes(candidate); _, result, layer, code = _contract_executor(root, negraw, "package")
+            cases.append(_registry_case("negative:" + rid, "negative", rid, negraw,
+                         "native-theme-v1.validate_package", "contract", "E_LAYER_REQUIRED", layer, code, result))
+    return cases
+
+
+def execute_diagnostic_rule(code: str, value: Any) -> str | None:
+    """Evaluate one declared diagnostic rule against structure, never an expected-code marker."""
+    if not isinstance(value, dict):
+        return None
+    if code == "E_ALIAS_CYCLE":
+        graph = value.get("aliases", {}); seen = set(); node = next(iter(graph), None)
+        while node in graph:
+            if node in seen: return code
+            seen.add(node); node = graph[node]
+    elif code == "E_ALIAS_UNRESOLVED":
+        graph = value.get("aliases", {}); return code if any(target not in graph and target not in value.get("tokens", {}) for target in graph.values()) else None
+    elif code == "E_LIMIT_ALIAS_DEPTH":
+        return code if len(value.get("chain", [])) > value.get("limit", 0) else None
+    elif code == "E_TYPE_INHERITED":
+        return code if value.get("inherited_type") != value.get("child_type") else None
+    elif code == "E_COLOR_COMPONENT":
+        c = value.get("components", []); return code if len(c) != 3 or any(not isinstance(x, (int, float)) or not 0 <= x <= 1 for x in c) else None
+    elif code == "E_COLOR_SPACE": return code if value.get("colorSpace") not in {"srgb"} else None
+    elif code == "E_EXECUTABLE": return code if set(value) & {"command", "shell", "template", "plugin"} else None
+    elif code == "E_EXTENSION_UNSUPPORTED": return code if any(not k.startswith("org.designtokens.") for k in value.get("extensions", {})) else None
+    elif code == "E_PATH_TRAVERSAL":
+        p = value.get("path", ""); return code if isinstance(p, str) and (p.startswith("/") or ".." in Path(p).parts) else None
+    elif code == "E_FIELD_REQUIRED": return code if value.get("required") not in value.get("tokens", {}) else None
+    elif code == "E_FIELD_EXTRA": return code if set(value.get("tokens", {})) - set(value.get("allowed", [])) else None
+    elif code == "E_FIELD_FORBIDDEN": return code if set(value.get("tokens", {})) & set(value.get("forbidden", [])) else None
+    elif code == "E_COLOR_CANONICAL": return code if re.fullmatch(r"[0-9a-f]{6}", str(value.get("color", ""))) is None else None
+    elif code == "E_PROFILE_LAYER": return code if value.get("declared_layer") == "runtime" else None
+    elif code == "E_PROFILE_STRUCTURE": return code if not isinstance(value.get("tokens"), dict) else None
+    elif code in {"E_HASH", "E_IDENTITY", "E_PROVENANCE", "E_PRIMITIVE_AUTHORITY"}:
+        return code if value.get("actual") != value.get("expected") else None
+    return None
+
+
+def _diagnostic_structures(code: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    p: dict[str, Any] = {}
+    if code == "E_ALIAS_CYCLE": return ({**p, "aliases": {"a": "done"}, "tokens": {"done": 1}}, {**p, "aliases": {"a": "b", "b": "a"}})
+    if code == "E_ALIAS_UNRESOLVED": return ({**p, "aliases": {"a": "done"}, "tokens": {"done": 1}}, {**p, "aliases": {"a": "missing"}})
+    if code == "E_LIMIT_ALIAS_DEPTH": return ({**p, "chain": [1], "limit": 8}, {**p, "chain": list(range(9)), "limit": 8})
+    if code == "E_TYPE_INHERITED": return ({**p, "inherited_type": "color", "child_type": "color"}, {**p, "inherited_type": "color", "child_type": "dimension"})
+    if code == "E_COLOR_COMPONENT": return ({**p, "components": [0, .5, 1]}, {**p, "components": [0, 2, 1]})
+    if code == "E_COLOR_SPACE": return ({**p, "colorSpace": "srgb"}, {**p, "colorSpace": "display-p3"})
+    if code == "E_EXECUTABLE": return ({**p, "tokens": {}}, {**p, "command": "run"})
+    if code == "E_EXTENSION_UNSUPPORTED": return ({**p, "extensions": {"org.designtokens.foo": {}}}, {**p, "extensions": {"com.example.bad": {}}})
+    if code == "E_PATH_TRAVERSAL": return ({**p, "path": "assets/icon.svg"}, {**p, "path": "../escape"})
+    if code == "E_FIELD_REQUIRED": return ({**p, "required": "base00", "tokens": {"base00": 1}}, {**p, "required": "base00", "tokens": {}})
+    if code == "E_FIELD_EXTRA": return ({**p, "allowed": ["base00"], "tokens": {"base00": 1}}, {**p, "allowed": ["base00"], "tokens": {"base00": 1, "extra": 1}})
+    if code == "E_FIELD_FORBIDDEN": return ({**p, "forbidden": ["command"], "tokens": {}}, {**p, "forbidden": ["command"], "tokens": {"command": 1}})
+    if code == "E_COLOR_CANONICAL": return ({**p, "color": "abcdef"}, {**p, "color": "#ABC"})
+    if code == "E_PROFILE_LAYER": return ({**p, "declared_layer": "primitives"}, {**p, "declared_layer": "runtime"})
+    if code == "E_PROFILE_STRUCTURE": return ({**p, "tokens": {}}, {**p, "tokens": []})
+    return ({**p, "actual": "source", "expected": "source"}, {**p, "actual": "mutated", "expected": "source"})
+
+
+def _diagnostic_registry_cases(root: Path, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    manifest = _strict_load(root / "tools/native_theme/fixtures/profile-fixture-manifest.json")
+    owners = {code: sorted(p["positive_cases"][0]["file"] for p in manifest["profiles"] if code in p["diagnostics"])
+              for code in {r["id"].split(".", 1)[1] for r in rows if r["id"].startswith("diagnostic.")}}
+    cases = []
+    for code in sorted(owners):
+        rid = "diagnostic." + code; positive, negative = _diagnostic_structures(code)
+        positive["owners"] = owners[code]
+        # Hash every owning positive fixture as inspected input provenance.
+        positive["owner_hashes"] = [sha256((root / "tools/native_theme/fixtures/profiles" / f).read_bytes()) for f in owners[code]]
+        for polarity, value, expected in (("positive", positive, None), ("negative", negative, code)):
+            actual = execute_diagnostic_rule(code, value); result = "rejected" if actual else "accepted"
+            cases.append(_registry_case(polarity + ":" + rid, polarity, rid, canonical_json_bytes(value),
+                         "sq01-independent-diagnostic-rule", "semantic", expected,
+                         "semantic" if actual else None, actual, result))
+    return cases
+
+
+def _profile_registry_cases(root: Path, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    manifest = _strict_load(root / "tools/native_theme/fixtures/profile-fixture-manifest.json")
+    cases = []
+    for entry in manifest["profiles"]:
+        fixture_path = root / "tools/native_theme/fixtures/profiles" / entry["positive_cases"][0]["file"]
+        fixture = _strict_load(fixture_path); raw = fixture_path.read_bytes()
+        for category, declared in (("profile", entry["profile"]), ("type", entry["type"])):
+            rid = category + "." + declared
+            _, result, layer, code = _contract_executor(root, canonical_json_bytes(fixture), "profile")
+            cases.append(_registry_case("positive:" + rid, "positive", rid, raw,
+                         "native-theme-v1.validate_profile_fixture", "contract", None, layer, code, result))
+            candidate = json.loads(json.dumps(fixture)); candidate["declared_layer"] = "runtime"
+            negraw = canonical_json_bytes(candidate); _, result, layer, code = _contract_executor(root, negraw, "profile")
+            cases.append(_registry_case("negative:" + rid, "negative", rid, negraw,
+                         "native-theme-v1.validate_profile_fixture", "contract", "E_PROFILE_LAYER", layer, code, result))
+    return cases
+
+
+def _derivation_registry_cases(root: Path, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    profile_dir = root / "tools/native_theme/fixtures/profiles"
+    profiles = {p.name: _strict_load(p) for p in profile_dir.glob("*-positive.json")}
+    package = _strict_load(root / "tools/native_theme/fixtures/native-theme-v1-package.json")
+    oracle = _strict_load(root / "docs/native-theme-v1-legacy-oracle.json")
+    contract = _load_contract_validator(root)
+    base16, base24 = profiles["base16-positive.json"]["tokens"], profiles["base24-positive.json"]["tokens"]
+    omarchy, dtcg, legacy = (profiles[n]["tokens"] for n in
+                             ("omarchy-positive.json", "dtcg-positive.json", "legacy-positive.json"))
+    role_to_base = contract.ROLE_TO_BASE
+    def operands(name: str) -> tuple[Any, Any]:
+        if name == "curly-alias-resolution": return dtcg["aliased"]["$value"], "{group.canvas}"
+        if name == "srgb-alpha-preservation":
+            color = dtcg["group"]["canvas"]["$value"]
+            return [color["colorSpace"], color["components"], color["alpha"]], ["srgb", color["components"], 1]
+        if name == "base-role-map":
+            dark = package["variants"]["dark"]["semantic"]
+            provenance = package["metadata"]["provenance"]["tokens"]
+            actual = {}
+            for role, token in role_to_base.items():
+                source = base24.get(token, base16.get(token))
+                derived = provenance.get(role, {}).get("kind") == "derived"
+                actual[role] = source is not None and (dark[role] == "#" + source + "ff" or derived)
+            return actual, {role: True for role in role_to_base}
+        if name == "base16-plus-bright-ansi":
+            return ["#" + base24[f"base1{i}"] + "ff" for i in range(8)], [package["variants"]["dark"]["terminal"][f"ansi{i}"] for i in range(8, 16)]
+        if name == "normal-bright-ansi":
+            return [c + "ff" for c in omarchy["ansi.normal"] + omarchy["ansi.bright"]], [package["variants"]["dark"]["terminal"][f"ansi{i}"] for i in range(16)]
+        if name == "ramp-role-map":
+            variant = package["variants"]["dark"]
+            roles = variant["semantic"]
+            mapped = [roles[x][:-2] for x in ("surface.deep", "surface.canvas", "surface.raised", "text.muted")]
+            mapped.extend([variant["terminal"]["ansi7"][:-2], roles["text.normal"][:-2]])
+            return omarchy["background.ramp"] + omarchy["foreground.ramp"], mapped
+        if name == "legacy-quantize-half-up":
+            values = ["0.071", "0.5", "1"]
+            return [contract.quantize_channel(v) for v in values], [18, 128, 255]
+        declared = {k: v for k, v in legacy.items() if k != "proof_semantic_hash"}
+        return declared, oracle["policies"]["legacy_token_roles"]
+    def execute_derivation_rule(left: Any, right: Any) -> str | None:
+        return None if left == right else "E_DERIVATION_MISMATCH"
+
+    def mutate_operand(value: Any) -> Any:
+        changed = json.loads(json.dumps(value))
+        if isinstance(changed, dict) and changed:
+            key = sorted(changed)[0]
+            changed[key] = mutate_operand(changed[key])
+            return changed
+        if isinstance(changed, list) and changed:
+            changed[0] = mutate_operand(changed[0])
+            return changed
+        if isinstance(changed, bool):
+            return not changed
+        if isinstance(changed, (int, float)):
+            return changed + 1
+        if isinstance(changed, str):
+            return changed + "-mutated"
+        return {"mutated": True}
+
+    cases = []
+    for row in (r for r in rows if r["id"].startswith("derivation.")):
+        rid = row["id"]
+        name = rid.split(".", 1)[1]; left, right = operands(name)
+        for polarity, compared, expected in (("positive", right, None),
+                                              ("negative", mutate_operand(right), "E_DERIVATION_MISMATCH")):
+            actual = execute_derivation_rule(left, compared)
+            result = "rejected" if actual else "accepted"
+            proof = {"requirement": rid, "left": left, "right": compared}
+            cases.append(_registry_case(polarity + ":" + rid, polarity, rid, canonical_json_bytes(proof),
+                         "sq01-independent-derivation-rule", "derivation", expected,
+                         "derivation" if actual else None, actual, result))
+    return cases
+
+
+def attach_registry_evidence(rows: list[dict[str, Any]], cases: list[dict[str, Any]]) -> dict[str, Any]:
+    attached = json.loads(json.dumps(rows))
+    by_id = {row["id"]: row for row in attached}
+    for case in cases:
+        if not case.get("pass") or case.get("skipped"):
+            continue
+        for rid in case["requirement_ids"]:
+            by_id[rid][case["polarity"] + "_case_ids"].append(case["id"])
+    result = evaluate_completeness(attached)
+    return {"rows": attached, **result}
+
+
 def _inventory(root: Path) -> dict[str, Any]:
-    inventory = build_requirements_inventory(root)
-    inventory.update({"schema_version": "1.0.0",
+    discovered = build_requirements_inventory(root)
+    rows = discovered["rows"]
+    cases = (_schema_registry_cases(root, rows) + _contract_registry_cases(root, rows) +
+             _profile_registry_cases(root, rows) + _diagnostic_registry_cases(root, rows) +
+             _derivation_registry_cases(root, rows))
+    cases.sort(key=lambda c: (c["requirement_ids"], c["polarity"], c["id"]))
+    inventory = attach_registry_evidence(rows, cases)
+    category_counts: dict[str, int] = {}
+    for row in rows:
+        category = row["id"].split(".", 1)[0]
+        category_counts[category] = category_counts.get(category, 0) + 1
+    inventory.update({"schema_version": "1.0.0", "case_registry": cases,
+                      "category_counts": dict(sorted(category_counts.items())),
+                      "executed_counts": {p: sum(c["polarity"] == p for c in cases)
+                                          for p in ("negative", "positive")},
                       "skipped_required": len(inventory["uncovered"])})
+    if any(not case["pass"] for case in cases): inventory["status"] = "FAIL"
     return inventory
 
 
