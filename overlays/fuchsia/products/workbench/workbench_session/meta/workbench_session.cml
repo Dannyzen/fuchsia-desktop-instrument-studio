@@ -98,6 +98,12 @@
             ],
             availability: "optional",
         },
+        {
+            protocol: "fuchsia.instrumentstudio.theme.NativeThemeSettings",
+            from: "#native_theme_service",
+            to: "#settings_elements",
+            availability: "optional",
+        },
         // Dependencies for elements
         {
             protocol: [ "fuchsia.element.GraphicalPresenter" ],
@@ -219,6 +225,7 @@
                 "#element_manager",
                 "#elements",
                 "#files_elements",
+                "#native_theme_service",
                 "#settings_elements",
             ],
         },

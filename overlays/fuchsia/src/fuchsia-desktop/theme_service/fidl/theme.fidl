@@ -12,6 +12,20 @@ const MAX_DISPLAY_NAME_BYTES uint32 = 256;
 const MAX_THEMES uint32 = 64;
 const MAX_SNAPSHOT_BYTES uint32 = 524288;
 
+/// Required package variant. Unknown ordinals are rejected by strict decoding.
+type ThemeVariant = strict enum : uint32 {
+    LIGHT = 1;
+    DARK = 2;
+    HIGH_CONTRAST = 3;
+};
+
+/// Exact semantic catalog identity selected for a restart.
+type ThemeIdentity = struct {
+    theme_id string:MAX_THEME_ID_BYTES;
+    variant ThemeVariant;
+    semantic_sha256 array<uint8, 32>;
+};
+
 /// Public, non-sensitive identity for one packaged immutable theme.
 type ThemeMetadata = struct {
     id string:MAX_THEME_ID_BYTES;
@@ -24,7 +38,15 @@ type ThemeMetadata = struct {
 type ThemeSnapshot = struct {
     generation uint64;
     metadata ThemeMetadata;
+    identity ThemeIdentity;
     canonical_package vector<uint8>:MAX_SNAPSHOT_BYTES;
+};
+
+/// Settings view of process-active and durable restart state.
+type NativeThemeSettingsState = struct {
+    active ThemeIdentity;
+    pending box<ThemeIdentity>;
+    last_known_good box<ThemeIdentity>;
 };
 
 /// Read-only NativeTheme authority for ordinary shell and application consumers.
@@ -45,4 +67,14 @@ closed protocol NativeTheme {
     /// Only one outstanding call is allowed per connection.
     strict WatchCurrent(struct { observed_generation uint64; })
         -> (struct { snapshot ThemeSnapshot; });
+};
+
+/// Internal restart-only control surface. Routed exclusively to Settings.
+@discoverable(server="platform")
+closed protocol NativeThemeSettings {
+    strict GetState() -> (struct { state NativeThemeSettingsState; });
+    strict Select(struct { identity ThemeIdentity; }) -> () error zx.Status;
+    strict RestoreBuiltIn() -> () error zx.Status;
+    /// Imports preferences.txt only when no authoritative durable state exists.
+    strict MigrateLegacy(struct { identity ThemeIdentity; }) -> () error zx.Status;
 };
