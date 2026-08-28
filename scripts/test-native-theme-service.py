@@ -155,6 +155,17 @@ class NativeThemeServiceContract(unittest.TestCase):
         self.assertNotRegex(session, r"fuchsia\.instrumentstudio\.theme\.(Writer|Manager|Control|Store)")
         self.assertNotIn('startup: "eager"', session.split('name: "native_theme_service"', 1)[1].split("}", 1)[0])
 
+    def test_p3s1_shell_absence_package_omits_theme_subpackage(self):
+        build = self.text(SESSION / "BUILD.gn")
+        marker = 'fuchsia_package("workbench_session_no_native_theme") {'
+        self.assertIn(marker, build)
+        block = build.split(marker, 1)[1].split("\n}", 1)[0]
+        self.assertIn('package_name = "workbench_session_no_native_theme"', block)
+        self.assertIn('":workbench_element_manager"', block)
+        self.assertIn('"//src/ui/bin/tiling_wm"', block)
+        self.assertNotIn("theme_service", block)
+        self.assertIn('deps = [ ":workbench_session_component" ]', block)
+
     def test_p3s1_gherkin_mapping_and_scope(self):
         feature = self.text(FEATURE)
         tests = self.text(Path(__file__))
@@ -170,7 +181,7 @@ class NativeThemeServiceContract(unittest.TestCase):
         self.assertIn("Apply and Restart", feature)
         self.assertIn("full product restarts", feature)
         self.assertIn("last-known-good or built-in", feature)
-        self.assertEqual(len(re.findall(r"^    def test_p3s1_", tests, re.MULTILINE)), 11)
+        self.assertEqual(len(re.findall(r"^    def test_p3s1_", tests, re.MULTILINE)), 12)
 
 
 if __name__ == "__main__":
