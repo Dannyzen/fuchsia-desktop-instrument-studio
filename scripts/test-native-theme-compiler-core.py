@@ -9,6 +9,7 @@ import hashlib
 import json
 from pathlib import Path
 import resource
+import subprocess
 import sys
 import time
 import tempfile
@@ -25,6 +26,12 @@ import native_theme_v1 as contract  # noqa: E402
 
 FIXTURE = ROOT / "tools/native_theme/fixtures/native-theme-v1-package.json"
 PRODUCTION = ROOT / "tools/native_theme/compiler_core.py"
+VALIDATOR = ROOT / "tools/native_theme/validate_native_theme_v1.py"
+EXPECTED_PACKAGE_VALIDATION_LINE = (
+    "VALID NativeThemeV1 "
+    "semantic_hash=sha256:5270267e6a857aaae560e5a161b110ae643b4ad3b016c2eceaae90331ae7230a "
+    "package_sha256=sha256:f1975d2511b5b4c711ef8b299389a07793b3113077cad32bb8272dcde7b1738b"
+)
 
 
 def fixture_package() -> dict[str, object]:
@@ -53,6 +60,34 @@ def refresh_semantic_hash(package: dict[str, object]) -> None:
     package["metadata"]["provenance"]["semantic_hash"] = contract.package_semantic_identity(package)
 
 
+def package_with_canonical_body_size(size: int) -> dict[str, object]:
+    package = fixture_package()
+    extensions = package["metadata"]["extensions"]
+    extensions.clear()
+    prior_key = None
+    index = 0
+    while True:
+        body = contract.canonical_json_bytes(package)
+        remaining = size - len(body)
+        if remaining == 0:
+            return package
+        if remaining < 0:
+            raise AssertionError(f"cannot construct canonical body of {size} bytes")
+        key = f"org.constructresearch.instrumentstudio.padding-{index:03d}"
+        extensions[key] = ""
+        overhead = len(contract.canonical_json_bytes(package)) - len(body)
+        if remaining >= overhead:
+            extensions[key] = "x" * min(4000, remaining - overhead)
+            prior_key = key
+            index += 1
+        else:
+            extensions.pop(key)
+            if prior_key is None:
+                raise AssertionError("target leaves no room for canonical padding")
+            extensions[prior_key] = extensions[prior_key][:-(overhead - remaining)]
+            extensions[key] = ""
+
+
 class CompilerCoreTests(unittest.TestCase):
     def assert_code(self, expected: str, candidate: object) -> core.CompilerError:
         with self.assertRaises(core.CompilerError) as caught:
@@ -66,15 +101,26 @@ class CompilerCoreTests(unittest.TestCase):
         source = normalized()
         before = copy.deepcopy(source)
         result = core.compile_normalized(source)
-        expected = contract.canonical_json_bytes(source["package"])
+        expected = contract.canonical_json_bytes(source["package"]) + b"\n"
         self.assertEqual(result.canonical_bytes, expected)
         self.assertEqual(result.package, source["package"])
         self.assertIsNot(result.package, source["package"])
         self.assertEqual(source, before)
         self.assertEqual(result.semantic_hash, contract.package_semantic_identity(result.package))
         self.assertEqual(result.diagnostics, ())
+        self.assertEqual(result.receipt["package_bytes"], len(expected))
         self.assertEqual(result.receipt["package_sha256"], "sha256:" + hashlib.sha256(expected).hexdigest())
         self.assertEqual(result.receipt_bytes, contract.canonical_json_bytes(result.receipt))
+
+    def test_future_full_file_serialization_obeys_exact_pack_boundary(self):
+        for raw_size in (262143, 262144):
+            with self.subTest(raw_size=raw_size):
+                package = package_with_canonical_body_size(raw_size - 1)
+                result = core.compile_normalized(normalized(package))
+                self.assertEqual(len(result.canonical_bytes), raw_size)
+        package = package_with_canonical_body_size(262144)
+        self.assertEqual(len(contract.canonical_json_bytes(package)) + 1, 262145)
+        self.assert_code("E_CANONICAL_SIZE", normalized(package))
 
     def test_reserved_namespaced_extension_metadata_is_preserved_without_capability_inference(self):
         source = normalized()
@@ -355,6 +401,24 @@ class CompilerCoreTests(unittest.TestCase):
                 result = core.compile_normalized_to_path(normalized(), Path(td) / "theme.json")
                 outputs.append((Path(td) / "theme.json").read_bytes())
                 receipts.append(result.receipt_bytes)
+                self.assertEqual(outputs[-1], result.canonical_bytes)
+                self.assertTrue(outputs[-1].endswith(b"\n"))
+                self.assertFalse(outputs[-1].endswith(b"\n\n"))
+                self.assertEqual(outputs[-1].count(b"\n"), 1)
+                self.assertEqual(result.receipt["package_bytes"], len(outputs[-1]))
+                self.assertEqual(
+                    result.receipt["package_sha256"],
+                    "sha256:" + hashlib.sha256(outputs[-1]).hexdigest(),
+                )
+                validated = subprocess.run(
+                    [sys.executable, str(VALIDATOR), str(Path(td) / "theme.json")],
+                    cwd=ROOT,
+                    check=False,
+                    text=True,
+                    capture_output=True,
+                )
+                self.assertEqual(validated.returncode, 0, validated.stderr)
+                self.assertEqual(validated.stdout, EXPECTED_PACKAGE_VALIDATION_LINE + "\n")
         self.assertEqual(outputs[0], outputs[1])
         self.assertEqual(outputs[1], outputs[2])
         self.assertEqual(receipts[0], receipts[1])

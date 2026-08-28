@@ -25,6 +25,7 @@ from native_theme_v1 import (
     HASH_RE,
     LIMITS,
     RGBA_RE,
+    assert_dominated_runtime_snapshot,
     canonical_json_bytes,
     package_semantic_identity,
     validate_package,
@@ -547,9 +548,11 @@ def _check_package_versions(package: dict[str, object]) -> None:
 def _validate_complete_package(package: dict[str, object]) -> tuple[bytes, str]:
     _check_package_versions(package)
     _check_package_safety(package)
-    encoded = _canonical(package)
-    if len(encoded) > LIMITS["compiled_pack_bytes"]:
+    canonical_body = _canonical(package)
+    package_file_bytes = canonical_body + b"\n"
+    if len(package_file_bytes) > LIMITS["compiled_pack_bytes"]:
         _reject("E_CANONICAL_SIZE", "canonical package exceeds 256 KiB")
+    assert_dominated_runtime_snapshot(len(package_file_bytes))
 
     metadata = package.get("metadata")
     provenance = metadata.get("provenance") if isinstance(metadata, dict) else None
@@ -566,7 +569,7 @@ def _validate_complete_package(package: dict[str, object]) -> tuple[bytes, str]:
     except ContractError as exc:
         code, message = _contract_code(exc)
         _reject("E_PACKAGE_VALIDATION", f"{code}: {message}")
-    return encoded, package_semantic_identity(package)
+    return package_file_bytes, package_semantic_identity(package)
 
 
 def compile_normalized(normalized: Mapping[str, object]) -> CompilationResult:

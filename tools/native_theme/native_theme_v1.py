@@ -26,6 +26,7 @@ LIMITS = {
     "decoded_assets_total_bytes": 4 * 1024 * 1024,
     "runtime_snapshot_bytes": 512 * 1024,
 }
+CANONICAL_PACKAGE_FINAL_LF_BYTES = 1
 CONTRACT_FIELDS = {"schema_version", "profile", "theme", "metadata", "variants", "fallback", "policy"}
 VARIANT_FIELDS = {"primitives", "semantic", "components", "typography", "geometry", "elevation", "opacity", "motion", "assets", "terminal"}
 REQUIRED_VARIANTS = {"light", "dark", "high-contrast"}
@@ -155,6 +156,23 @@ def canonical_json_bytes(value: object) -> bytes:
             return [normalize(child) for child in item]
         return item
     return json.dumps(normalize(value), sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
+
+
+def canonical_package_file_size(canonical_body: bytes) -> int:
+    """Count canonical UTF-8 package bytes including the one required final LF."""
+    return len(canonical_body) + CANONICAL_PACKAGE_FINAL_LF_BYTES
+
+
+def assert_dominated_runtime_snapshot(full_file_bytes: int) -> None:
+    """Fail internally if the declared or established dominated invariant is false."""
+    if LIMITS["compiled_pack_bytes"] > LIMITS["runtime_snapshot_bytes"]:
+        raise RuntimeError(
+            "E_INTERNAL_LIMIT_CONTRACT: compiled_pack_bytes exceeds runtime_snapshot_bytes"
+        )
+    if full_file_bytes > LIMITS["runtime_snapshot_bytes"]:
+        raise RuntimeError(
+            "E_INTERNAL_LIMIT_CONTRACT: compiled package escaped runtime snapshot dominance"
+        )
 
 
 def semantic_identity(value: object) -> str:
@@ -348,8 +366,10 @@ def validate_package(data: dict[str, object]) -> None:
     if token_count > LIMITS["tokens"]:
         reject("E_LIMIT_TOKENS", "token count exceeds 1024")
     encoded = canonical_json_bytes(data)
-    if len(encoded) > LIMITS["compiled_pack_bytes"]:
+    full_file_bytes = canonical_package_file_size(encoded)
+    if full_file_bytes > LIMITS["compiled_pack_bytes"]:
         reject("E_LIMIT_PACK", "compiled pack exceeds 256 KiB")
+    assert_dominated_runtime_snapshot(full_file_bytes)
     if provenance["semantic_hash"] != package_semantic_identity(data):
         reject("E_PROVENANCE", "complete package semantic hash mismatch")
 
@@ -515,7 +535,7 @@ def compile_legacy(path: Path) -> dict[str, object]:
 
 
 def write_canonical(snapshot: dict[str, object], output: Path) -> None:
-    encoded = (json.dumps(snapshot, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n").encode()
+    encoded = canonical_json_bytes(snapshot) + b"\n"
     output.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary = tempfile.mkstemp(prefix=output.name + ".", dir=output.parent)
     try:

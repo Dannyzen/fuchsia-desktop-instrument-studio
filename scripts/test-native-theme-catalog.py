@@ -388,6 +388,31 @@ class CatalogContractTests(unittest.TestCase):
         with mock.patch.object(catalog, "parse_descriptor_bytes", return_value=low):
             self.assert_code("E_LIMIT_CATALOG", catalog.generate_catalog, low, self.sources)
 
+    def test_runtime_snapshot_limit_is_an_internal_dominated_invariant(self):
+        self.assertLessEqual(
+            catalog.LIMITS["compiled_pack_bytes"],
+            catalog.LIMITS["runtime_snapshot_bytes"],
+        )
+        catalog._assert_runtime_snapshot_dominance(catalog.LIMITS["compiled_pack_bytes"])
+        with mock.patch.dict(catalog.LIMITS, {
+            "compiled_pack_bytes": 2,
+            "runtime_snapshot_bytes": 1,
+        }):
+            self.assert_code(
+                "E_INTERNAL_LIMIT_CONTRACT",
+                catalog._assert_runtime_snapshot_dominance,
+                1,
+            )
+        with mock.patch.dict(catalog.LIMITS, {
+            "compiled_pack_bytes": 1,
+            "runtime_snapshot_bytes": 2,
+        }):
+            self.assert_code(
+                "E_INTERNAL_LIMIT_CONTRACT",
+                catalog._assert_runtime_snapshot_dominance,
+                3,
+            )
+
     def test_verify_missing_unexpected_noncanonical_and_drift(self):
         verified = catalog.verify_catalog(self.descriptor, self.sources, self.actual)
         self.assertEqual(verified["schema_version"], "native-theme-catalog-generation-v1")

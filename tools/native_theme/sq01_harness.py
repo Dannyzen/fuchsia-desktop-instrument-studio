@@ -68,6 +68,12 @@ REQUIRED_MUTATIONS = {
     "contract.contrast-ui": ("contract", "E_CONTRAST_UI"),
     "contract.terminal-ansi": ("contract", "E_TERMINAL_ANSI"),
     "contract.profile-layer": ("contract", "E_PROFILE_LAYER"),
+    "source-manifest.machine-limit-missing-runtime-snapshot": (
+        "source-manifest", "E_MACHINE_LIMIT_CONTRACT"),
+    "source-manifest.machine-limit-changed-runtime-unit": (
+        "source-manifest", "E_MACHINE_LIMIT_CONTRACT"),
+    "source-manifest.machine-limit-reversed-dominance": (
+        "source-manifest", "E_MACHINE_LIMIT_CONTRACT"),
 }
 SAFETY_MODULES = (
     "tools/native_theme/native_theme_v1.py",
@@ -77,6 +83,39 @@ SAFETY_MODULES = (
     "tools/native_theme/sq01_harness.py",
     "tools/native_theme/sq01_semantic_validator.py",
 )
+EXPECTED_LIMITS = {
+    "alias_depth": 32,
+    "aliases": 2048,
+    "catalog_bytes": 8388608,
+    "compiled_pack_bytes": 262144,
+    "decoded_asset_bytes": 524288,
+    "decoded_assets_total_bytes": 4194304,
+    "nesting": 32,
+    "runtime_snapshot_bytes": 524288,
+    "semantic_assets": 64,
+    "source_bytes": 1048576,
+    "string_bytes": 4096,
+    "tokens": 1024,
+}
+EXPECTED_LIMIT_UNITS = {
+    "compiled_pack_bytes": "canonical_utf8_package_file_bytes_including_final_lf",
+    "runtime_snapshot_bytes": "retained_canonical_utf8_package_file_bytes_including_final_lf",
+}
+EXPECTED_LIMIT_RELATIONS = ({
+    "additive_bytes": 0,
+    "dominated": "runtime_snapshot_bytes",
+    "proof": "compiled_pack_bytes <= runtime_snapshot_bytes",
+    "stricter": "compiled_pack_bytes",
+},)
+MACHINE_LIMIT_CONTRACT_FIELDS = {"limits", "limit_units", "limit_relations"}
+SOURCE_MANIFEST_FIELDS = {
+    "binary_diff_serialization", "binary_diff_sha256", "command_schema",
+    "comparison_base_sha", "environment_pins", "machine_limit_contract",
+    "oracle_hashes", "production_hashes", "profile_fixture_manifest_sha256",
+    "runtime_versions", "schema_sha256", "schema_version", "skipped_required",
+    "source_sha", "source_tree", "status", "tracked_files",
+    "tracked_manifest_sha256", "versions_env_pins", "versions_env_sha256",
+}
 
 
 class SourceIdentity(NamedTuple):
@@ -386,6 +425,43 @@ def _contract_executor(root: Path, raw: bytes, kind: str) -> tuple[int, str, str
     return 0, "accepted", None, None
 
 
+def _machine_contract_mutation_inputs(root: Path) -> dict[str, bytes]:
+    schema = _strict_load(root / "tools/native_theme/native-theme-v1.schema.json")
+
+    def candidate() -> dict[str, Any]:
+        return json.loads(json.dumps(schema))
+
+    missing_runtime = candidate()
+    del missing_runtime["x-native-theme-v1-contract"]["limits"]["runtime_snapshot_bytes"]
+    changed_unit = candidate()
+    changed_unit["x-native-theme-v1-contract"]["limit_units"]["runtime_snapshot_bytes"] = (
+        "heap_bytes"
+    )
+    reversed_relation = candidate()
+    reversed_relation["x-native-theme-v1-contract"]["limit_relations"] = [{
+        "additive_bytes": 0,
+        "dominated": "compiled_pack_bytes",
+        "proof": "runtime_snapshot_bytes <= compiled_pack_bytes",
+        "stricter": "runtime_snapshot_bytes",
+    }]
+    return {
+        "source-manifest.machine-limit-missing-runtime-snapshot":
+            canonical_json_bytes(missing_runtime),
+        "source-manifest.machine-limit-changed-runtime-unit":
+            canonical_json_bytes(changed_unit),
+        "source-manifest.machine-limit-reversed-dominance":
+            canonical_json_bytes(reversed_relation),
+    }
+
+
+def _machine_contract_executor(raw: bytes) -> tuple[int, str, str | None, str | None]:
+    try:
+        extract_machine_limit_contract(json.loads(raw))
+    except (UnicodeError, ValueError, TypeError, KeyError):
+        return 2, "rejected", "source-manifest", "E_MACHINE_LIMIT_CONTRACT"
+    return 0, "accepted", None, None
+
+
 def execute_mutations(root: Path, executor=None, contract_executor=None) -> dict[str, Any]:
     executor = executor or _strict_bytes_executor
     contract_executor = contract_executor or _contract_executor
@@ -402,6 +478,7 @@ def execute_mutations(root: Path, executor=None, contract_executor=None) -> dict
                                  execution_result=result))
     bound_inputs = _bound_inputs()
     contract_inputs = _contract_mutation_inputs(root)
+    machine_contract_inputs = _machine_contract_mutation_inputs(root)
     for case_id, (layer, code) in REQUIRED_MUTATIONS.items():
         if case_id in {case["id"] for case in cases}:
             continue
@@ -413,6 +490,10 @@ def execute_mutations(root: Path, executor=None, contract_executor=None) -> dict
             raw, kind = contract_inputs[case_id]
             ret, result, actual_layer, actual = contract_executor(root, raw, kind)
             validator_name = "native-theme-v1-contract-validator"
+        elif case_id in machine_contract_inputs:
+            raw = machine_contract_inputs[case_id]
+            ret, result, actual_layer, actual = _machine_contract_executor(raw)
+            validator_name = "sq01-machine-limit-contract-extractor"
         else:
             cases.append({"id": case_id, "requirement_ids": [case_id],
                           "validator_name": None, "validator_version": None,
@@ -441,6 +522,12 @@ def validate_receipt_bytes(raw: bytes, fields: set[str]) -> dict[str, Any]:
     if raw != canonical_json_bytes(data):
         raise ValueError("receipt is noncanonical")
     return data
+
+
+def validate_source_manifest_bytes(raw: bytes) -> dict[str, Any]:
+    manifest = validate_receipt_bytes(raw, SOURCE_MANIFEST_FIELDS)
+    _validate_machine_limit_contract(manifest["machine_limit_contract"])
+    return manifest
 
 
 def verify_receipt_hash(raw: bytes, expected: str) -> bool:
@@ -503,6 +590,79 @@ def _file_record(root: Path, path: Path) -> dict[str, Any]:
             "sha256": sha256(path.read_bytes())}
 
 
+def _validate_machine_limit_contract(contract: Any) -> dict[str, Any]:
+    """Validate and normalize the complete machine-readable limit contract."""
+    if not isinstance(contract, dict) or set(contract) != MACHINE_LIMIT_CONTRACT_FIELDS:
+        raise ValueError("machine limit contract fields differ")
+    limits = contract["limits"]
+    if not isinstance(limits, dict) or set(limits) != set(EXPECTED_LIMITS):
+        raise ValueError("limit keys differ from the frozen contract")
+    if any(type(value) is not int or value <= 0 for value in limits.values()):
+        raise ValueError("limits must be positive integers")
+
+    units = contract["limit_units"]
+    if not isinstance(units, dict) or set(units) != set(EXPECTED_LIMIT_UNITS):
+        raise ValueError("limit unit keys differ from the frozen contract")
+    if any(not isinstance(value, str) for value in units.values()):
+        raise ValueError("limit units must be strings")
+
+    relations = contract["limit_relations"]
+    if not isinstance(relations, list) or len(relations) != len(EXPECTED_LIMIT_RELATIONS):
+        raise ValueError("limit_relations shape differs from the frozen contract")
+    normalized_relations = []
+    relation_fields = {"stricter", "dominated", "additive_bytes", "proof"}
+    for relation in relations:
+        if not isinstance(relation, dict) or set(relation) != relation_fields:
+            raise ValueError("limit relation fields differ")
+        stricter, dominated = relation["stricter"], relation["dominated"]
+        if not isinstance(stricter, str) or not isinstance(dominated, str):
+            raise ValueError("limit relation endpoints must be strings")
+        if stricter not in limits or dominated not in limits:
+            raise ValueError("limit relation endpoint is unknown")
+        additive = relation["additive_bytes"]
+        if type(additive) is not int or additive < 0:
+            raise ValueError("limit relation additive_bytes must be a non-negative integer")
+        if not isinstance(relation["proof"], str):
+            raise ValueError("limit relation proof must be a string")
+        if relation["proof"] != f"{stricter} <= {dominated}":
+            raise ValueError("limit relation proof differs from its endpoints")
+        if limits[stricter] + additive > limits[dominated]:
+            raise ValueError("limit relation dominance inequality failed")
+        normalized_relations.append({key: relation[key] for key in sorted(relation)})
+
+    normalized_relations.sort(key=lambda relation: (
+        relation["stricter"], relation["dominated"], relation["additive_bytes"],
+        relation["proof"],
+    ))
+    expected_relations = [
+        {key: relation[key] for key in sorted(relation)}
+        for relation in EXPECTED_LIMIT_RELATIONS
+    ]
+    if normalized_relations != expected_relations:
+        raise ValueError("limit relations differ from the frozen contract")
+    if limits != EXPECTED_LIMITS:
+        raise ValueError("limit values differ from the frozen contract")
+    if units != EXPECTED_LIMIT_UNITS:
+        raise ValueError("limit unit semantics differ from the frozen contract")
+    return {
+        "limit_relations": normalized_relations,
+        "limit_units": dict(sorted(units.items())),
+        "limits": dict(sorted(limits.items())),
+    }
+
+
+def extract_machine_limit_contract(schema: Any) -> dict[str, Any]:
+    """Extract and freeze the exact schema-declared limit accounting contract."""
+    if not isinstance(schema, dict):
+        raise ValueError("schema must be an object")
+    policy = schema.get("x-native-theme-v1-contract")
+    if not isinstance(policy, dict):
+        raise ValueError("x-native-theme-v1-contract must be an object")
+    return _validate_machine_limit_contract({
+        field: policy.get(field) for field in MACHINE_LIMIT_CONTRACT_FIELDS
+    })
+
+
 def _source_manifest(root: Path, ident: SourceIdentity) -> dict[str, Any]:
     tracked = sorted(str(git(root, "ls-files")).splitlines())
     records = [_file_record(root, root / p) for p in tracked]
@@ -513,6 +673,7 @@ def _source_manifest(root: Path, ident: SourceIdentity) -> dict[str, Any]:
     for line in (root / "versions.env").read_text().splitlines():
         if line and not line.startswith("#") and "=" in line:
             key, value = line.split("=", 1); versions[key] = value
+    schema = _strict_load(root / "tools/native_theme/native-theme-v1.schema.json")
     return {
         "schema_version": "1.0.0", "status": "PASS", "source_sha": ident.sha,
         "source_tree": ident.tree, "comparison_base_sha": BASE_SHA,
@@ -524,6 +685,7 @@ def _source_manifest(root: Path, ident: SourceIdentity) -> dict[str, Any]:
         "binary_diff_sha256": sha256(diff), "tracked_files": records,
         "tracked_manifest_sha256": sha256(canonical_json_bytes(records)),
         "schema_sha256": hashed("tools/native_theme/native-theme-v1.schema.json"),
+        "machine_limit_contract": extract_machine_limit_contract(schema),
         "profile_fixture_manifest_sha256": hashed("tools/native_theme/fixtures/profile-fixture-manifest.json"),
         "production_hashes": {p: hashed(p) for p in SAFETY_MODULES[:4]},
         "oracle_hashes": {p: hashed(p) for p in ("docs/native-theme-v1-legacy-oracle.json", "tools/native_theme/legacy_inventory.py")},
@@ -1069,7 +1231,10 @@ def run_gate(root: Path, source_sha: str, output: Path, *, safe_temp_root: Path 
         receipts["mutation-results.json"]["coverage_failure"] = True
     component_status = derive_status({k: receipts[k] for k in VERDICT_INPUT_RECEIPTS})
     for name, receipt in receipts.items():
-        (output / name).write_bytes(canonical_json_bytes(receipt))
+        raw = canonical_json_bytes(receipt)
+        if name == "source-manifest.json":
+            validate_source_manifest_bytes(raw)
+        (output / name).write_bytes(raw)
     hashes = receipt_hash_map({name: (output / name).read_bytes()
                                for name in VERDICT_INPUT_RECEIPTS})
     verdict = {"schema_version": "1.0.0", "status": component_status,

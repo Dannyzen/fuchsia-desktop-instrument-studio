@@ -117,6 +117,19 @@ def _canonical(value: object) -> bytes:
         _reject("E_CANONICAL", f"value is not canonical JSON: {exc}")
 
 
+def _assert_runtime_snapshot_dominance(package_bytes: int) -> None:
+    if LIMITS["compiled_pack_bytes"] > LIMITS["runtime_snapshot_bytes"]:
+        _reject(
+            "E_INTERNAL_LIMIT_CONTRACT",
+            "compiled_pack_bytes exceeds runtime_snapshot_bytes",
+        )
+    if package_bytes > LIMITS["runtime_snapshot_bytes"]:
+        _reject(
+            "E_INTERNAL_LIMIT_CONTRACT",
+            "compiled package escaped runtime snapshot dominance",
+        )
+
+
 def _pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
     result: dict[str, object] = {}
     for key, value in pairs:
@@ -327,6 +340,7 @@ def build_entry_artifacts(entry: object, source_bytes: object, template_bytes: o
     package_bytes = _canonical(result.package) + b"\n"
     if len(package_bytes) > limits["max_package_bytes"]:
         _reject("E_LIMIT_PACK", "package exceeds catalog package budget")
+    _assert_runtime_snapshot_dominance(len(package_bytes))
     metrics = _package_metrics(result.package)
     if metrics["token_count"] > limits["max_tokens"]:
         _reject("E_LIMIT_TOKENS", "package token budget exceeded")

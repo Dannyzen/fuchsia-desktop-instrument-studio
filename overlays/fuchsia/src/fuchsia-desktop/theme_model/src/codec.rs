@@ -6,7 +6,7 @@ use serde_json::Value;
 use std::collections::HashSet;
 
 pub(crate) fn decode_canonical_value(bytes: &[u8]) -> Result<Value, ThemeError> {
-    if bytes.len() > COMPILED_PACK_BYTES_LIMIT + 1 {
+    if bytes.len() > COMPILED_PACK_BYTES_LIMIT {
         return reject("E_LIMIT_PACK", "compiled package exceeds 256 KiB");
     }
     if std::str::from_utf8(bytes).is_err() {
@@ -18,9 +18,6 @@ pub(crate) fn decode_canonical_value(bytes: &[u8]) -> Result<Value, ThemeError> 
             "canonical JSON requires one final newline",
         );
     };
-    if body.len() > COMPILED_PACK_BYTES_LIMIT {
-        return reject("E_LIMIT_PACK", "compiled package exceeds 256 KiB");
-    }
     Preflight::new(body).run()?;
     let value: Value = serde_json::from_slice(body).map_err(|_| ThemeError {
         code: "E_JSON_MALFORMED",

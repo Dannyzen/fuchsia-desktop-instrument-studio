@@ -20,6 +20,18 @@ pub const SEMANTIC_ASSET_LIMIT: usize = 64;
 pub const DECODED_ASSET_BYTES_LIMIT: usize = 524_288;
 pub const DECODED_ASSETS_TOTAL_BYTES_LIMIT: usize = 4_194_304;
 pub const RUNTIME_SNAPSHOT_BYTES_LIMIT: usize = 524_288;
+pub(crate) const COMPILED_PACK_BYTES_UNIT: &str =
+    "canonical_utf8_package_file_bytes_including_final_lf";
+pub(crate) const RUNTIME_SNAPSHOT_BYTES_UNIT: &str =
+    "retained_canonical_utf8_package_file_bytes_including_final_lf";
+pub(crate) const LIMIT_RELATIONS: [(&str, &str, usize, &str); 1] = [(
+    "compiled_pack_bytes",
+    "runtime_snapshot_bytes",
+    0,
+    "compiled_pack_bytes <= runtime_snapshot_bytes",
+)];
+
+const _: () = assert!(COMPILED_PACK_BYTES_LIMIT <= RUNTIME_SNAPSHOT_BYTES_LIMIT);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ThemeError {
@@ -60,6 +72,10 @@ pub struct NativeThemeV1 {
 impl NativeThemeV1 {
     pub fn decode_canonical(bytes: &[u8]) -> Result<Self, ThemeError> {
         let value = codec::decode_canonical_value(bytes)?;
+        assert!(
+            bytes.len() <= RUNTIME_SNAPSHOT_BYTES_LIMIT,
+            "compiled package escaped runtime snapshot dominance"
+        );
         validate::validate_package(&value)?;
         let semantic_sha256 = semantic_digest(&value)?;
         let declared = value["metadata"]["provenance"]["semantic_hash"]
@@ -77,6 +93,10 @@ impl NativeThemeV1 {
 
     pub fn canonical_bytes(&self) -> &[u8] {
         &self.canonical_bytes
+    }
+
+    pub fn runtime_snapshot_bytes(&self) -> usize {
+        self.canonical_bytes.len()
     }
 
     pub fn semantic_sha256(&self) -> [u8; 32] {
@@ -167,7 +187,10 @@ fn semantic_digest(value: &Value) -> Result<[u8; 32], ThemeError> {
 
 #[cfg(test)]
 mod tests {
-    use super::NativeThemeV1;
+    use super::{
+        COMPILED_PACK_BYTES_LIMIT, COMPILED_PACK_BYTES_UNIT, LIMIT_RELATIONS, NativeThemeV1,
+        RUNTIME_SNAPSHOT_BYTES_LIMIT, RUNTIME_SNAPSHOT_BYTES_UNIT, STRING_BYTES_LIMIT,
+    };
     use serde_json::{Map, Value};
     use sha2::{Digest, Sha256};
 
@@ -193,6 +216,71 @@ mod tests {
         value["metadata"]["provenance"]["semantic_hash"] = Value::String(semantic_hash);
         let mut bytes = super::codec::canonical_json_bytes(&value).unwrap();
         bytes.push(b'\n');
+        bytes
+    }
+
+    fn package_with_exact_length(target: usize) -> Vec<u8> {
+        const PADDING_ITERATION_CAP: usize = 128;
+        const PADDING_PREFIX: &str = "org.constructresearch.instrumentstudio.boundary_padding_";
+
+        let mut value = golden_value();
+        let baseline = canonical_with_hash(value.clone());
+        assert_eq!(baseline, GOLDEN);
+        assert!(target >= baseline.len());
+
+        // Every ASCII string entry adds one comma, two key quotes, a colon, and two value
+        // quotes. Find a bounded number of entries whose combined string capacity reaches
+        // the target, then serialize only once after distributing the exact payload.
+        let mut empty_entry_bytes = 0usize;
+        let mut selected = None;
+        for index in 0..PADDING_ITERATION_CAP {
+            let key = format!("{PADDING_PREFIX}{index:03}");
+            empty_entry_bytes += key.len() + 6;
+            if target >= baseline.len() + empty_entry_bytes {
+                let payload_bytes = target - baseline.len() - empty_entry_bytes;
+                if payload_bytes <= (index + 1) * STRING_BYTES_LIMIT {
+                    selected = Some((index + 1, payload_bytes));
+                    break;
+                }
+            }
+        }
+        let (chunk_count, mut payload_bytes) = selected.unwrap_or_else(|| {
+            panic!(
+                "exact package length {target} was not reachable within {PADDING_ITERATION_CAP} padding entries"
+            )
+        });
+        let extensions = value["metadata"]["extensions"].as_object_mut().unwrap();
+        for index in 0..chunk_count {
+            let chunk_bytes = payload_bytes.min(STRING_BYTES_LIMIT);
+            payload_bytes -= chunk_bytes;
+            let key = format!("{PADDING_PREFIX}{index:03}");
+            assert!(extensions
+                .insert(key, Value::String("x".repeat(chunk_bytes)))
+                .is_none());
+        }
+        assert_eq!(payload_bytes, 0, "padding payload was not exhausted");
+
+        super::validate::validate_package(&value).unwrap();
+        let declared = value["metadata"]["provenance"]["semantic_hash"]
+            .as_str()
+            .unwrap();
+        assert_eq!(
+            declared,
+            format!(
+                "sha256:{}",
+                hex::encode(super::semantic_digest(&value).unwrap())
+            )
+        );
+        let bytes = canonical_with_hash(value);
+        assert_eq!(bytes.len(), target);
+        assert_eq!(
+            bytes
+                .iter()
+                .rev()
+                .take_while(|byte| **byte == b'\n')
+                .count(),
+            1
+        );
         bytes
     }
 
@@ -236,6 +324,7 @@ mod tests {
         assert_eq!(theme.revision(), 1);
         assert_eq!(theme.semantic_sha256_hex(), GOLDEN_SEMANTIC_HASH);
         assert_eq!(hex::encode(theme.semantic_sha256()), GOLDEN_SEMANTIC_HASH);
+        assert_eq!(theme.runtime_snapshot_bytes(), GOLDEN.len());
         assert_eq!(
             theme.variant("dark").unwrap()["semantic"]["interaction.selection"],
             "#8150d6ff"
@@ -292,7 +381,10 @@ mod tests {
 
     #[test]
     fn package_string_nesting_and_token_limits_are_bounded() {
-        assert_eq!(code(&vec![b' '; 262_146]), "E_LIMIT_PACK");
+        // Padding probes only preflight ordering; malformed padding is not schema acceptance.
+        assert_eq!(code(&vec![b' '; 262_143]), "E_JSON_NONCANONICAL");
+        assert_eq!(code(&vec![b' '; 262_144]), "E_JSON_NONCANONICAL");
+        assert_eq!(code(&vec![b' '; 262_145]), "E_LIMIT_PACK");
 
         let long_string = format!("{{\"x\":\"{}\"}}\n", "x".repeat(4097));
         assert_eq!(code(long_string.as_bytes()), "E_LIMIT_STRING");
@@ -321,6 +413,43 @@ mod tests {
             );
         }
         assert_eq!(code(&canonical_with_hash(value)), "E_LIMIT_TOKENS");
+    }
+
+    #[test]
+    fn schema_valid_packages_enforce_exact_compiled_pack_boundaries() {
+        for expected_length in [COMPILED_PACK_BYTES_LIMIT - 1, COMPILED_PACK_BYTES_LIMIT] {
+            let bytes = package_with_exact_length(expected_length);
+            let theme = NativeThemeV1::decode_canonical(&bytes).unwrap();
+            assert_eq!(theme.canonical_bytes(), bytes.as_slice());
+            assert_eq!(theme.runtime_snapshot_bytes(), expected_length);
+        }
+
+        let over_limit = package_with_exact_length(COMPILED_PACK_BYTES_LIMIT + 1);
+        assert_eq!(code(&over_limit), "E_LIMIT_PACK");
+    }
+
+    #[test]
+    fn machine_limit_contract_is_exact_and_runtime_is_dominated() {
+        assert_eq!(COMPILED_PACK_BYTES_LIMIT, 262_144);
+        assert_eq!(RUNTIME_SNAPSHOT_BYTES_LIMIT, 524_288);
+        assert!(COMPILED_PACK_BYTES_LIMIT <= RUNTIME_SNAPSHOT_BYTES_LIMIT);
+        assert_eq!(
+            COMPILED_PACK_BYTES_UNIT,
+            "canonical_utf8_package_file_bytes_including_final_lf"
+        );
+        assert_eq!(
+            RUNTIME_SNAPSHOT_BYTES_UNIT,
+            "retained_canonical_utf8_package_file_bytes_including_final_lf"
+        );
+        assert_eq!(
+            LIMIT_RELATIONS,
+            [(
+                "compiled_pack_bytes",
+                "runtime_snapshot_bytes",
+                0,
+                "compiled_pack_bytes <= runtime_snapshot_bytes",
+            )]
+        );
     }
 
     #[test]
