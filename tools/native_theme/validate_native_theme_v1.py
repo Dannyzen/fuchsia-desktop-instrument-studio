@@ -10,6 +10,8 @@ import re
 import sys
 from typing import NoReturn
 
+from native_theme_v1 import ContractError, canonical_json_bytes, load_json_strict, semantic_identity, validate_package
+
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = Path(__file__).with_name("native-theme-v1.schema.json")
 COMPILER_VERSION = "0.1.0-proof"
@@ -132,7 +134,8 @@ def validate(path: Path) -> None:
     if not isinstance(data, dict):
         fail("snapshot must be an object")
     schema = json.loads(SCHEMA_PATH.read_text(), object_pairs_hook=no_duplicates)
-    expected_top = set(schema["required"])
+    legacy_schema = schema["$defs"]["legacySnapshot"]
+    expected_top = set(legacy_schema["required"])
     actual_top = set(data)
     if actual_top - expected_top:
         fail("unexpected top-level fields: " + ", ".join(sorted(actual_top - expected_top)))
@@ -149,7 +152,7 @@ def validate(path: Path) -> None:
     colors = data["colors"]
     if not isinstance(colors, dict):
         fail("colors must be an object")
-    expected_roles = set(schema["properties"]["colors"]["required"])
+    expected_roles = set(legacy_schema["properties"]["colors"]["required"])
     if set(colors) != expected_roles:
         fail("colors must contain exactly the proof semantic roles")
     for role, value in colors.items():
@@ -170,8 +173,16 @@ def main(argv: list[str]) -> int:
         print(f"usage: {argv[0]} SNAPSHOT.json", file=sys.stderr)
         return 2
     try:
-        validate(Path(argv[1]))
-    except (ValidationError, OSError, json.JSONDecodeError, TypeError, KeyError) as error:
+        path = Path(argv[1])
+        candidate = load_json_strict(path)
+        if "variants" in candidate:
+            if path.read_bytes() != canonical_json_bytes(candidate) + b"\n":
+                fail("E_JSON_NONCANONICAL: package must be canonical JSON plus final newline")
+            validate_package(candidate)
+            print(f"VALID NativeThemeV1 {semantic_identity(candidate)}")
+            return 0
+        validate(path)
+    except (ContractError, ValidationError, OSError, json.JSONDecodeError, TypeError, KeyError) as error:
         print(f"INVALID: {error}", file=sys.stderr)
         return 2
     print("VALID NativeThemeV1")

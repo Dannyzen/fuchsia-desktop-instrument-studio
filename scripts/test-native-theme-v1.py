@@ -12,11 +12,14 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools/native_theme"))
+import native_theme_v1 as contract
 TOOL = ROOT / "tools/native_theme/native_theme_v1.py"
 VALIDATOR = ROOT / "tools/native_theme/validate_native_theme_v1.py"
 FIXTURE = ROOT / "tools/native_theme/fixtures/base24-instrument-studio.yaml"
 GOLDEN = ROOT / "tools/native_theme/fixtures/base24-instrument-studio.golden.json"
 SCHEMA = ROOT / "tools/native_theme/native-theme-v1.schema.json"
+MANIFEST = ROOT / "tools/native_theme/fixtures/profile-fixture-manifest.json"
 LEGACY = ROOT / "overlays/fuchsia/src/fuchsia-desktop/desktop_ui/src/tokens.rs"
 EXPECTED_SEMANTIC_HASH = "sha256:455014e692f51a536550a1e0368b66b1758bdfb7e7037f35acc2dc570aa24051"
 
@@ -103,7 +106,8 @@ class NativeThemeV1ProofTests(unittest.TestCase):
 
     def test_schema_encodes_exact_bounded_source_and_provenance_profiles(self):
         schema = json.loads(SCHEMA.read_text())
-        properties = schema["properties"]
+        legacy = schema["$defs"]["legacySnapshot"]
+        properties = legacy["properties"]
         self.assertEqual(properties["compiler_version"]["const"], "0.1.0-proof")
         self.assertEqual(
             properties["source"]["properties"]["format"]["enum"],
@@ -113,8 +117,8 @@ class NativeThemeV1ProofTests(unittest.TestCase):
             properties["provenance"]["properties"]["surface.canvas"]["properties"]["kind"]["enum"],
             ["derived", "explicit", "legacy-quantized"],
         )
-        self.assertEqual(len(schema["allOf"]), 2)
-        formats = [entry["if"]["properties"]["source"]["properties"]["format"]["const"] for entry in schema["allOf"]]
+        self.assertEqual(len(legacy["allOf"]), 2)
+        formats = [entry["if"]["properties"]["source"]["properties"]["format"]["const"] for entry in legacy["allOf"]]
         self.assertEqual(formats, ["base24-yaml-flat-v1", "rust-theme-tokens-v1"])
 
     def test_independent_validator_enforces_schema_and_source_provenance(self):
@@ -162,6 +166,171 @@ class NativeThemeV1ProofTests(unittest.TestCase):
             extra = run(VALIDATOR, output, check=False)
             self.assertNotEqual(extra.returncode, 0)
             self.assertIn("unexpected top-level fields", extra.stderr)
+
+
+class NativeThemeV1ContractTests(unittest.TestCase):
+    FIXTURES = ROOT / "tools/native_theme/fixtures"
+
+    def test_root_schema_explicitly_selects_legacy_or_complete_package(self):
+        schema = contract.load_json_strict(SCHEMA)
+        self.assertEqual(schema["oneOf"], [
+            {"$ref": "#/$defs/legacySnapshot"}, {"$ref": "#/$defs/nativePackage"}
+        ])
+        self.assertIn("legacySnapshot", schema["$defs"])
+        package = contract.load_json_strict(self.FIXTURES / "native-theme-v1-package.json")
+        try:
+            import jsonschema
+        except ImportError:
+            contract.validate_root_schema_structural(schema, package)
+        else:
+            jsonschema.Draft202012Validator(schema).validate(package)
+
+    def test_every_variant_has_exact_complete_semantic_color_taxonomy(self):
+        package = contract.load_json_strict(self.FIXTURES / "native-theme-v1-package.json")
+        for name, variant in package["variants"].items():
+            self.assertEqual(set(variant["semantic"]), contract.SEMANTIC_COLOR_ROLES, name)
+            self.assertNotEqual(variant["semantic"]["border.focusConfirmed"],
+                                variant["semantic"]["interaction.selection"])
+        for role in sorted(contract.SEMANTIC_COLOR_ROLES):
+            candidate = json.loads(json.dumps(package)); candidate["variants"]["dark"]["semantic"].pop(role)
+            with self.assertRaisesRegex(contract.ContractError, "^E_SEMANTIC_ROLES:"):
+                contract.validate_package(candidate)
+
+    def test_complete_typed_domains_and_representative_bounds(self):
+        package = contract.load_json_strict(self.FIXTURES / "native-theme-v1-package.json")
+        contract.validate_package(package)
+        cases = [
+            ("E_TYPOGRAPHY", lambda p: p["variants"]["dark"]["typography"]["roles"].pop("caption")),
+            ("E_GEOMETRY", lambda p: p["variants"]["dark"]["geometry"]["responsive"].__setitem__("narrow_max_px", 900)),
+            ("E_ELEVATION", lambda p: p["variants"]["dark"]["elevation"]["levels"]["raised"].__setitem__("blur_px", 99)),
+            ("E_OPACITY", lambda p: p["variants"]["dark"]["opacity"].__setitem__("overlay", 1.1)),
+            ("E_MOTION", lambda p: p["variants"]["dark"]["motion"]["durations_ms"].__setitem__("short", -1)),
+            ("E_ASSET_METADATA", lambda p: p["variants"]["dark"]["assets"]["items"]["status.error"].pop("spdx")),
+            ("E_PROVENANCE", lambda p: p["metadata"]["provenance"].pop("semantic_hash")),
+            ("E_FALLBACK_REQUIRED", lambda p: p["fallback"].pop("last_known_good")),
+            ("E_COMPATIBILITY", lambda p: p["policy"]["compatibility"].__setitem__("window", "N/N-2")),
+        ]
+        for code, mutate in cases:
+            with self.subTest(code=code):
+                candidate = json.loads(json.dumps(package)); mutate(candidate)
+                with self.assertRaisesRegex(contract.ContractError, "^" + code + ":"):
+                    contract.validate_package(candidate)
+
+    def test_profile_manifest_is_bidirectionally_complete(self):
+        manifest = contract.load_json_strict(MANIFEST)
+        report = contract.validate_profile_manifest(manifest, self.FIXTURES / "profiles")
+        self.assertEqual(report["profiles"], 5)
+        self.assertGreaterEqual(report["positive_cases"], 5)
+        self.assertGreaterEqual(report["negative_cases"], 25)
+        self.assertEqual(report["uncovered"], 0)
+
+    def test_complete_package_covers_required_variants_layers_and_domains(self):
+        package = contract.load_json_strict(self.FIXTURES / "native-theme-v1-package.json")
+        contract.validate_package(package)
+        self.assertEqual(set(package["variants"]), {"light", "dark", "high-contrast"})
+        for variant in package["variants"].values():
+            self.assertEqual(set(variant), {
+                "primitives", "semantic", "components", "typography", "geometry",
+                "elevation", "opacity", "motion", "assets", "terminal",
+            })
+            self.assertEqual(len(variant["terminal"]), 16)
+            self.assertNotEqual(variant["semantic"]["border.focusConfirmed"], variant["semantic"]["interaction.selection"])
+
+    def test_contract_rejections_have_stable_codes(self):
+        package = contract.load_json_strict(self.FIXTURES / "native-theme-v1-package.json")
+        cases = [
+            ("E_VERSION_REQUIRED", lambda p: p.__setitem__("schema_version", "2.0.0")),
+            ("E_VARIANT_REQUIRED", lambda p: p["variants"].pop("high-contrast")),
+            ("E_FIELD_FORBIDDEN", lambda p: p.__setitem__("command", "run-me")),
+            ("E_COLOR_CANONICAL", lambda p: p["variants"]["dark"]["primitives"].__setitem__("canvas", "#FFFFFF")),
+            ("E_FALLBACK_REQUIRED", lambda p: p["fallback"].pop("built_in_theme_id")),
+            ("E_STATUS_NONCOLOR", lambda p: p["variants"]["dark"]["assets"]["items"].pop("status.error")),
+            ("E_CONTRAST_NORMAL", lambda p: p["variants"]["dark"]["semantic"].__setitem__("text.normal", "#12141aff")),
+        ]
+        for code, mutate in cases:
+            with self.subTest(code=code):
+                candidate = json.loads(json.dumps(package))
+                mutate(candidate)
+                with self.assertRaisesRegex(contract.ContractError, "^" + code + ":"):
+                    contract.validate_package(candidate)
+
+    def test_canonical_bytes_duplicate_keys_numbers_and_semantic_hash(self):
+        package = contract.load_json_strict(self.FIXTURES / "native-theme-v1-package.json")
+        canonical = contract.canonical_json_bytes(package)
+        self.assertNotIn(b"\n", canonical)
+        self.assertEqual(canonical, contract.canonical_json_bytes(json.loads(canonical)))
+        self.assertEqual(contract.semantic_identity(package), "sha256:" + hashlib.sha256(canonical).hexdigest())
+        with tempfile.TemporaryDirectory() as td:
+            duplicate = Path(td) / "duplicate.json"
+            duplicate.write_text('{"a":1,"a":2}')
+            with self.assertRaisesRegex(contract.ContractError, "E_JSON_DUPLICATE"):
+                contract.load_json_strict(duplicate)
+        with self.assertRaisesRegex(contract.ContractError, "E_NUMBER_NONFINITE"):
+            contract.canonical_json_bytes({"bad": float("nan")})
+        self.assertEqual(contract.canonical_json_bytes({"b": 1.0, "a": -0.0}), b'{"a":0,"b":1}')
+
+    def test_all_import_profiles_have_positive_and_layer_negative_fixtures(self):
+        profiles = ("dtcg", "base16", "base24", "omarchy", "legacy")
+        for profile in profiles:
+            with self.subTest(profile=profile):
+                positive = self.FIXTURES / "profiles" / f"{profile}-positive.json"
+                negative = self.FIXTURES / "profiles" / f"{profile}-negative-layer.json"
+                contract.validate_profile_fixture(contract.load_json_strict(positive))
+                with self.assertRaisesRegex(contract.ContractError, "E_PROFILE_LAYER"):
+                    contract.validate_profile_fixture(contract.load_json_strict(negative))
+
+    def test_limits_and_extension_namespace_are_machine_checkable(self):
+        package = contract.load_json_strict(self.FIXTURES / "native-theme-v1-package.json")
+        self.assertEqual(contract.LIMITS["source_bytes"], 1024 * 1024)
+        self.assertEqual(contract.LIMITS["compiled_pack_bytes"], 256 * 1024)
+        candidate = json.loads(json.dumps(package))
+        candidate["metadata"]["extensions"] = {"com.example.private": True}
+        with self.assertRaisesRegex(contract.ContractError, "E_EXTENSION_NAMESPACE"):
+            contract.validate_package(candidate)
+
+    def test_domain_shapes_assets_licensing_and_ui_contrast_are_enforced(self):
+        package = contract.load_json_strict(self.FIXTURES / "native-theme-v1-package.json")
+        cases = [
+            ("E_LICENSE", lambda p: p["metadata"].__setitem__("license", {})),
+            ("E_TYPOGRAPHY", lambda p: p["variants"]["dark"].__setitem__("typography", {})),
+            ("E_GEOMETRY", lambda p: p["variants"]["dark"].__setitem__("geometry", {})),
+            ("E_ASSET_PATH", lambda p: p["variants"]["dark"]["assets"]["items"]["status.error"].__setitem__("path", "../escape.svg")),
+            ("E_REDUCED_MOTION", lambda p: p["variants"]["dark"]["motion"].__setitem__("reduced", {"duration_ms": 1, "essential_only": True})),
+            ("E_CONTRAST_UI", lambda p: p["variants"]["dark"]["semantic"].__setitem__("border.focusConfirmed", "#12141aff")),
+        ]
+        for code, mutate in cases:
+            with self.subTest(code=code):
+                candidate = json.loads(json.dumps(package)); mutate(candidate)
+                with self.assertRaisesRegex(contract.ContractError, "^" + code + ":"):
+                    contract.validate_package(candidate)
+
+    def test_validator_accepts_complete_package_and_is_deterministic_twice(self):
+        fixture = self.FIXTURES / "native-theme-v1-package.json"
+        first = run(VALIDATOR, fixture)
+        second = run(VALIDATOR, fixture)
+        self.assertEqual(first.stdout, second.stdout)
+        self.assertRegex(first.stdout, r"VALID NativeThemeV1 sha256:[0-9a-f]{64}")
+
+    def test_schema_publishes_machine_readable_contract_policy(self):
+        schema = json.loads(SCHEMA.read_text())
+        policy = schema["x-native-theme-v1-contract"]
+        self.assertEqual(policy["required_variants"], ["light", "dark", "high-contrast"])
+        self.assertEqual(policy["token_layers"], ["primitives", "semantic", "components"])
+        self.assertEqual(policy["canonical_color"], "lowercase-rrggbbaa-srgb")
+        self.assertEqual(policy["extension_namespace"], "org.constructresearch.instrumentstudio.*")
+        self.assertEqual(policy["limits"], contract.LIMITS)
+        self.assertIn("command", policy["forbidden_fields"])
+        self.assertIn("semantic_hash", policy["derived_fields"])
+        self.assertEqual(set(policy["import_profiles"]), set(contract.PROFILE_LAYERS))
+        self.assertIn("nativePackage", schema["$defs"])
+
+    def test_profile_and_decision_docs_cover_normative_conversion_and_policy(self):
+        profile = (ROOT / "docs/native-theme-v1-profile.md").read_text()
+        decisions = (ROOT / "docs/native-theme-v1-contract-decisions.md").read_text()
+        for phrase in ("DTCG Format and Color Modules 2025.10", "Display-P3", "OKLCH", "clamp", "E_PROFILE_LAYER"):
+            self.assertIn(phrase, profile)
+        for phrase in ("restart-to-apply", "fail closed", "7.0", "4.5", "No external asset packs"):
+            self.assertIn(phrase, decisions)
 
 
 if __name__ == "__main__":

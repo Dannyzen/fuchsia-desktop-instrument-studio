@@ -1,943 +1,2210 @@
 {
-  "$id": "https://dannyzen.github.io/fuchsia-desktop-instrument-studio/native-theme-v1.schema.json",
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": false,
-  "allOf": [
-    {
-      "if": {
-        "properties": {
-          "source": {
-            "properties": {
-              "format": {
-                "const": "base24-yaml-flat-v1"
-              }
-            }
-          }
-        },
-        "required": [
-          "source"
-        ]
-      },
-      "then": {
-        "properties": {
-          "provenance": {
-            "properties": {
-              "border.focusConfirmed": {
-                "properties": {
-                  "kind": {
-                    "const": "derived"
-                  },
-                  "source_token": {
-                    "const": "base0C"
-                  }
-                }
-              },
-              "border.normal": {
-                "properties": {
-                  "kind": {
-                    "const": "derived"
-                  },
-                  "source_token": {
-                    "const": "base04"
-                  }
-                }
-              },
-              "interaction.accent": {
-                "properties": {
-                  "kind": {
-                    "const": "explicit"
-                  },
-                  "source_token": {
-                    "const": "base0D"
-                  }
-                }
-              },
-              "interaction.selection": {
-                "properties": {
-                  "kind": {
-                    "const": "explicit"
-                  },
-                  "source_token": {
-                    "const": "base02"
-                  }
-                }
-              },
-              "status.danger": {
-                "properties": {
-                  "kind": {
-                    "const": "explicit"
-                  },
-                  "source_token": {
-                    "const": "base08"
-                  }
-                }
-              },
-              "status.success": {
-                "properties": {
-                  "kind": {
-                    "const": "explicit"
-                  },
-                  "source_token": {
-                    "const": "base0B"
-                  }
-                }
-              },
-              "surface.canvas": {
-                "properties": {
-                  "kind": {
-                    "const": "explicit"
-                  },
-                  "source_token": {
-                    "const": "base00"
-                  }
-                }
-              },
-              "surface.raised": {
-                "properties": {
-                  "kind": {
-                    "const": "explicit"
-                  },
-                  "source_token": {
-                    "const": "base01"
-                  }
-                }
-              },
-              "text.bright": {
-                "properties": {
-                  "kind": {
-                    "const": "explicit"
-                  },
-                  "source_token": {
-                    "const": "base07"
-                  }
-                }
-              },
-              "text.muted": {
-                "properties": {
-                  "kind": {
-                    "const": "explicit"
-                  },
-                  "source_token": {
-                    "const": "base03"
-                  }
-                }
-              }
-            }
-          },
-          "source": {
-            "properties": {
-              "format": {
-                "const": "base24-yaml-flat-v1"
-              },
-              "identity": {
-                "const": "tools/native_theme/fixtures/base24-instrument-studio.yaml"
-              },
-              "profile_version": {
-                "const": "base24-instrument-studio-proof-v1"
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "source": {
-            "properties": {
-              "format": {
-                "const": "rust-theme-tokens-v1"
-              }
-            }
-          }
-        },
-        "required": [
-          "source"
-        ]
-      },
-      "then": {
-        "properties": {
-          "provenance": {
-            "properties": {
-              "border.focusConfirmed": {
-                "properties": {
-                  "kind": {
-                    "const": "legacy-quantized"
-                  },
-                  "source_token": {
-                    "const": "confirmed_focus"
-                  }
-                }
-              },
-              "border.normal": {
-                "properties": {
-                  "kind": {
-                    "const": "legacy-quantized"
-                  },
-                  "source_token": {
-                    "const": "border_muted"
-                  }
-                }
-              },
-              "interaction.accent": {
-                "properties": {
-                  "kind": {
-                    "const": "legacy-quantized"
-                  },
-                  "source_token": {
-                    "const": "accent_secondary"
-                  }
-                }
-              },
-              "interaction.selection": {
-                "properties": {
-                  "kind": {
-                    "const": "legacy-quantized"
-                  },
-                  "source_token": {
-                    "const": "selected_focus"
-                  }
-                }
-              },
-              "status.danger": {
-                "properties": {
-                  "kind": {
-                    "const": "legacy-quantized"
-                  },
-                  "source_token": {
-                    "const": "danger"
-                  }
-                }
-              },
-              "status.success": {
-                "properties": {
-                  "kind": {
-                    "const": "legacy-quantized"
-                  },
-                  "source_token": {
-                    "const": "ok"
-                  }
-                }
-              },
-              "surface.canvas": {
-                "properties": {
-                  "kind": {
-                    "const": "legacy-quantized"
-                  },
-                  "source_token": {
-                    "const": "panel_bg"
-                  }
-                }
-              },
-              "surface.raised": {
-                "properties": {
-                  "kind": {
-                    "const": "legacy-quantized"
-                  },
-                  "source_token": {
-                    "const": "panel_elevated"
-                  }
-                }
-              },
-              "text.bright": {
-                "properties": {
-                  "kind": {
-                    "const": "legacy-quantized"
-                  },
-                  "source_token": {
-                    "const": "text_primary"
-                  }
-                }
-              },
-              "text.muted": {
-                "properties": {
-                  "kind": {
-                    "const": "legacy-quantized"
-                  },
-                  "source_token": {
-                    "const": "text_secondary"
-                  }
-                }
-              }
-            }
-          },
-          "source": {
-            "properties": {
-              "format": {
-                "const": "rust-theme-tokens-v1"
-              },
-              "identity": {
-                "const": "overlays/fuchsia/src/fuchsia-desktop/desktop_ui/src/tokens.rs"
-              },
-              "profile_version": {
-                "const": "instrument-studio-legacy-v1"
-              }
-            }
-          }
-        }
-      }
-    }
-  ],
-  "properties": {
-    "bounds": {
+  "$defs": {
+    "asset": {
       "additionalProperties": false,
       "properties": {
-        "aliases": {
-          "const": 0,
-          "type": "integer"
+        "attribution": {
+          "minLength": 1,
+          "type": "string"
         },
-        "assets": {
-          "const": 0,
-          "type": "integer"
+        "decoded_bytes": {
+          "maximum": 524288,
+          "minimum": 1,
+          "type": "number"
         },
-        "identifier_chars": {
-          "const": 128,
-          "type": "integer"
+        "height": {
+          "maximum": 4096,
+          "minimum": 1,
+          "type": "number"
         },
-        "source_bytes": {
-          "const": 65536,
-          "type": "integer"
+        "kind": {
+          "enum": [
+            "svg",
+            "png"
+          ]
         },
-        "tokens": {
-          "const": 256,
-          "type": "integer"
+        "path": {
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*://)[^\\\\]+$",
+          "type": "string"
+        },
+        "spdx": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "variants": {
+          "items": {
+            "enum": [
+              "light",
+              "dark",
+              "high-contrast"
+            ]
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "width": {
+          "maximum": 4096,
+          "minimum": 1,
+          "type": "number"
         }
       },
       "required": [
-        "aliases",
-        "assets",
-        "identifier_chars",
-        "source_bytes",
-        "tokens"
+        "path",
+        "kind",
+        "variants",
+        "width",
+        "height",
+        "decoded_bytes",
+        "spdx",
+        "attribution"
       ],
       "type": "object"
     },
-    "colors": {
+    "canonicalColor": {
+      "pattern": "^#[0-9a-f]{8}$",
+      "type": "string"
+    },
+    "legacySnapshot": {
       "additionalProperties": false,
-      "properties": {
-        "border.focusConfirmed": {
-          "pattern": "^#[0-9a-f]{6}$",
-          "type": "string"
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "properties": {
+                  "format": {
+                    "const": "base24-yaml-flat-v1"
+                  }
+                }
+              }
+            },
+            "required": [
+              "source"
+            ]
+          },
+          "then": {
+            "properties": {
+              "provenance": {
+                "properties": {
+                  "border.focusConfirmed": {
+                    "properties": {
+                      "kind": {
+                        "const": "derived"
+                      },
+                      "source_token": {
+                        "const": "base0C"
+                      }
+                    }
+                  },
+                  "border.normal": {
+                    "properties": {
+                      "kind": {
+                        "const": "derived"
+                      },
+                      "source_token": {
+                        "const": "base04"
+                      }
+                    }
+                  },
+                  "interaction.accent": {
+                    "properties": {
+                      "kind": {
+                        "const": "explicit"
+                      },
+                      "source_token": {
+                        "const": "base0D"
+                      }
+                    }
+                  },
+                  "interaction.selection": {
+                    "properties": {
+                      "kind": {
+                        "const": "explicit"
+                      },
+                      "source_token": {
+                        "const": "base02"
+                      }
+                    }
+                  },
+                  "status.danger": {
+                    "properties": {
+                      "kind": {
+                        "const": "explicit"
+                      },
+                      "source_token": {
+                        "const": "base08"
+                      }
+                    }
+                  },
+                  "status.success": {
+                    "properties": {
+                      "kind": {
+                        "const": "explicit"
+                      },
+                      "source_token": {
+                        "const": "base0B"
+                      }
+                    }
+                  },
+                  "surface.canvas": {
+                    "properties": {
+                      "kind": {
+                        "const": "explicit"
+                      },
+                      "source_token": {
+                        "const": "base00"
+                      }
+                    }
+                  },
+                  "surface.raised": {
+                    "properties": {
+                      "kind": {
+                        "const": "explicit"
+                      },
+                      "source_token": {
+                        "const": "base01"
+                      }
+                    }
+                  },
+                  "text.bright": {
+                    "properties": {
+                      "kind": {
+                        "const": "explicit"
+                      },
+                      "source_token": {
+                        "const": "base07"
+                      }
+                    }
+                  },
+                  "text.muted": {
+                    "properties": {
+                      "kind": {
+                        "const": "explicit"
+                      },
+                      "source_token": {
+                        "const": "base03"
+                      }
+                    }
+                  }
+                }
+              },
+              "source": {
+                "properties": {
+                  "format": {
+                    "const": "base24-yaml-flat-v1"
+                  },
+                  "identity": {
+                    "const": "tools/native_theme/fixtures/base24-instrument-studio.yaml"
+                  },
+                  "profile_version": {
+                    "const": "base24-instrument-studio-proof-v1"
+                  }
+                }
+              }
+            }
+          }
         },
-        "border.normal": {
-          "pattern": "^#[0-9a-f]{6}$",
-          "type": "string"
-        },
-        "interaction.accent": {
-          "pattern": "^#[0-9a-f]{6}$",
-          "type": "string"
-        },
-        "interaction.selection": {
-          "pattern": "^#[0-9a-f]{6}$",
-          "type": "string"
-        },
-        "status.danger": {
-          "pattern": "^#[0-9a-f]{6}$",
-          "type": "string"
-        },
-        "status.success": {
-          "pattern": "^#[0-9a-f]{6}$",
-          "type": "string"
-        },
-        "surface.canvas": {
-          "pattern": "^#[0-9a-f]{6}$",
-          "type": "string"
-        },
-        "surface.raised": {
-          "pattern": "^#[0-9a-f]{6}$",
-          "type": "string"
-        },
-        "text.bright": {
-          "pattern": "^#[0-9a-f]{6}$",
-          "type": "string"
-        },
-        "text.muted": {
-          "pattern": "^#[0-9a-f]{6}$",
-          "type": "string"
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "properties": {
+                  "format": {
+                    "const": "rust-theme-tokens-v1"
+                  }
+                }
+              }
+            },
+            "required": [
+              "source"
+            ]
+          },
+          "then": {
+            "properties": {
+              "provenance": {
+                "properties": {
+                  "border.focusConfirmed": {
+                    "properties": {
+                      "kind": {
+                        "const": "legacy-quantized"
+                      },
+                      "source_token": {
+                        "const": "confirmed_focus"
+                      }
+                    }
+                  },
+                  "border.normal": {
+                    "properties": {
+                      "kind": {
+                        "const": "legacy-quantized"
+                      },
+                      "source_token": {
+                        "const": "border_muted"
+                      }
+                    }
+                  },
+                  "interaction.accent": {
+                    "properties": {
+                      "kind": {
+                        "const": "legacy-quantized"
+                      },
+                      "source_token": {
+                        "const": "accent_secondary"
+                      }
+                    }
+                  },
+                  "interaction.selection": {
+                    "properties": {
+                      "kind": {
+                        "const": "legacy-quantized"
+                      },
+                      "source_token": {
+                        "const": "selected_focus"
+                      }
+                    }
+                  },
+                  "status.danger": {
+                    "properties": {
+                      "kind": {
+                        "const": "legacy-quantized"
+                      },
+                      "source_token": {
+                        "const": "danger"
+                      }
+                    }
+                  },
+                  "status.success": {
+                    "properties": {
+                      "kind": {
+                        "const": "legacy-quantized"
+                      },
+                      "source_token": {
+                        "const": "ok"
+                      }
+                    }
+                  },
+                  "surface.canvas": {
+                    "properties": {
+                      "kind": {
+                        "const": "legacy-quantized"
+                      },
+                      "source_token": {
+                        "const": "panel_bg"
+                      }
+                    }
+                  },
+                  "surface.raised": {
+                    "properties": {
+                      "kind": {
+                        "const": "legacy-quantized"
+                      },
+                      "source_token": {
+                        "const": "panel_elevated"
+                      }
+                    }
+                  },
+                  "text.bright": {
+                    "properties": {
+                      "kind": {
+                        "const": "legacy-quantized"
+                      },
+                      "source_token": {
+                        "const": "text_primary"
+                      }
+                    }
+                  },
+                  "text.muted": {
+                    "properties": {
+                      "kind": {
+                        "const": "legacy-quantized"
+                      },
+                      "source_token": {
+                        "const": "text_secondary"
+                      }
+                    }
+                  }
+                }
+              },
+              "source": {
+                "properties": {
+                  "format": {
+                    "const": "rust-theme-tokens-v1"
+                  },
+                  "identity": {
+                    "const": "overlays/fuchsia/src/fuchsia-desktop/desktop_ui/src/tokens.rs"
+                  },
+                  "profile_version": {
+                    "const": "instrument-studio-legacy-v1"
+                  }
+                }
+              }
+            }
+          }
         }
-      },
-      "required": [
-        "border.focusConfirmed",
-        "border.normal",
-        "interaction.accent",
-        "interaction.selection",
-        "status.danger",
-        "status.success",
-        "surface.canvas",
-        "surface.raised",
-        "text.bright",
-        "text.muted"
       ],
-      "type": "object"
-    },
-    "compiler_version": {
-      "const": "0.1.0-proof",
-      "type": "string"
-    },
-    "display_name": {
-      "const": "Instrument Studio",
-      "type": "string"
-    },
-    "provenance": {
-      "additionalProperties": false,
       "properties": {
-        "border.focusConfirmed": {
+        "bounds": {
           "additionalProperties": false,
           "properties": {
-            "kind": {
-              "enum": [
-                "derived",
-                "explicit",
-                "legacy-quantized"
-              ],
-              "maxLength": 128,
-              "minLength": 1,
-              "type": "string"
+            "aliases": {
+              "const": 0,
+              "type": "integer"
             },
-            "source_token": {
-              "enum": [
-                "accent_secondary",
-                "base00",
-                "base01",
-                "base02",
-                "base03",
-                "base04",
-                "base07",
-                "base08",
-                "base0B",
-                "base0C",
-                "base0D",
-                "border_muted",
-                "confirmed_focus",
-                "danger",
-                "ok",
-                "panel_bg",
-                "panel_elevated",
-                "selected_focus",
-                "text_primary",
-                "text_secondary"
-              ],
-              "maxLength": 128,
-              "minLength": 1,
-              "type": "string"
+            "assets": {
+              "const": 0,
+              "type": "integer"
+            },
+            "identifier_chars": {
+              "const": 128,
+              "type": "integer"
+            },
+            "source_bytes": {
+              "const": 65536,
+              "type": "integer"
+            },
+            "tokens": {
+              "const": 256,
+              "type": "integer"
             }
           },
           "required": [
-            "kind",
-            "source_token"
+            "aliases",
+            "assets",
+            "identifier_chars",
+            "source_bytes",
+            "tokens"
           ],
           "type": "object"
         },
-        "border.normal": {
+        "colors": {
           "additionalProperties": false,
           "properties": {
-            "kind": {
-              "enum": [
-                "derived",
-                "explicit",
-                "legacy-quantized"
-              ],
-              "maxLength": 128,
-              "minLength": 1,
+            "border.focusConfirmed": {
+              "pattern": "^#[0-9a-f]{6}$",
               "type": "string"
             },
-            "source_token": {
-              "enum": [
-                "accent_secondary",
-                "base00",
-                "base01",
-                "base02",
-                "base03",
-                "base04",
-                "base07",
-                "base08",
-                "base0B",
-                "base0C",
-                "base0D",
-                "border_muted",
-                "confirmed_focus",
-                "danger",
-                "ok",
-                "panel_bg",
-                "panel_elevated",
-                "selected_focus",
-                "text_primary",
-                "text_secondary"
-              ],
-              "maxLength": 128,
-              "minLength": 1,
+            "border.normal": {
+              "pattern": "^#[0-9a-f]{6}$",
+              "type": "string"
+            },
+            "interaction.accent": {
+              "pattern": "^#[0-9a-f]{6}$",
+              "type": "string"
+            },
+            "interaction.selection": {
+              "pattern": "^#[0-9a-f]{6}$",
+              "type": "string"
+            },
+            "status.danger": {
+              "pattern": "^#[0-9a-f]{6}$",
+              "type": "string"
+            },
+            "status.success": {
+              "pattern": "^#[0-9a-f]{6}$",
+              "type": "string"
+            },
+            "surface.canvas": {
+              "pattern": "^#[0-9a-f]{6}$",
+              "type": "string"
+            },
+            "surface.raised": {
+              "pattern": "^#[0-9a-f]{6}$",
+              "type": "string"
+            },
+            "text.bright": {
+              "pattern": "^#[0-9a-f]{6}$",
+              "type": "string"
+            },
+            "text.muted": {
+              "pattern": "^#[0-9a-f]{6}$",
               "type": "string"
             }
           },
           "required": [
-            "kind",
-            "source_token"
+            "border.focusConfirmed",
+            "border.normal",
+            "interaction.accent",
+            "interaction.selection",
+            "status.danger",
+            "status.success",
+            "surface.canvas",
+            "surface.raised",
+            "text.bright",
+            "text.muted"
           ],
           "type": "object"
         },
-        "interaction.accent": {
+        "compiler_version": {
+          "const": "0.1.0-proof",
+          "type": "string"
+        },
+        "display_name": {
+          "const": "Instrument Studio",
+          "type": "string"
+        },
+        "provenance": {
           "additionalProperties": false,
           "properties": {
-            "kind": {
-              "enum": [
-                "derived",
-                "explicit",
-                "legacy-quantized"
+            "border.focusConfirmed": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "derived",
+                    "explicit",
+                    "legacy-quantized"
+                  ],
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "source_token": {
+                  "enum": [
+                    "accent_secondary",
+                    "base00",
+                    "base01",
+                    "base02",
+                    "base03",
+                    "base04",
+                    "base07",
+                    "base08",
+                    "base0B",
+                    "base0C",
+                    "base0D",
+                    "border_muted",
+                    "confirmed_focus",
+                    "danger",
+                    "ok",
+                    "panel_bg",
+                    "panel_elevated",
+                    "selected_focus",
+                    "text_primary",
+                    "text_secondary"
+                  ],
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "source_token"
               ],
-              "maxLength": 128,
-              "minLength": 1,
-              "type": "string"
+              "type": "object"
             },
-            "source_token": {
-              "enum": [
-                "accent_secondary",
-                "base00",
-                "base01",
-                "base02",
-                "base03",
-                "base04",
-                "base07",
-                "base08",
-                "base0B",
-                "base0C",
-                "base0D",
-                "border_muted",
-                "confirmed_focus",
-                "danger",
-                "ok",
-                "panel_bg",
-                "panel_elevated",
-                "selected_focus",
-                "text_primary",
-                "text_secondary"
+            "border.normal": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "derived",
+                    "explicit",
+                    "legacy-quantized"
+                  ],
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "source_token": {
+                  "enum": [
+                    "accent_secondary",
+                    "base00",
+                    "base01",
+                    "base02",
+                    "base03",
+                    "base04",
+                    "base07",
+                    "base08",
+                    "base0B",
+                    "base0C",
+                    "base0D",
+                    "border_muted",
+                    "confirmed_focus",
+                    "danger",
+                    "ok",
+                    "panel_bg",
+                    "panel_elevated",
+                    "selected_focus",
+                    "text_primary",
+                    "text_secondary"
+                  ],
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "source_token"
               ],
-              "maxLength": 128,
-              "minLength": 1,
-              "type": "string"
+              "type": "object"
+            },
+            "interaction.accent": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "derived",
+                    "explicit",
+                    "legacy-quantized"
+                  ],
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "source_token": {
+                  "enum": [
+                    "accent_secondary",
+                    "base00",
+                    "base01",
+                    "base02",
+                    "base03",
+                    "base04",
+                    "base07",
+                    "base08",
+                    "base0B",
+                    "base0C",
+                    "base0D",
+                    "border_muted",
+                    "confirmed_focus",
+                    "danger",
+                    "ok",
+                    "panel_bg",
+                    "panel_elevated",
+                    "selected_focus",
+                    "text_primary",
+                    "text_secondary"
+                  ],
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "source_token"
+              ],
+              "type": "object"
+            },
+            "interaction.selection": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "derived",
+                    "explicit",
+                    "legacy-quantized"
+                  ],
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "source_token": {
+                  "enum": [
+                    "accent_secondary",
+                    "base00",
+                    "base01",
+                    "base02",
+                    "base03",
+                    "base04",
+                    "base07",
+                    "base08",
+                    "base0B",
+                    "base0C",
+                    "base0D",
+                    "border_muted",
+                    "confirmed_focus",
+                    "danger",
+                    "ok",
+                    "panel_bg",
+                    "panel_elevated",
+                    "selected_focus",
+                    "text_primary",
+                    "text_secondary"
+                  ],
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "source_token"
+              ],
+              "type": "object"
+            },
+            "status.danger": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "derived",
+                    "explicit",
+                    "legacy-quantized"
+                  ],
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "source_token": {
+                  "enum": [
+                    "accent_secondary",
+                    "base00",
+                    "base01",
+                    "base02",
+                    "base03",
+                    "base04",
+                    "base07",
+                    "base08",
+                    "base0B",
+                    "base0C",
+                    "base0D",
+                    "border_muted",
+                    "confirmed_focus",
+                    "danger",
+                    "ok",
+                    "panel_bg",
+                    "panel_elevated",
+                    "selected_focus",
+                    "text_primary",
+                    "text_secondary"
+                  ],
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "source_token"
+              ],
+              "type": "object"
+            },
+            "status.success": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "derived",
+                    "explicit",
+                    "legacy-quantized"
+                  ],
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "source_token": {
+                  "enum": [
+                    "accent_secondary",
+                    "base00",
+                    "base01",
+                    "base02",
+                    "base03",
+                    "base04",
+                    "base07",
+                    "base08",
+                    "base0B",
+                    "base0C",
+                    "base0D",
+                    "border_muted",
+                    "confirmed_focus",
+                    "danger",
+                    "ok",
+                    "panel_bg",
+                    "panel_elevated",
+                    "selected_focus",
+                    "text_primary",
+                    "text_secondary"
+                  ],
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "source_token"
+              ],
+              "type": "object"
+            },
+            "surface.canvas": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "derived",
+                    "explicit",
+                    "legacy-quantized"
+                  ],
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "source_token": {
+                  "enum": [
+                    "accent_secondary",
+                    "base00",
+                    "base01",
+                    "base02",
+                    "base03",
+                    "base04",
+                    "base07",
+                    "base08",
+                    "base0B",
+                    "base0C",
+                    "base0D",
+                    "border_muted",
+                    "confirmed_focus",
+                    "danger",
+                    "ok",
+                    "panel_bg",
+                    "panel_elevated",
+                    "selected_focus",
+                    "text_primary",
+                    "text_secondary"
+                  ],
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "source_token"
+              ],
+              "type": "object"
+            },
+            "surface.raised": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "derived",
+                    "explicit",
+                    "legacy-quantized"
+                  ],
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "source_token": {
+                  "enum": [
+                    "accent_secondary",
+                    "base00",
+                    "base01",
+                    "base02",
+                    "base03",
+                    "base04",
+                    "base07",
+                    "base08",
+                    "base0B",
+                    "base0C",
+                    "base0D",
+                    "border_muted",
+                    "confirmed_focus",
+                    "danger",
+                    "ok",
+                    "panel_bg",
+                    "panel_elevated",
+                    "selected_focus",
+                    "text_primary",
+                    "text_secondary"
+                  ],
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "source_token"
+              ],
+              "type": "object"
+            },
+            "text.bright": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "derived",
+                    "explicit",
+                    "legacy-quantized"
+                  ],
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "source_token": {
+                  "enum": [
+                    "accent_secondary",
+                    "base00",
+                    "base01",
+                    "base02",
+                    "base03",
+                    "base04",
+                    "base07",
+                    "base08",
+                    "base0B",
+                    "base0C",
+                    "base0D",
+                    "border_muted",
+                    "confirmed_focus",
+                    "danger",
+                    "ok",
+                    "panel_bg",
+                    "panel_elevated",
+                    "selected_focus",
+                    "text_primary",
+                    "text_secondary"
+                  ],
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "source_token"
+              ],
+              "type": "object"
+            },
+            "text.muted": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "derived",
+                    "explicit",
+                    "legacy-quantized"
+                  ],
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "source_token": {
+                  "enum": [
+                    "accent_secondary",
+                    "base00",
+                    "base01",
+                    "base02",
+                    "base03",
+                    "base04",
+                    "base07",
+                    "base08",
+                    "base0B",
+                    "base0C",
+                    "base0D",
+                    "border_muted",
+                    "confirmed_focus",
+                    "danger",
+                    "ok",
+                    "panel_bg",
+                    "panel_elevated",
+                    "selected_focus",
+                    "text_primary",
+                    "text_secondary"
+                  ],
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "source_token"
+              ],
+              "type": "object"
             }
           },
           "required": [
-            "kind",
-            "source_token"
+            "border.focusConfirmed",
+            "border.normal",
+            "interaction.accent",
+            "interaction.selection",
+            "status.danger",
+            "status.success",
+            "surface.canvas",
+            "surface.raised",
+            "text.bright",
+            "text.muted"
           ],
           "type": "object"
         },
-        "interaction.selection": {
-          "additionalProperties": false,
-          "properties": {
-            "kind": {
-              "enum": [
-                "derived",
-                "explicit",
-                "legacy-quantized"
-              ],
-              "maxLength": 128,
-              "minLength": 1,
-              "type": "string"
-            },
-            "source_token": {
-              "enum": [
-                "accent_secondary",
-                "base00",
-                "base01",
-                "base02",
-                "base03",
-                "base04",
-                "base07",
-                "base08",
-                "base0B",
-                "base0C",
-                "base0D",
-                "border_muted",
-                "confirmed_focus",
-                "danger",
-                "ok",
-                "panel_bg",
-                "panel_elevated",
-                "selected_focus",
-                "text_primary",
-                "text_secondary"
-              ],
-              "maxLength": 128,
-              "minLength": 1,
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "source_token"
-          ],
-          "type": "object"
+        "schema_version": {
+          "const": "1.0.0",
+          "type": "string"
         },
-        "status.danger": {
-          "additionalProperties": false,
-          "properties": {
-            "kind": {
-              "enum": [
-                "derived",
-                "explicit",
-                "legacy-quantized"
-              ],
-              "maxLength": 128,
-              "minLength": 1,
-              "type": "string"
-            },
-            "source_token": {
-              "enum": [
-                "accent_secondary",
-                "base00",
-                "base01",
-                "base02",
-                "base03",
-                "base04",
-                "base07",
-                "base08",
-                "base0B",
-                "base0C",
-                "base0D",
-                "border_muted",
-                "confirmed_focus",
-                "danger",
-                "ok",
-                "panel_bg",
-                "panel_elevated",
-                "selected_focus",
-                "text_primary",
-                "text_secondary"
-              ],
-              "maxLength": 128,
-              "minLength": 1,
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "source_token"
-          ],
-          "type": "object"
-        },
-        "status.success": {
-          "additionalProperties": false,
-          "properties": {
-            "kind": {
-              "enum": [
-                "derived",
-                "explicit",
-                "legacy-quantized"
-              ],
-              "maxLength": 128,
-              "minLength": 1,
-              "type": "string"
-            },
-            "source_token": {
-              "enum": [
-                "accent_secondary",
-                "base00",
-                "base01",
-                "base02",
-                "base03",
-                "base04",
-                "base07",
-                "base08",
-                "base0B",
-                "base0C",
-                "base0D",
-                "border_muted",
-                "confirmed_focus",
-                "danger",
-                "ok",
-                "panel_bg",
-                "panel_elevated",
-                "selected_focus",
-                "text_primary",
-                "text_secondary"
-              ],
-              "maxLength": 128,
-              "minLength": 1,
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "source_token"
-          ],
-          "type": "object"
-        },
-        "surface.canvas": {
-          "additionalProperties": false,
-          "properties": {
-            "kind": {
-              "enum": [
-                "derived",
-                "explicit",
-                "legacy-quantized"
-              ],
-              "maxLength": 128,
-              "minLength": 1,
-              "type": "string"
-            },
-            "source_token": {
-              "enum": [
-                "accent_secondary",
-                "base00",
-                "base01",
-                "base02",
-                "base03",
-                "base04",
-                "base07",
-                "base08",
-                "base0B",
-                "base0C",
-                "base0D",
-                "border_muted",
-                "confirmed_focus",
-                "danger",
-                "ok",
-                "panel_bg",
-                "panel_elevated",
-                "selected_focus",
-                "text_primary",
-                "text_secondary"
-              ],
-              "maxLength": 128,
-              "minLength": 1,
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "source_token"
-          ],
-          "type": "object"
-        },
-        "surface.raised": {
-          "additionalProperties": false,
-          "properties": {
-            "kind": {
-              "enum": [
-                "derived",
-                "explicit",
-                "legacy-quantized"
-              ],
-              "maxLength": 128,
-              "minLength": 1,
-              "type": "string"
-            },
-            "source_token": {
-              "enum": [
-                "accent_secondary",
-                "base00",
-                "base01",
-                "base02",
-                "base03",
-                "base04",
-                "base07",
-                "base08",
-                "base0B",
-                "base0C",
-                "base0D",
-                "border_muted",
-                "confirmed_focus",
-                "danger",
-                "ok",
-                "panel_bg",
-                "panel_elevated",
-                "selected_focus",
-                "text_primary",
-                "text_secondary"
-              ],
-              "maxLength": 128,
-              "minLength": 1,
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "source_token"
-          ],
-          "type": "object"
-        },
-        "text.bright": {
-          "additionalProperties": false,
-          "properties": {
-            "kind": {
-              "enum": [
-                "derived",
-                "explicit",
-                "legacy-quantized"
-              ],
-              "maxLength": 128,
-              "minLength": 1,
-              "type": "string"
-            },
-            "source_token": {
-              "enum": [
-                "accent_secondary",
-                "base00",
-                "base01",
-                "base02",
-                "base03",
-                "base04",
-                "base07",
-                "base08",
-                "base0B",
-                "base0C",
-                "base0D",
-                "border_muted",
-                "confirmed_focus",
-                "danger",
-                "ok",
-                "panel_bg",
-                "panel_elevated",
-                "selected_focus",
-                "text_primary",
-                "text_secondary"
-              ],
-              "maxLength": 128,
-              "minLength": 1,
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "source_token"
-          ],
-          "type": "object"
-        },
-        "text.muted": {
-          "additionalProperties": false,
-          "properties": {
-            "kind": {
-              "enum": [
-                "derived",
-                "explicit",
-                "legacy-quantized"
-              ],
-              "maxLength": 128,
-              "minLength": 1,
-              "type": "string"
-            },
-            "source_token": {
-              "enum": [
-                "accent_secondary",
-                "base00",
-                "base01",
-                "base02",
-                "base03",
-                "base04",
-                "base07",
-                "base08",
-                "base0B",
-                "base0C",
-                "base0D",
-                "border_muted",
-                "confirmed_focus",
-                "danger",
-                "ok",
-                "panel_bg",
-                "panel_elevated",
-                "selected_focus",
-                "text_primary",
-                "text_secondary"
-              ],
-              "maxLength": 128,
-              "minLength": 1,
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "source_token"
-          ],
-          "type": "object"
-        }
-      },
-      "required": [
-        "border.focusConfirmed",
-        "border.normal",
-        "interaction.accent",
-        "interaction.selection",
-        "status.danger",
-        "status.success",
-        "surface.canvas",
-        "surface.raised",
-        "text.bright",
-        "text.muted"
-      ],
-      "type": "object"
-    },
-    "schema_version": {
-      "const": "1.0.0",
-      "type": "string"
-    },
-    "semantic_hash": {
-      "pattern": "^sha256:[0-9a-f]{64}$",
-      "type": "string"
-    },
-    "source": {
-      "additionalProperties": false,
-      "properties": {
-        "content_sha256": {
+        "semantic_hash": {
           "pattern": "^sha256:[0-9a-f]{64}$",
           "type": "string"
         },
-        "format": {
-          "enum": [
-            "base24-yaml-flat-v1",
-            "rust-theme-tokens-v1"
+        "source": {
+          "additionalProperties": false,
+          "properties": {
+            "content_sha256": {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "format": {
+              "enum": [
+                "base24-yaml-flat-v1",
+                "rust-theme-tokens-v1"
+              ],
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "identity": {
+              "enum": [
+                "tools/native_theme/fixtures/base24-instrument-studio.yaml",
+                "overlays/fuchsia/src/fuchsia-desktop/desktop_ui/src/tokens.rs"
+              ],
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "profile_version": {
+              "enum": [
+                "base24-instrument-studio-proof-v1",
+                "instrument-studio-legacy-v1"
+              ],
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "content_sha256",
+            "format",
+            "identity",
+            "profile_version"
           ],
-          "maxLength": 128,
-          "minLength": 1,
+          "type": "object"
+        },
+        "theme_id": {
+          "const": "instrument-studio",
           "type": "string"
         },
-        "identity": {
-          "enum": [
-            "tools/native_theme/fixtures/base24-instrument-studio.yaml",
-            "overlays/fuchsia/src/fuchsia-desktop/desktop_ui/src/tokens.rs"
-          ],
-          "maxLength": 128,
-          "minLength": 1,
-          "type": "string"
-        },
-        "profile_version": {
-          "enum": [
-            "base24-instrument-studio-proof-v1",
-            "instrument-studio-legacy-v1"
-          ],
-          "maxLength": 128,
-          "minLength": 1,
+        "variant": {
+          "const": "dark",
           "type": "string"
         }
       },
       "required": [
-        "content_sha256",
-        "format",
-        "identity",
-        "profile_version"
+        "bounds",
+        "colors",
+        "compiler_version",
+        "display_name",
+        "provenance",
+        "schema_version",
+        "semantic_hash",
+        "source",
+        "theme_id",
+        "variant"
       ],
       "type": "object"
     },
-    "theme_id": {
-      "const": "instrument-studio",
-      "type": "string"
+    "nativePackage": {
+      "additionalProperties": false,
+      "properties": {
+        "fallback": {
+          "required": [
+            "built_in_theme_id",
+            "missing_asset",
+            "missing_token",
+            "last_known_good",
+            "storage_independent"
+          ],
+          "type": "object"
+        },
+        "metadata": {
+          "required": [
+            "license",
+            "provenance",
+            "extensions"
+          ],
+          "type": "object"
+        },
+        "policy": {
+          "required": [
+            "unknown_required_version",
+            "compatibility",
+            "no_animation_required_for_correctness"
+          ],
+          "type": "object"
+        },
+        "profile": {
+          "const": {
+            "name": "instrument-studio-dtcg-subset",
+            "version": "2025.10"
+          }
+        },
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "theme": {
+          "required": [
+            "id",
+            "display_name",
+            "revision"
+          ],
+          "type": "object"
+        },
+        "variants": {
+          "additionalProperties": false,
+          "properties": {
+            "dark": {
+              "$ref": "#/$defs/variant"
+            },
+            "high-contrast": {
+              "$ref": "#/$defs/variant"
+            },
+            "light": {
+              "$ref": "#/$defs/variant"
+            }
+          },
+          "required": [
+            "light",
+            "dark",
+            "high-contrast"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "schema_version",
+        "profile",
+        "theme",
+        "metadata",
+        "variants",
+        "fallback",
+        "policy"
+      ],
+      "type": "object"
+    },
+    "typography": {
+      "additionalProperties": false,
+      "properties": {
+        "fallback": {
+          "const": "builtin-system-stacks"
+        },
+        "families": {
+          "additionalProperties": false,
+          "properties": {
+            "display": {
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "monospace": {
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "ui": {
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": [
+            "ui",
+            "monospace"
+          ],
+          "type": "object"
+        },
+        "minimum_legible_px": {
+          "maximum": 24,
+          "minimum": 10,
+          "type": "number"
+        },
+        "roles": {
+          "additionalProperties": false,
+          "properties": {
+            "body": {
+              "additionalProperties": false,
+              "properties": {
+                "family": {
+                  "enum": [
+                    "ui",
+                    "monospace",
+                    "display"
+                  ]
+                },
+                "letter_spacing_em": {
+                  "maximum": 0.2,
+                  "minimum": -0.1,
+                  "type": "number"
+                },
+                "line_height": {
+                  "maximum": 2,
+                  "minimum": 1,
+                  "type": "number"
+                },
+                "size_px": {
+                  "maximum": 96,
+                  "minimum": 10,
+                  "type": "number"
+                },
+                "weight": {
+                  "maximum": 900,
+                  "minimum": 100,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "family",
+                "size_px",
+                "line_height",
+                "weight",
+                "letter_spacing_em"
+              ],
+              "type": "object"
+            },
+            "caption": {
+              "additionalProperties": false,
+              "properties": {
+                "family": {
+                  "enum": [
+                    "ui",
+                    "monospace",
+                    "display"
+                  ]
+                },
+                "letter_spacing_em": {
+                  "maximum": 0.2,
+                  "minimum": -0.1,
+                  "type": "number"
+                },
+                "line_height": {
+                  "maximum": 2,
+                  "minimum": 1,
+                  "type": "number"
+                },
+                "size_px": {
+                  "maximum": 96,
+                  "minimum": 10,
+                  "type": "number"
+                },
+                "weight": {
+                  "maximum": 900,
+                  "minimum": 100,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "family",
+                "size_px",
+                "line_height",
+                "weight",
+                "letter_spacing_em"
+              ],
+              "type": "object"
+            },
+            "data-display": {
+              "additionalProperties": false,
+              "properties": {
+                "family": {
+                  "enum": [
+                    "ui",
+                    "monospace",
+                    "display"
+                  ]
+                },
+                "letter_spacing_em": {
+                  "maximum": 0.2,
+                  "minimum": -0.1,
+                  "type": "number"
+                },
+                "line_height": {
+                  "maximum": 2,
+                  "minimum": 1,
+                  "type": "number"
+                },
+                "size_px": {
+                  "maximum": 96,
+                  "minimum": 10,
+                  "type": "number"
+                },
+                "weight": {
+                  "maximum": 900,
+                  "minimum": 100,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "family",
+                "size_px",
+                "line_height",
+                "weight",
+                "letter_spacing_em"
+              ],
+              "type": "object"
+            },
+            "label": {
+              "additionalProperties": false,
+              "properties": {
+                "family": {
+                  "enum": [
+                    "ui",
+                    "monospace",
+                    "display"
+                  ]
+                },
+                "letter_spacing_em": {
+                  "maximum": 0.2,
+                  "minimum": -0.1,
+                  "type": "number"
+                },
+                "line_height": {
+                  "maximum": 2,
+                  "minimum": 1,
+                  "type": "number"
+                },
+                "size_px": {
+                  "maximum": 96,
+                  "minimum": 10,
+                  "type": "number"
+                },
+                "weight": {
+                  "maximum": 900,
+                  "minimum": 100,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "family",
+                "size_px",
+                "line_height",
+                "weight",
+                "letter_spacing_em"
+              ],
+              "type": "object"
+            },
+            "title": {
+              "additionalProperties": false,
+              "properties": {
+                "family": {
+                  "enum": [
+                    "ui",
+                    "monospace",
+                    "display"
+                  ]
+                },
+                "letter_spacing_em": {
+                  "maximum": 0.2,
+                  "minimum": -0.1,
+                  "type": "number"
+                },
+                "line_height": {
+                  "maximum": 2,
+                  "minimum": 1,
+                  "type": "number"
+                },
+                "size_px": {
+                  "maximum": 96,
+                  "minimum": 10,
+                  "type": "number"
+                },
+                "weight": {
+                  "maximum": 900,
+                  "minimum": 100,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "family",
+                "size_px",
+                "line_height",
+                "weight",
+                "letter_spacing_em"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "caption",
+            "label",
+            "body",
+            "title",
+            "data-display"
+          ],
+          "type": "object"
+        },
+        "terminal_cell": {
+          "additionalProperties": false,
+          "properties": {
+            "height_px": {
+              "maximum": 64,
+              "minimum": 8,
+              "type": "number"
+            },
+            "width_px": {
+              "maximum": 32,
+              "minimum": 4,
+              "type": "number"
+            }
+          },
+          "required": [
+            "width_px",
+            "height_px"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "families",
+        "roles",
+        "minimum_legible_px",
+        "terminal_cell",
+        "fallback"
+      ],
+      "type": "object"
     },
     "variant": {
-      "const": "dark",
-      "type": "string"
+      "additionalProperties": false,
+      "properties": {
+        "assets": {
+          "additionalProperties": false,
+          "properties": {
+            "fallback": {
+              "const": "builtin-semantic-icon"
+            },
+            "items": {
+              "additionalProperties": {
+                "additionalProperties": false,
+                "properties": {
+                  "attribution": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "decoded_bytes": {
+                    "maximum": 524288,
+                    "minimum": 1,
+                    "type": "number"
+                  },
+                  "height": {
+                    "maximum": 4096,
+                    "minimum": 1,
+                    "type": "number"
+                  },
+                  "kind": {
+                    "enum": [
+                      "svg",
+                      "png"
+                    ]
+                  },
+                  "path": {
+                    "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*://)[^\\\\]+$",
+                    "type": "string"
+                  },
+                  "spdx": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "variants": {
+                    "items": {
+                      "enum": [
+                        "light",
+                        "dark",
+                        "high-contrast"
+                      ]
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "width": {
+                    "maximum": 4096,
+                    "minimum": 1,
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "path",
+                  "kind",
+                  "variants",
+                  "width",
+                  "height",
+                  "decoded_bytes",
+                  "spdx",
+                  "attribution"
+                ],
+                "type": "object"
+              },
+              "maxProperties": 64,
+              "type": "object"
+            }
+          },
+          "required": [
+            "items",
+            "fallback"
+          ],
+          "type": "object"
+        },
+        "components": {
+          "minProperties": 1,
+          "type": "object"
+        },
+        "elevation": {
+          "required": [
+            "levels"
+          ],
+          "type": "object"
+        },
+        "geometry": {
+          "additionalProperties": false,
+          "properties": {
+            "accent_rail_px": {
+              "maximum": 8,
+              "minimum": 1,
+              "type": "number"
+            },
+            "border_widths": {
+              "type": "array"
+            },
+            "density": {
+              "enum": [
+                "compact",
+                "comfortable",
+                "touch"
+              ]
+            },
+            "gaps": {
+              "type": "array"
+            },
+            "heights": {
+              "type": "object"
+            },
+            "icon_sizes": {
+              "type": "array"
+            },
+            "minimum_hit_target_px": {
+              "maximum": 64,
+              "minimum": 24,
+              "type": "number"
+            },
+            "panel": {
+              "type": "object"
+            },
+            "radii": {
+              "type": "array"
+            },
+            "responsive": {
+              "const": {
+                "narrow_max_px": 719,
+                "regular_max_px": 1199,
+                "wide_min_px": 1200
+              }
+            },
+            "spacing": {
+              "type": "array"
+            }
+          },
+          "required": [
+            "spacing",
+            "gaps",
+            "heights",
+            "accent_rail_px",
+            "panel",
+            "radii",
+            "border_widths",
+            "icon_sizes",
+            "minimum_hit_target_px",
+            "density",
+            "responsive"
+          ],
+          "type": "object"
+        },
+        "motion": {
+          "required": [
+            "durations_ms",
+            "easing",
+            "reduced"
+          ],
+          "type": "object"
+        },
+        "opacity": {
+          "additionalProperties": false,
+          "properties": {
+            "disabled": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "overlay": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "disabled",
+            "overlay"
+          ],
+          "type": "object"
+        },
+        "primitives": {
+          "additionalProperties": {
+            "pattern": "^#[0-9a-f]{8}$",
+            "type": "string"
+          },
+          "minProperties": 1,
+          "type": "object"
+        },
+        "semantic": {
+          "additionalProperties": false,
+          "properties": {
+            "border.active": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "border.focusConfirmed": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "border.normal": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "border.strong": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "border.subtle": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "interaction.accent": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "interaction.disabled": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "interaction.hover": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "interaction.pressed": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "interaction.selected": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "interaction.selection": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "status.danger": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "status.info": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "status.success": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "status.warning": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "surface.base": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "surface.canvas": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "surface.deep": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "surface.overlay": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "surface.raised": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "surface.sunken": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "terminal.background": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "terminal.cursor": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "terminal.foreground": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "terminal.selection": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "text.bright": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "text.disabled": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "text.inverse": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "text.muted": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "text.normal": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "text.strong": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "text.subtle": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "window.active": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "window.inactive": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "window.urgent": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "surface.canvas",
+            "surface.deep",
+            "surface.sunken",
+            "surface.base",
+            "surface.raised",
+            "surface.overlay",
+            "text.muted",
+            "text.subtle",
+            "text.normal",
+            "text.strong",
+            "text.bright",
+            "text.inverse",
+            "text.disabled",
+            "border.subtle",
+            "border.normal",
+            "border.strong",
+            "border.active",
+            "border.focusConfirmed",
+            "interaction.accent",
+            "interaction.hover",
+            "interaction.pressed",
+            "interaction.selection",
+            "interaction.selected",
+            "interaction.disabled",
+            "status.info",
+            "status.success",
+            "status.warning",
+            "status.danger",
+            "window.active",
+            "window.inactive",
+            "window.urgent",
+            "terminal.background",
+            "terminal.foreground",
+            "terminal.cursor",
+            "terminal.selection"
+          ],
+          "type": "object"
+        },
+        "terminal": {
+          "additionalProperties": false,
+          "properties": {
+            "ansi0": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "ansi1": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "ansi10": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "ansi11": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "ansi12": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "ansi13": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "ansi14": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "ansi15": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "ansi2": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "ansi3": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "ansi4": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "ansi5": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "ansi6": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "ansi7": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "ansi8": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "ansi9": {
+              "pattern": "^#[0-9a-f]{8}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "ansi0",
+            "ansi1",
+            "ansi2",
+            "ansi3",
+            "ansi4",
+            "ansi5",
+            "ansi6",
+            "ansi7",
+            "ansi8",
+            "ansi9",
+            "ansi10",
+            "ansi11",
+            "ansi12",
+            "ansi13",
+            "ansi14",
+            "ansi15"
+          ],
+          "type": "object"
+        },
+        "typography": {
+          "additionalProperties": false,
+          "properties": {
+            "fallback": {
+              "const": "builtin-system-stacks"
+            },
+            "families": {
+              "additionalProperties": false,
+              "properties": {
+                "display": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "monospace": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "ui": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "ui",
+                "monospace"
+              ],
+              "type": "object"
+            },
+            "minimum_legible_px": {
+              "maximum": 24,
+              "minimum": 10,
+              "type": "number"
+            },
+            "roles": {
+              "additionalProperties": false,
+              "properties": {
+                "body": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "family": {
+                      "enum": [
+                        "ui",
+                        "monospace",
+                        "display"
+                      ]
+                    },
+                    "letter_spacing_em": {
+                      "maximum": 0.2,
+                      "minimum": -0.1,
+                      "type": "number"
+                    },
+                    "line_height": {
+                      "maximum": 2,
+                      "minimum": 1,
+                      "type": "number"
+                    },
+                    "size_px": {
+                      "maximum": 96,
+                      "minimum": 10,
+                      "type": "number"
+                    },
+                    "weight": {
+                      "maximum": 900,
+                      "minimum": 100,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "family",
+                    "size_px",
+                    "line_height",
+                    "weight",
+                    "letter_spacing_em"
+                  ],
+                  "type": "object"
+                },
+                "caption": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "family": {
+                      "enum": [
+                        "ui",
+                        "monospace",
+                        "display"
+                      ]
+                    },
+                    "letter_spacing_em": {
+                      "maximum": 0.2,
+                      "minimum": -0.1,
+                      "type": "number"
+                    },
+                    "line_height": {
+                      "maximum": 2,
+                      "minimum": 1,
+                      "type": "number"
+                    },
+                    "size_px": {
+                      "maximum": 96,
+                      "minimum": 10,
+                      "type": "number"
+                    },
+                    "weight": {
+                      "maximum": 900,
+                      "minimum": 100,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "family",
+                    "size_px",
+                    "line_height",
+                    "weight",
+                    "letter_spacing_em"
+                  ],
+                  "type": "object"
+                },
+                "data-display": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "family": {
+                      "enum": [
+                        "ui",
+                        "monospace",
+                        "display"
+                      ]
+                    },
+                    "letter_spacing_em": {
+                      "maximum": 0.2,
+                      "minimum": -0.1,
+                      "type": "number"
+                    },
+                    "line_height": {
+                      "maximum": 2,
+                      "minimum": 1,
+                      "type": "number"
+                    },
+                    "size_px": {
+                      "maximum": 96,
+                      "minimum": 10,
+                      "type": "number"
+                    },
+                    "weight": {
+                      "maximum": 900,
+                      "minimum": 100,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "family",
+                    "size_px",
+                    "line_height",
+                    "weight",
+                    "letter_spacing_em"
+                  ],
+                  "type": "object"
+                },
+                "label": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "family": {
+                      "enum": [
+                        "ui",
+                        "monospace",
+                        "display"
+                      ]
+                    },
+                    "letter_spacing_em": {
+                      "maximum": 0.2,
+                      "minimum": -0.1,
+                      "type": "number"
+                    },
+                    "line_height": {
+                      "maximum": 2,
+                      "minimum": 1,
+                      "type": "number"
+                    },
+                    "size_px": {
+                      "maximum": 96,
+                      "minimum": 10,
+                      "type": "number"
+                    },
+                    "weight": {
+                      "maximum": 900,
+                      "minimum": 100,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "family",
+                    "size_px",
+                    "line_height",
+                    "weight",
+                    "letter_spacing_em"
+                  ],
+                  "type": "object"
+                },
+                "title": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "family": {
+                      "enum": [
+                        "ui",
+                        "monospace",
+                        "display"
+                      ]
+                    },
+                    "letter_spacing_em": {
+                      "maximum": 0.2,
+                      "minimum": -0.1,
+                      "type": "number"
+                    },
+                    "line_height": {
+                      "maximum": 2,
+                      "minimum": 1,
+                      "type": "number"
+                    },
+                    "size_px": {
+                      "maximum": 96,
+                      "minimum": 10,
+                      "type": "number"
+                    },
+                    "weight": {
+                      "maximum": 900,
+                      "minimum": 100,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "family",
+                    "size_px",
+                    "line_height",
+                    "weight",
+                    "letter_spacing_em"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "caption",
+                "label",
+                "body",
+                "title",
+                "data-display"
+              ],
+              "type": "object"
+            },
+            "terminal_cell": {
+              "additionalProperties": false,
+              "properties": {
+                "height_px": {
+                  "maximum": 64,
+                  "minimum": 8,
+                  "type": "number"
+                },
+                "width_px": {
+                  "maximum": 32,
+                  "minimum": 4,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "width_px",
+                "height_px"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "families",
+            "roles",
+            "minimum_legible_px",
+            "terminal_cell",
+            "fallback"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "primitives",
+        "semantic",
+        "components",
+        "typography",
+        "geometry",
+        "elevation",
+        "opacity",
+        "motion",
+        "assets",
+        "terminal"
+      ],
+      "type": "object"
     }
   },
-  "required": [
-    "bounds",
-    "colors",
-    "compiler_version",
-    "display_name",
-    "provenance",
-    "schema_version",
-    "semantic_hash",
-    "source",
-    "theme_id",
-    "variant"
+  "$id": "https://dannyzen.github.io/fuchsia-desktop-instrument-studio/native-theme-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/legacySnapshot"
+    },
+    {
+      "$ref": "#/$defs/nativePackage"
+    }
   ],
-  "title": "NativeThemeV1 bounded Phase 1 color snapshot",
-  "type": "object"
+  "x-native-theme-v1-contract": {
+    "canonical_color": "lowercase-rrggbbaa-srgb",
+    "derived_fields": [
+      "semantic_hash",
+      "canonical_bytes",
+      "conversion_diagnostics"
+    ],
+    "extension_namespace": "org.constructresearch.instrumentstudio.*",
+    "forbidden_fields": [
+      "command",
+      "executable",
+      "script",
+      "hook",
+      "external_asset_pack",
+      "runtime_import"
+    ],
+    "import_profiles": [
+      "dtcg-2025.10-instrument-studio-v1",
+      "base16-v1",
+      "base24-v1",
+      "omarchy-colors-toml-v1",
+      "native-legacy-v1"
+    ],
+    "limits": {
+      "alias_depth": 32,
+      "aliases": 2048,
+      "catalog_bytes": 8388608,
+      "compiled_pack_bytes": 262144,
+      "decoded_asset_bytes": 524288,
+      "decoded_assets_total_bytes": 4194304,
+      "nesting": 32,
+      "runtime_snapshot_bytes": 524288,
+      "semantic_assets": 64,
+      "source_bytes": 1048576,
+      "string_bytes": 4096,
+      "tokens": 1024
+    },
+    "optional_fields": [
+      "metadata.extensions.org.constructresearch.instrumentstudio.*"
+    ],
+    "required_domains": [
+      "identity",
+      "provenance",
+      "colors",
+      "typography",
+      "geometry",
+      "density",
+      "responsive",
+      "elevation",
+      "opacity",
+      "motion",
+      "reduced-motion",
+      "assets",
+      "terminal",
+      "fallback",
+      "versions"
+    ],
+    "required_variants": [
+      "light",
+      "dark",
+      "high-contrast"
+    ],
+    "token_layers": [
+      "primitives",
+      "semantic",
+      "components"
+    ]
+  }
 }

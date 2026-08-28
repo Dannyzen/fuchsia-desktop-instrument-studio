@@ -18,6 +18,35 @@ import sys
 import tempfile
 from typing import NoReturn
 
+LIMITS = {
+    "source_bytes": 1024 * 1024, "compiled_pack_bytes": 256 * 1024,
+    "catalog_bytes": 8 * 1024 * 1024, "tokens": 1024, "aliases": 2048,
+    "alias_depth": 32, "nesting": 32, "string_bytes": 4096,
+    "semantic_assets": 64, "decoded_asset_bytes": 512 * 1024,
+    "decoded_assets_total_bytes": 4 * 1024 * 1024,
+    "runtime_snapshot_bytes": 512 * 1024,
+}
+CONTRACT_FIELDS = {"schema_version", "profile", "theme", "metadata", "variants", "fallback", "policy"}
+VARIANT_FIELDS = {"primitives", "semantic", "components", "typography", "geometry", "elevation", "opacity", "motion", "assets", "terminal"}
+REQUIRED_VARIANTS = {"light", "dark", "high-contrast"}
+PROFILE_LAYERS = {
+    "dtcg-2025.10-instrument-studio-v1": {"primitives", "semantic", "components"},
+    "base16-v1": {"primitives"}, "base24-v1": {"primitives"},
+    "omarchy-colors-toml-v1": {"primitives"}, "native-legacy-v1": {"semantic"},
+}
+RGBA_RE = re.compile(r"^#[0-9a-f]{8}$")
+HASH_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+SEMANTIC_COLOR_ROLES = {
+    *(f"surface.{x}" for x in ("canvas", "deep", "sunken", "base", "raised", "overlay")),
+    *(f"text.{x}" for x in ("muted", "subtle", "normal", "strong", "bright", "inverse", "disabled")),
+    *(f"border.{x}" for x in ("subtle", "normal", "strong", "active", "focusConfirmed")),
+    *(f"interaction.{x}" for x in ("accent", "hover", "pressed", "selection", "selected", "disabled")),
+    *(f"status.{x}" for x in ("info", "success", "warning", "danger")),
+    *(f"window.{x}" for x in ("active", "inactive", "urgent")),
+    *(f"terminal.{x}" for x in ("background", "foreground", "cursor", "selection")),
+}
+TYPOGRAPHY_ROLES = {"caption", "label", "body", "title", "data-display"}
+
 SCHEMA_VERSION = "1.0.0"
 COMPILER_VERSION = "0.1.0-proof"
 PROFILE_VERSION = "base24-instrument-studio-proof-v1"
@@ -75,6 +104,233 @@ class ContractError(ValueError):
 
 def fail(message: str) -> NoReturn:
     raise ContractError(message)
+
+
+def reject(code: str, message: str) -> NoReturn:
+    fail(f"{code}: {message}")
+
+
+def _strict_pairs(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            reject("E_JSON_DUPLICATE", f"duplicate key {key}")
+        result[key] = value
+    return result
+
+
+def load_json_strict(path: Path) -> dict[str, object]:
+    raw = path.read_bytes()
+    if len(raw) > LIMITS["source_bytes"]:
+        reject("E_LIMIT_SOURCE", "source exceeds 1 MiB")
+    try:
+        value = json.loads(raw, object_pairs_hook=_strict_pairs, parse_constant=lambda value: reject("E_NUMBER_NONFINITE", value))
+    except UnicodeDecodeError:
+        reject("E_UTF8", "source is not UTF-8")
+    if not isinstance(value, dict):
+        reject("E_JSON_ROOT", "root must be an object")
+    return value
+
+
+def canonical_json_bytes(value: object) -> bytes:
+    def inspect(item: object, depth: int = 0) -> None:
+        if depth > LIMITS["nesting"]:
+            reject("E_LIMIT_NESTING", "nesting exceeds 32")
+        if isinstance(item, float) and not __import__("math").isfinite(item):
+            reject("E_NUMBER_NONFINITE", "numbers must be finite")
+        if isinstance(item, str) and len(item.encode("utf-8")) > LIMITS["string_bytes"]:
+            reject("E_LIMIT_STRING", "string exceeds 4 KiB")
+        if isinstance(item, dict):
+            for key, child in item.items():
+                inspect(key, depth + 1); inspect(child, depth + 1)
+        elif isinstance(item, list):
+            for child in item: inspect(child, depth + 1)
+    inspect(value)
+    def normalize(item: object) -> object:
+        if isinstance(item, float) and item.is_integer():
+            return int(item)
+        if isinstance(item, dict):
+            return {key: normalize(child) for key, child in item.items()}
+        if isinstance(item, list):
+            return [normalize(child) for child in item]
+        return item
+    return json.dumps(normalize(value), sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
+
+
+def semantic_identity(value: object) -> str:
+    return "sha256:" + hashlib.sha256(canonical_json_bytes(value)).hexdigest()
+
+
+def validate_profile_fixture(data: dict[str, object]) -> None:
+    if set(data) != {"profile_version", "declared_layer", "tokens"}:
+        reject("E_PROFILE_FIELDS", "profile fixture fields differ")
+    profile = data.get("profile_version")
+    if profile not in PROFILE_LAYERS:
+        reject("E_VERSION_PROFILE", "unknown required profile version")
+    if data.get("declared_layer") not in PROFILE_LAYERS[profile]:
+        reject("E_PROFILE_LAYER", "tokens are declared in a forbidden layer")
+    if not isinstance(data.get("tokens"), dict) or not data["tokens"]:
+        reject("E_PROFILE_TOKENS", "tokens must be a non-empty object")
+
+
+def validate_root_schema_structural(schema: dict[str, object], instance: dict[str, object]) -> None:
+    """Honest stdlib fallback: checks root dispatch only, not full Draft semantics."""
+    refs = schema.get("oneOf")
+    if refs != [{"$ref": "#/$defs/legacySnapshot"}, {"$ref": "#/$defs/nativePackage"}]:
+        reject("E_SCHEMA_ROOT", "root must dispatch both declared contracts")
+    if "variants" in instance:
+        validate_package(instance)
+    elif "colors" not in instance:
+        reject("E_SCHEMA_ROOT", "instance matches neither declared contract")
+
+
+def validate_profile_manifest(manifest: dict[str, object], fixtures: Path) -> dict[str, int]:
+    if set(manifest) != {"schema_version", "profiles"} or manifest["schema_version"] != "1.0.0":
+        reject("E_MANIFEST", "manifest shape/version")
+    profiles = manifest["profiles"]
+    if not isinstance(profiles, list) or len(profiles) != len(PROFILE_LAYERS):
+        reject("E_MANIFEST", "all profiles required")
+    positives = negatives = uncovered = 0
+    seen = set()
+    for entry in profiles:
+        required = {"profile", "type", "layers", "variants", "derivations", "role_map", "diagnostics", "positive_cases", "negative_cases"}
+        if not isinstance(entry, dict) or set(entry) != required or entry["profile"] not in PROFILE_LAYERS:
+            reject("E_MANIFEST", "profile entry incomplete")
+        seen.add(entry["profile"]); positives += len(entry["positive_cases"]); negatives += len(entry["negative_cases"])
+        for case in entry["positive_cases"] + entry["negative_cases"]:
+            if not isinstance(case, dict) or not (fixtures / case["file"]).is_file(): uncovered += 1
+        negative_codes = {case.get("code") for case in entry["negative_cases"]}
+        if not set(entry["diagnostics"]) <= negative_codes: uncovered += len(set(entry["diagnostics"]) - negative_codes)
+    if seen != set(PROFILE_LAYERS) or positives < 5 or negatives < 25 or uncovered:
+        reject("E_MANIFEST_COVERAGE", f"positive={positives} negative={negatives} uncovered={uncovered}")
+    return {"profiles": len(profiles), "positive_cases": positives, "negative_cases": negatives, "uncovered": uncovered}
+
+
+def _exact_object(value, keys, code):
+    if not isinstance(value, dict) or set(value) != set(keys): reject(code, "required exact shape")
+
+
+def _number(value, low, high, code):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not low <= value <= high: reject(code, f"bound {low}..{high}")
+
+
+def validate_package(data: dict[str, object]) -> None:
+    if set(data) - CONTRACT_FIELDS:
+        reject("E_FIELD_FORBIDDEN", "unknown required or executable field")
+    missing = CONTRACT_FIELDS - set(data)
+    if missing:
+        reject("E_FIELD_REQUIRED", ",".join(sorted(missing)))
+    if data["schema_version"] != "1.0.0":
+        reject("E_VERSION_REQUIRED", "unsupported schema version")
+    profile = data["profile"]
+    if profile != {"name": "instrument-studio-dtcg-subset", "version": "2025.10"}:
+        reject("E_VERSION_PROFILE", "unsupported normative profile")
+    variants = data["variants"]
+    if not isinstance(variants, dict) or set(variants) != REQUIRED_VARIANTS:
+        reject("E_VARIANT_REQUIRED", "light, dark, and high-contrast are required")
+    fallback = data["fallback"]
+    if not isinstance(fallback, dict) or set(fallback) != {"built_in_theme_id", "missing_asset", "missing_token", "last_known_good", "storage_independent"} or fallback.get("missing_token") != "fail" or fallback.get("storage_independent") is not True:
+        reject("E_FALLBACK_REQUIRED", "fallback policy is incomplete")
+    metadata = data["metadata"]
+    if not isinstance(metadata, dict) or set(metadata) != {"license", "provenance", "extensions"}:
+        reject("E_METADATA_REQUIRED", "license, provenance, and extensions are required")
+    extensions = metadata["extensions"]
+    if not isinstance(extensions, dict) or any(not key.startswith("org.constructresearch.instrumentstudio.") for key in extensions):
+        reject("E_EXTENSION_NAMESPACE", "extension key is outside the reserved namespace")
+    license_data = metadata["license"]
+    if not isinstance(license_data, dict) or set(license_data) != {"spdx", "notice"} or not all(isinstance(value, str) and value for value in license_data.values()):
+        reject("E_LICENSE", "SPDX identifier and notice are required")
+    provenance = metadata["provenance"]
+    provenance_keys = {"source_format", "profile_version", "source_identity", "content_hash", "compiler_version", "semantic_hash", "license", "attribution", "tokens"}
+    if not isinstance(provenance, dict) or set(provenance) != provenance_keys or not HASH_RE.fullmatch(str(provenance.get("content_hash", ""))) or not HASH_RE.fullmatch(str(provenance.get("semantic_hash", ""))):
+        reject("E_PROVENANCE", "complete hashes, identity, compiler, license, attribution, and tokens required")
+    identity = provenance["source_identity"]
+    if not isinstance(identity, str) or identity.startswith(("/", "http://", "https://")) or ".." in Path(identity).parts:
+        reject("E_PROVENANCE", "source identity must be repository-relative or URI policy identity")
+    if not isinstance(provenance["tokens"], dict) or any(not isinstance(v, dict) or v.get("kind") not in {"explicit", "inherited", "derived"} or not set(v) <= {"kind", "source_token", "derivation"} for v in provenance["tokens"].values()):
+        reject("E_PROVENANCE", "per-token provenance is invalid")
+    policy = data["policy"]
+    if not isinstance(policy, dict) or policy.get("unknown_required_version") != "fail-closed" or policy.get("no_animation_required_for_correctness") is not True:
+        reject("E_COMPATIBILITY", "fail-closed and animation-independent policy required")
+    compatibility = policy.get("compatibility")
+    if compatibility != {"current": "1.0.0", "previous": "0.x", "window": "N/N-1"}:
+        reject("E_COMPATIBILITY", "N/N-1 window required")
+    token_count = 0
+    for variant_name, variant in variants.items():
+        if not isinstance(variant, dict) or set(variant) != VARIANT_FIELDS:
+            reject("E_DOMAIN_REQUIRED", f"{variant_name} domains are incomplete")
+        for layer in ("primitives", "semantic", "components"):
+            if not isinstance(variant[layer], dict) or not variant[layer]:
+                reject("E_LAYER_REQUIRED", f"{variant_name}.{layer}")
+            token_count += len(variant[layer])
+        for layer in ("primitives", "semantic", "components"):
+            for name, color in variant[layer].items():
+                if (name.endswith("color") or layer != "components") and isinstance(color, str) and color.startswith("#") and not RGBA_RE.fullmatch(color):
+                    reject("E_COLOR_CANONICAL", f"{variant_name}.{layer}.{name}")
+        terminal = variant["terminal"]
+        if not isinstance(terminal, dict) or set(terminal) != {f"ansi{i}" for i in range(16)} or any(not isinstance(v, str) or not RGBA_RE.fullmatch(v) for v in terminal.values()):
+            reject("E_TERMINAL_ANSI", "exact ANSI 0..15 palette required")
+        semantic = variant["semantic"]
+        if not isinstance(semantic, dict) or set(semantic) != SEMANTIC_COLOR_ROLES:
+            reject("E_SEMANTIC_ROLES", "exact complete semantic taxonomy required")
+        if any(not isinstance(v, str) or not RGBA_RE.fullmatch(v) for v in semantic.values()):
+            reject("E_COLOR_CANONICAL", "all semantic roles require lowercase #rrggbbaa")
+        if semantic["border.focusConfirmed"] == semantic["interaction.selection"]:
+            reject("E_FOCUS_DISTINCT", "confirmed focus and selection must differ")
+        assets = variant["assets"]
+        if not isinstance(assets, dict) or set(assets) != {"items", "fallback"} or "status.error" not in assets.get("items", {}):
+            reject("E_STATUS_NONCOLOR", "status.error semantic asset is required")
+        if len(assets["items"]) > LIMITS["semantic_assets"]:
+            reject("E_LIMIT_ASSETS", "semantic asset count exceeds 64")
+        for asset_id, asset in assets["items"].items():
+            required_asset = {"path", "kind", "variants", "width", "height", "decoded_bytes", "spdx", "attribution"}
+            if not isinstance(asset, dict) or set(asset) != required_asset or asset["kind"] not in {"svg", "png"} or not isinstance(asset["variants"], list) or not asset["variants"]:
+                reject("E_ASSET_METADATA", f"{asset_id} metadata")
+            asset_path = asset["path"]
+            if not isinstance(asset_path, str) or asset_path.startswith("/") or ".." in Path(asset_path).parts or "\\" in asset_path:
+                reject("E_ASSET_PATH", f"{asset_id} must be package-relative")
+            _number(asset["width"], 1, 4096, "E_ASSET_METADATA"); _number(asset["height"], 1, 4096, "E_ASSET_METADATA"); _number(asset["decoded_bytes"], 1, LIMITS["decoded_asset_bytes"], "E_LIMIT_ASSET_BYTES")
+        typography = variant["typography"]
+        if not isinstance(typography, dict) or set(typography) != {"families", "roles", "minimum_legible_px", "terminal_cell", "fallback"}:
+            reject("E_TYPOGRAPHY", "body and mono selections are required")
+        families = typography["families"]
+        if not isinstance(families, dict) or not {"ui", "monospace"} <= set(families) or any(not isinstance(v, list) or not v or not all(isinstance(x, str) for x in v) for v in families.values()): reject("E_TYPOGRAPHY", "family stacks")
+        if set(typography["roles"]) != TYPOGRAPHY_ROLES: reject("E_TYPOGRAPHY", "all typography roles")
+        for style in typography["roles"].values():
+            if not isinstance(style, dict) or set(style) != {"family", "size_px", "line_height", "weight", "letter_spacing_em"}: reject("E_TYPOGRAPHY", "typed role")
+            _number(style["size_px"], 10, 96, "E_TYPOGRAPHY"); _number(style["line_height"], 1, 2, "E_TYPOGRAPHY"); _number(style["weight"], 100, 900, "E_TYPOGRAPHY"); _number(style["letter_spacing_em"], -.1, .2, "E_TYPOGRAPHY")
+        geometry = variant["geometry"]
+        geometry_keys = {"spacing", "gaps", "heights", "accent_rail_px", "panel", "radii", "border_widths", "icon_sizes", "minimum_hit_target_px", "density", "responsive"}
+        if not isinstance(geometry, dict) or set(geometry) != geometry_keys or geometry.get("density") not in {"compact", "comfortable", "touch"}:
+            reject("E_GEOMETRY", "density and responsive geometry are required")
+        if geometry["responsive"] != {"narrow_max_px": 719, "regular_max_px": 1199, "wide_min_px": 1200}: reject("E_GEOMETRY", "fixed product thresholds")
+        elevation = variant["elevation"]
+        if not isinstance(elevation, dict) or set(elevation) != {"levels"} or set(elevation["levels"]) != {"flat", "raised", "overlay"}: reject("E_ELEVATION", "levels")
+        for shadow in elevation["levels"].values():
+            if not isinstance(shadow, dict) or set(shadow) != {"x_px", "y_px", "blur_px", "spread_px", "color"}: reject("E_ELEVATION", "shadow shape")
+            _number(shadow["blur_px"], 0, 64, "E_ELEVATION")
+        opacity = variant["opacity"]
+        if not isinstance(opacity, dict) or set(opacity) != {"disabled", "overlay"}: reject("E_OPACITY", "shape")
+        for value in opacity.values(): _number(value, 0, 1, "E_OPACITY")
+        motion = variant["motion"]
+        if not isinstance(motion, dict) or set(motion) != {"durations_ms", "easing", "reduced"} or set(motion["durations_ms"]) != {"short", "medium", "long"} or set(motion["easing"]) != {"standard", "emphasized"}: reject("E_MOTION", "shape")
+        for value in motion["durations_ms"].values(): _number(value, 0, 1000, "E_MOTION")
+        if motion["reduced"] != {"duration_ms": 0, "substitution": "instant", "essential_only": True}: reject("E_REDUCED_MOTION", "deterministic reduced motion required")
+        fg, bg = semantic.get("text.normal"), semantic.get("surface.canvas")
+        if not isinstance(fg, str) or not isinstance(bg, str) or not RGBA_RE.fullmatch(fg) or not RGBA_RE.fullmatch(bg):
+            reject("E_COLOR_CANONICAL", "semantic text/surface colors")
+        target = 7.0 if variant_name == "high-contrast" else 4.5
+        if contrast(fg[1:7], bg[1:7]) < target:
+            reject("E_CONTRAST_NORMAL", f"{variant_name} text contrast below {target}")
+        focus = semantic.get("border.focusConfirmed")
+        ui_target = 4.5 if variant_name == "high-contrast" else 3.0
+        if not isinstance(focus, str) or not RGBA_RE.fullmatch(focus) or contrast(focus[1:7], bg[1:7]) < ui_target:
+            reject("E_CONTRAST_UI", f"{variant_name} focus contrast below {ui_target}")
+    if token_count > LIMITS["tokens"]:
+        reject("E_LIMIT_TOKENS", "token count exceeds 1024")
+    encoded = canonical_json_bytes(data)
+    if len(encoded) > LIMITS["compiled_pack_bytes"]:
+        reject("E_LIMIT_PACK", "compiled pack exceeds 256 KiB")
 
 
 def read_bounded(path: Path) -> bytes:
