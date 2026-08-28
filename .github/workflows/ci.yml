@@ -7,13 +7,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.12.9'
       - name: Secret and structure scan
-        run: |
-          chmod +x scripts/*.sh scripts/*.py || true
-          ./scripts/secret-scan.sh
+        run: bash scripts/secret-scan.sh
       - name: Package structure checks
         run: |
           test -f versions.env
@@ -88,6 +88,25 @@ jobs:
           python3 -m py_compile scripts/*.py tools/native_theme/*.py
       - name: NativeThemeV1 bounded contract proof
         run: PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-native-theme-v1.py
+      - name: NativeThemeV1 legacy oracle proof
+        run: PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-native-theme-legacy-oracle.py
+      - name: Prepare NativeThemeV1 sq-01 dependencies
+        run: python3 -m pip install --requirement tools/native_theme/sq01-requirements.txt
+      - name: NativeThemeV1 sq-01 source-quality gate
+        run: PYTHONDONTWRITEBYTECODE=1 TZ=UTC LC_ALL=C LANG=C PYTHONHASHSEED=0 NATIVE_THEME_SQ01_NETWORK=deny python3 scripts/test-native-theme-sq01.py --source-sha "$GITHUB_SHA" --output-dir artifacts/quality/sq-01
+      - name: Upload NativeThemeV1 sq-01 receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-theme-sq-01-${{ github.sha }}
+          path: |
+            artifacts/quality/sq-01/source-manifest.json
+            artifacts/quality/sq-01/profile-fixture-inventory.json
+            artifacts/quality/sq-01/schema-validation.json
+            artifacts/quality/sq-01/semantic-conformance.json
+            artifacts/quality/sq-01/mutation-results.json
+            artifacts/quality/sq-01/public-boundary-and-license-scan.json
+            artifacts/quality/sq-01/verdict.json
       - name: Instrument Studio desktop_ui host contract
         run: python3 scripts/test-desktop-ui-host.py
       - name: Design feedback empty fixture

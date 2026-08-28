@@ -1,0 +1,401 @@
+{
+  "profiles": [
+    {
+      "complete_package": {
+        "file": "native-theme-v1-package.json",
+        "selection": {
+          "dark": "#8150d6ff",
+          "high-contrast": "#65ffffff",
+          "light": "#8150d6ff"
+        },
+        "semantic_hash": "sha256:df8221ecea037e9cd3c449f4dff9a1d4229d3d528e286d4e557cba31661573f6",
+        "sha256": "sha256:9e93c0a6cb1a7b13532d7929a2103a218db92cca37bec5dd55b14ea1e4c371af"
+      },
+      "derivations": [
+        "curly-alias-resolution",
+        "srgb-alpha-preservation"
+      ],
+      "diagnostics": [
+        "E_ALIAS_CYCLE",
+        "E_ALIAS_UNRESOLVED",
+        "E_COLOR_COMPONENT",
+        "E_COLOR_SPACE",
+        "E_EXECUTABLE",
+        "E_EXTENSION_UNSUPPORTED",
+        "E_FIELD_FORBIDDEN",
+        "E_LIMIT_ALIAS_DEPTH",
+        "E_PROFILE_LAYER",
+        "E_PROFILE_STRUCTURE",
+        "E_TYPE_INHERITED"
+      ],
+      "layers": [
+        "components",
+        "primitives",
+        "semantic"
+      ],
+      "negative_cases": [
+        {
+          "code": "E_PROFILE_STRUCTURE",
+          "expected_layer": "semantic",
+          "file": "dtcg-negative-cases.json",
+          "id": "dtcg-1"
+        },
+        {
+          "code": "E_FIELD_FORBIDDEN",
+          "expected_layer": "semantic",
+          "file": "dtcg-negative-cases.json",
+          "id": "dtcg-2"
+        },
+        {
+          "code": "E_ALIAS_CYCLE",
+          "expected_layer": "semantic",
+          "file": "dtcg-negative-cases.json",
+          "id": "dtcg-3"
+        },
+        {
+          "code": "E_ALIAS_UNRESOLVED",
+          "expected_layer": "semantic",
+          "file": "dtcg-negative-cases.json",
+          "id": "dtcg-4"
+        },
+        {
+          "code": "E_LIMIT_ALIAS_DEPTH",
+          "expected_layer": "semantic",
+          "file": "dtcg-negative-cases.json",
+          "id": "dtcg-5"
+        },
+        {
+          "code": "E_TYPE_INHERITED",
+          "expected_layer": "semantic",
+          "file": "dtcg-negative-cases.json",
+          "id": "dtcg-6"
+        },
+        {
+          "code": "E_EXTENSION_UNSUPPORTED",
+          "expected_layer": "semantic",
+          "file": "dtcg-negative-cases.json",
+          "id": "dtcg-7"
+        },
+        {
+          "code": "E_COLOR_COMPONENT",
+          "expected_layer": "semantic",
+          "file": "dtcg-negative-cases.json",
+          "id": "dtcg-8"
+        },
+        {
+          "code": "E_COLOR_SPACE",
+          "expected_layer": "semantic",
+          "file": "dtcg-negative-cases.json",
+          "id": "dtcg-9"
+        },
+        {
+          "code": "E_EXECUTABLE",
+          "expected_layer": "semantic",
+          "file": "dtcg-negative-cases.json",
+          "id": "dtcg-10"
+        },
+        {
+          "code": "E_PROFILE_LAYER",
+          "expected_layer": "forbidden",
+          "file": "dtcg-negative-layer.json",
+          "id": "dtcg-layer"
+        }
+      ],
+      "positive_cases": [
+        {
+          "file": "dtcg-positive.json",
+          "id": "dtcg-positive"
+        }
+      ],
+      "profile": "dtcg-2025.10-instrument-studio-v1",
+      "role_map": "complete-declared-map",
+      "type": "dtcg",
+      "variants": [
+        "light",
+        "dark",
+        "high-contrast"
+      ]
+    },
+    {
+      "complete_package": {
+        "file": "native-theme-v1-package.json",
+        "selection": {
+          "dark": "#8150d6ff",
+          "high-contrast": "#65ffffff",
+          "light": "#8150d6ff"
+        },
+        "semantic_hash": "sha256:df8221ecea037e9cd3c449f4dff9a1d4229d3d528e286d4e557cba31661573f6",
+        "sha256": "sha256:9e93c0a6cb1a7b13532d7929a2103a218db92cca37bec5dd55b14ea1e4c371af"
+      },
+      "derivations": [
+        "base-role-map"
+      ],
+      "diagnostics": [
+        "E_COLOR_CANONICAL",
+        "E_FIELD_EXTRA",
+        "E_FIELD_FORBIDDEN",
+        "E_FIELD_REQUIRED",
+        "E_PROFILE_LAYER"
+      ],
+      "layers": [
+        "primitives"
+      ],
+      "negative_cases": [
+        {
+          "code": "E_FIELD_REQUIRED",
+          "expected_layer": "primitives",
+          "file": "base16-negative-cases.json",
+          "id": "base16-1"
+        },
+        {
+          "code": "E_FIELD_EXTRA",
+          "expected_layer": "primitives",
+          "file": "base16-negative-cases.json",
+          "id": "base16-2"
+        },
+        {
+          "code": "E_COLOR_CANONICAL",
+          "expected_layer": "primitives",
+          "file": "base16-negative-cases.json",
+          "id": "base16-3"
+        },
+        {
+          "code": "E_FIELD_FORBIDDEN",
+          "expected_layer": "primitives",
+          "file": "base16-negative-cases.json",
+          "id": "base16-4"
+        },
+        {
+          "code": "E_PROFILE_LAYER",
+          "expected_layer": "primitives",
+          "file": "base16-negative-cases.json",
+          "id": "base16-5"
+        }
+      ],
+      "positive_cases": [
+        {
+          "file": "base16-positive.json",
+          "id": "base16-positive"
+        }
+      ],
+      "profile": "base16-v1",
+      "role_map": "complete-declared-map",
+      "type": "base16",
+      "variants": [
+        "dark"
+      ]
+    },
+    {
+      "complete_package": {
+        "file": "native-theme-v1-package.json",
+        "selection": {
+          "dark": "#8150d6ff",
+          "high-contrast": "#65ffffff",
+          "light": "#8150d6ff"
+        },
+        "semantic_hash": "sha256:df8221ecea037e9cd3c449f4dff9a1d4229d3d528e286d4e557cba31661573f6",
+        "sha256": "sha256:9e93c0a6cb1a7b13532d7929a2103a218db92cca37bec5dd55b14ea1e4c371af"
+      },
+      "derivations": [
+        "base16-plus-bright-ansi",
+        "base-role-map"
+      ],
+      "diagnostics": [
+        "E_COLOR_CANONICAL",
+        "E_FIELD_EXTRA",
+        "E_FIELD_REQUIRED",
+        "E_PATH_TRAVERSAL",
+        "E_PROFILE_LAYER"
+      ],
+      "layers": [
+        "primitives"
+      ],
+      "negative_cases": [
+        {
+          "code": "E_FIELD_REQUIRED",
+          "expected_layer": "primitives",
+          "file": "base24-negative-cases.json",
+          "id": "base24-1"
+        },
+        {
+          "code": "E_FIELD_EXTRA",
+          "expected_layer": "primitives",
+          "file": "base24-negative-cases.json",
+          "id": "base24-2"
+        },
+        {
+          "code": "E_COLOR_CANONICAL",
+          "expected_layer": "primitives",
+          "file": "base24-negative-cases.json",
+          "id": "base24-3"
+        },
+        {
+          "code": "E_PATH_TRAVERSAL",
+          "expected_layer": "primitives",
+          "file": "base24-negative-cases.json",
+          "id": "base24-4"
+        },
+        {
+          "code": "E_PROFILE_LAYER",
+          "expected_layer": "primitives",
+          "file": "base24-negative-cases.json",
+          "id": "base24-5"
+        }
+      ],
+      "positive_cases": [
+        {
+          "file": "base24-positive.json",
+          "id": "base24-positive"
+        }
+      ],
+      "profile": "base24-v1",
+      "role_map": "complete-declared-map",
+      "type": "base24",
+      "variants": [
+        "dark"
+      ]
+    },
+    {
+      "complete_package": {
+        "file": "native-theme-v1-package.json",
+        "selection": {
+          "dark": "#8150d6ff",
+          "high-contrast": "#65ffffff",
+          "light": "#8150d6ff"
+        },
+        "semantic_hash": "sha256:df8221ecea037e9cd3c449f4dff9a1d4229d3d528e286d4e557cba31661573f6",
+        "sha256": "sha256:9e93c0a6cb1a7b13532d7929a2103a218db92cca37bec5dd55b14ea1e4c371af"
+      },
+      "derivations": [
+        "normal-bright-ansi",
+        "ramp-role-map"
+      ],
+      "diagnostics": [
+        "E_COLOR_CANONICAL",
+        "E_EXECUTABLE",
+        "E_FIELD_REQUIRED",
+        "E_PATH_TRAVERSAL",
+        "E_PROFILE_LAYER"
+      ],
+      "layers": [
+        "primitives"
+      ],
+      "negative_cases": [
+        {
+          "code": "E_EXECUTABLE",
+          "expected_layer": "primitives",
+          "file": "omarchy-negative-cases.json",
+          "id": "omarchy-1"
+        },
+        {
+          "code": "E_PATH_TRAVERSAL",
+          "expected_layer": "primitives",
+          "file": "omarchy-negative-cases.json",
+          "id": "omarchy-2"
+        },
+        {
+          "code": "E_FIELD_REQUIRED",
+          "expected_layer": "primitives",
+          "file": "omarchy-negative-cases.json",
+          "id": "omarchy-3"
+        },
+        {
+          "code": "E_COLOR_CANONICAL",
+          "expected_layer": "primitives",
+          "file": "omarchy-negative-cases.json",
+          "id": "omarchy-4"
+        },
+        {
+          "code": "E_PROFILE_LAYER",
+          "expected_layer": "primitives",
+          "file": "omarchy-negative-cases.json",
+          "id": "omarchy-5"
+        }
+      ],
+      "positive_cases": [
+        {
+          "file": "omarchy-positive.json",
+          "id": "omarchy-positive"
+        }
+      ],
+      "profile": "omarchy-colors-toml-v1",
+      "role_map": "complete-declared-map",
+      "type": "omarchy",
+      "variants": [
+        "light",
+        "dark"
+      ]
+    },
+    {
+      "complete_package": {
+        "file": "native-theme-v1-package.json",
+        "selection": {
+          "dark": "#8150d6ff",
+          "high-contrast": "#65ffffff",
+          "light": "#8150d6ff"
+        },
+        "semantic_hash": "sha256:df8221ecea037e9cd3c449f4dff9a1d4229d3d528e286d4e557cba31661573f6",
+        "sha256": "sha256:9e93c0a6cb1a7b13532d7929a2103a218db92cca37bec5dd55b14ea1e4c371af"
+      },
+      "derivations": [
+        "legacy-quantize-half-up",
+        "declared-proof-role-map"
+      ],
+      "diagnostics": [
+        "E_HASH",
+        "E_IDENTITY",
+        "E_PRIMITIVE_AUTHORITY",
+        "E_PROFILE_LAYER",
+        "E_PROVENANCE"
+      ],
+      "layers": [
+        "semantic"
+      ],
+      "negative_cases": [
+        {
+          "code": "E_HASH",
+          "expected_layer": "semantic",
+          "file": "legacy-negative-cases.json",
+          "id": "legacy-1"
+        },
+        {
+          "code": "E_IDENTITY",
+          "expected_layer": "semantic",
+          "file": "legacy-negative-cases.json",
+          "id": "legacy-2"
+        },
+        {
+          "code": "E_PROVENANCE",
+          "expected_layer": "semantic",
+          "file": "legacy-negative-cases.json",
+          "id": "legacy-3"
+        },
+        {
+          "code": "E_PRIMITIVE_AUTHORITY",
+          "expected_layer": "semantic",
+          "file": "legacy-negative-cases.json",
+          "id": "legacy-4"
+        },
+        {
+          "code": "E_PROFILE_LAYER",
+          "expected_layer": "semantic",
+          "file": "legacy-negative-cases.json",
+          "id": "legacy-5"
+        }
+      ],
+      "positive_cases": [
+        {
+          "file": "legacy-positive.json",
+          "id": "legacy-positive"
+        }
+      ],
+      "profile": "native-legacy-v1",
+      "role_map": "complete-declared-map",
+      "type": "legacy",
+      "variants": [
+        "dark"
+      ]
+    }
+  ],
+  "schema_version": "1.1.0"
+}
