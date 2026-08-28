@@ -88,6 +88,8 @@ jobs:
           python3 -m py_compile scripts/*.py tools/native_theme/*.py
       - name: NativeThemeV1 bounded contract proof
         run: PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-native-theme-v1.py
+      - name: NativeThemeV1 legacy oracle proof
+        run: PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-native-theme-legacy-oracle.py
       - name: Instrument Studio desktop_ui host contract
         run: python3 scripts/test-desktop-ui-host.py
       - name: Design feedback empty fixture
