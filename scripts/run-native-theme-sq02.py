@@ -180,7 +180,7 @@ def enter(args: argparse.Namespace) -> NoReturn:
         "NATIVE_THEME_SQ02_TOOLCHAIN_ORIGIN=" + ("hosted-official-nightly" if os.environ.get("GITHUB_ACTIONS") == "true" else "project-fuchsia-prebuilt"),
         "PATH=/usr/bin:/bin",
     ]
-    command = [*prefix, env_tool, "-i", *assignments, str(Path(sys.executable).resolve()), "-I",
+    command = [*prefix, env_tool, "-i", *assignments, str(Path(sys.executable).absolute()), "-I",
                str(Path(__file__).resolve()), *forwarded]
     os.execve(command[0], command, {"PATH": "/usr/bin:/bin"})
 
@@ -193,7 +193,7 @@ def inside(args: argparse.Namespace) -> NoReturn:
     current = namespace_identity()
     if not parent or current == parent or mode not in ("unprivileged-user-network", "ci-sudo-network"):
         raise RuntimeError("network namespace did not change")
-    result = run_allowed([str(Path(sys.executable).resolve()), "-I", "-S", "-c", PROBE],
+    result = run_allowed([str(Path(sys.executable).absolute()), "-I", "-S", "-c", PROBE],
                          phase="socket-probe", check=False, capture_output=True, text=True,
                          env={**FIXED, "PATH": "/usr/bin:/bin"})
     try:
@@ -210,7 +210,7 @@ def inside(args: argparse.Namespace) -> NoReturn:
                    "NATIVE_THEME_SQ02_ISOLATION_JSON": json.dumps(normalized, sort_keys=True, separators=(",", ":"))}
     inner = repo / "scripts/test-native-theme-sq02.py"
     forwarded = [item for item in sys.argv[1:] if item != "--inside"]
-    command = [str(Path(sys.executable).resolve()), "-I", str(inner), *forwarded]
+    command = [str(Path(sys.executable).absolute()), "-I", str(inner), *forwarded]
     os.execve(command[0], command, environment)
 
 

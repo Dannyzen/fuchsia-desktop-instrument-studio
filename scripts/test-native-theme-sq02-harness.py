@@ -86,6 +86,14 @@ class CoreTests(unittest.TestCase):
             undo()
         self.assertIs(socket.socket.connect, original)
 
+    def test_python_invocation_preserves_virtual_environment_path(self):
+        launcher = (ROOT / "scripts/run-native-theme-sq02.py").read_text()
+        harness = (ROOT / "tools/native_theme/sq02_harness.py").read_text()
+        self.assertEqual(launcher.count("str(Path(sys.executable).absolute())"), 3)
+        self.assertEqual(harness.count("str(Path(sys.executable).absolute())"), 2)
+        self.assertEqual(launcher.count("Path(sys.executable).resolve()"), 1)
+        self.assertEqual(harness.count("Path(sys.executable).resolve()"), 1)
+
     def test_subprocess_allowlist_rejects_unknown_shell_and_malformed(self):
         git_ok = ["git", "rev-parse", "HEAD"]
         self.assertTrue(h.allowed_subprocess(git_ok, ROOT))

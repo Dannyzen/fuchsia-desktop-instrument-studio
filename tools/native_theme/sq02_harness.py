@@ -634,14 +634,14 @@ def measure_coverage(root: Path, workspace: Path) -> tuple[dict[str, dict[str, i
     environment = {**os.environ, **ENVIRONMENT, "COVERAGE_FILE": str(data_file), "PYTHONDONTWRITEBYTECODE": "1"}
     tests = ("scripts/test-native-theme-sq02-harness.py", "scripts/test-native-theme-sq02-receipts.py")
     for index, test in enumerate(tests):
-        command = [str(Path(sys.executable).resolve()), "-m", "coverage", "run"]
+        command = [str(Path(sys.executable).absolute()), "-m", "coverage", "run"]
         if index:
             command.append("--append")
         command.extend(["--branch", f"--include={include}", test])
         result = run_allowed(command, root, check=False, capture_output=True, text=True, env=environment)
         if result.returncode != 0:
             fail("CI_COVERAGE", "coverage test execution failed")
-    command = [str(Path(sys.executable).resolve()), "-m", "coverage", "json", "-o", str(report_file)]
+    command = [str(Path(sys.executable).absolute()), "-m", "coverage", "json", "-o", str(report_file)]
     result = run_allowed(command, root, check=False, capture_output=True, text=True, env=environment)
     if result.returncode != 0:
         fail("CI_COVERAGE", "coverage machine report failed")
