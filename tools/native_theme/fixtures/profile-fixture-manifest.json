@@ -8,8 +8,8 @@
           "high-contrast": "#65ffffff",
           "light": "#8150d6ff"
         },
-        "semantic_hash": "sha256:df8221ecea037e9cd3c449f4dff9a1d4229d3d528e286d4e557cba31661573f6",
-        "sha256": "sha256:9e93c0a6cb1a7b13532d7929a2103a218db92cca37bec5dd55b14ea1e4c371af"
+        "semantic_hash": "sha256:5270267e6a857aaae560e5a161b110ae643b4ad3b016c2eceaae90331ae7230a",
+        "sha256": "sha256:f1975d2511b5b4c711ef8b299389a07793b3113077cad32bb8272dcde7b1738b"
       },
       "derivations": [
         "curly-alias-resolution",
@@ -124,8 +124,8 @@
           "high-contrast": "#65ffffff",
           "light": "#8150d6ff"
         },
-        "semantic_hash": "sha256:df8221ecea037e9cd3c449f4dff9a1d4229d3d528e286d4e557cba31661573f6",
-        "sha256": "sha256:9e93c0a6cb1a7b13532d7929a2103a218db92cca37bec5dd55b14ea1e4c371af"
+        "semantic_hash": "sha256:5270267e6a857aaae560e5a161b110ae643b4ad3b016c2eceaae90331ae7230a",
+        "sha256": "sha256:f1975d2511b5b4c711ef8b299389a07793b3113077cad32bb8272dcde7b1738b"
       },
       "derivations": [
         "base-role-map"
@@ -193,8 +193,8 @@
           "high-contrast": "#65ffffff",
           "light": "#8150d6ff"
         },
-        "semantic_hash": "sha256:df8221ecea037e9cd3c449f4dff9a1d4229d3d528e286d4e557cba31661573f6",
-        "sha256": "sha256:9e93c0a6cb1a7b13532d7929a2103a218db92cca37bec5dd55b14ea1e4c371af"
+        "semantic_hash": "sha256:5270267e6a857aaae560e5a161b110ae643b4ad3b016c2eceaae90331ae7230a",
+        "sha256": "sha256:f1975d2511b5b4c711ef8b299389a07793b3113077cad32bb8272dcde7b1738b"
       },
       "derivations": [
         "base16-plus-bright-ansi",
@@ -263,8 +263,8 @@
           "high-contrast": "#65ffffff",
           "light": "#8150d6ff"
         },
-        "semantic_hash": "sha256:df8221ecea037e9cd3c449f4dff9a1d4229d3d528e286d4e557cba31661573f6",
-        "sha256": "sha256:9e93c0a6cb1a7b13532d7929a2103a218db92cca37bec5dd55b14ea1e4c371af"
+        "semantic_hash": "sha256:5270267e6a857aaae560e5a161b110ae643b4ad3b016c2eceaae90331ae7230a",
+        "sha256": "sha256:f1975d2511b5b4c711ef8b299389a07793b3113077cad32bb8272dcde7b1738b"
       },
       "derivations": [
         "normal-bright-ansi",
@@ -334,8 +334,8 @@
           "high-contrast": "#65ffffff",
           "light": "#8150d6ff"
         },
-        "semantic_hash": "sha256:df8221ecea037e9cd3c449f4dff9a1d4229d3d528e286d4e557cba31661573f6",
-        "sha256": "sha256:9e93c0a6cb1a7b13532d7929a2103a218db92cca37bec5dd55b14ea1e4c371af"
+        "semantic_hash": "sha256:5270267e6a857aaae560e5a161b110ae643b4ad3b016c2eceaae90331ae7230a",
+        "sha256": "sha256:f1975d2511b5b4c711ef8b299389a07793b3113077cad32bb8272dcde7b1738b"
       },
       "derivations": [
         "legacy-quantize-half-up",

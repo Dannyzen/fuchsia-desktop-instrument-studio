@@ -24,6 +24,6 @@ The checked-in positive and negative fixtures are normative examples. The legacy
 
 ## Canonical JSON and diagnostics
 
-Canonical JSON is UTF-8, keys sorted by Unicode code point, with no insignificant whitespace or duplicate keys. Numbers are finite and use JSON's shortest normalized representation; negative zero is normalized to zero by producers. SHA-256 semantic identity is computed over exactly those canonical bytes. Stable rejection codes begin with `E_`; warnings begin with `W_`.
+Canonical JSON is UTF-8, keys sorted by Unicode code point, with no insignificant whitespace or duplicate keys. Numbers are finite and use JSON's shortest normalized representation; negative zero is normalized to zero by producers. SHA-256 semantic identity is computed over canonical package bytes after removing the entire mandatory `metadata` object, because license, extensions, source provenance, and their hashes are inert for rendering. Exact canonical package identity, including metadata, is recorded separately as `package_sha256`; exact external source identity remains `content_hash`. Stable rejection codes begin with `E_`; warnings begin with `W_`.
 
 Limits are normative as recorded in the schema. Assets are package-relative semantic IDs, never executable, with no traversal or external lookup. Built-in IDs provide deterministic fallback.

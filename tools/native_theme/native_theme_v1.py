@@ -162,9 +162,9 @@ def semantic_identity(value: object) -> str:
 
 
 def package_semantic_identity(package: dict[str, object]) -> str:
-    """Hash complete package meaning without recursively hashing the hash field."""
+    """Hash renderable package meaning, excluding mandatory inert metadata."""
     semantic = json.loads(json.dumps(package))
-    semantic["metadata"]["provenance"].pop("semantic_hash", None)
+    semantic.pop("metadata", None)
     return semantic_identity(semantic)
 
 

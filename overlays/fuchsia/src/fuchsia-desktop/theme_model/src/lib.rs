@@ -154,10 +154,10 @@ impl NativeThemeV1 {
 
 fn semantic_digest(value: &Value) -> Result<[u8; 32], ThemeError> {
     let mut projected = value.clone();
-    projected["metadata"]["provenance"]
+    projected
         .as_object_mut()
-        .expect("validated provenance")
-        .remove("semantic_hash");
+        .expect("validated package object")
+        .remove("metadata");
     let bytes = codec::canonical_json_bytes(&projected)?;
     let digest = Sha256::digest(bytes);
     let mut output = [0u8; 32];
@@ -173,9 +173,9 @@ mod tests {
 
     const GOLDEN: &[u8] = include_bytes!("../testdata/native-theme-v1-package.json");
     const GOLDEN_BYTE_HASH: &str =
-        "9e93c0a6cb1a7b13532d7929a2103a218db92cca37bec5dd55b14ea1e4c371af";
+        "f1975d2511b5b4c711ef8b299389a07793b3113077cad32bb8272dcde7b1738b";
     const GOLDEN_SEMANTIC_HASH: &str =
-        "df8221ecea037e9cd3c449f4dff9a1d4229d3d528e286d4e557cba31661573f6";
+        "5270267e6a857aaae560e5a161b110ae643b4ad3b016c2eceaae90331ae7230a";
 
     fn code(bytes: &[u8]) -> &'static str {
         NativeThemeV1::decode_canonical(bytes).unwrap_err().code()
@@ -186,16 +186,42 @@ mod tests {
     }
 
     fn canonical_with_hash(mut value: Value) -> Vec<u8> {
-        value["metadata"]["provenance"]
-            .as_object_mut()
-            .unwrap()
-            .remove("semantic_hash");
-        let semantic_bytes = super::codec::canonical_json_bytes(&value).unwrap();
+        let mut projected = value.clone();
+        projected.as_object_mut().unwrap().remove("metadata");
+        let semantic_bytes = super::codec::canonical_json_bytes(&projected).unwrap();
         let semantic_hash = format!("sha256:{}", hex::encode(Sha256::digest(&semantic_bytes)));
         value["metadata"]["provenance"]["semantic_hash"] = Value::String(semantic_hash);
         let mut bytes = super::codec::canonical_json_bytes(&value).unwrap();
         bytes.push(b'\n');
         bytes
+    }
+
+    #[test]
+    fn semantic_identity_excludes_inert_metadata_only() {
+        let baseline = NativeThemeV1::decode_canonical(GOLDEN).unwrap();
+        let mut metadata_only = golden_value();
+        metadata_only["metadata"]["provenance"]["source_identity"] =
+            Value::String("profiles/other-source.json".to_string());
+        metadata_only["metadata"]["provenance"]["content_hash"] =
+            Value::String(format!("sha256:{}", "1".repeat(64)));
+        metadata_only["metadata"]["provenance"]["license"] = Value::String("MIT".to_string());
+        metadata_only["metadata"]["provenance"]["attribution"] =
+            Value::String("Other contributor".to_string());
+        metadata_only["metadata"]["license"]["spdx"] = Value::String("MIT".to_string());
+        metadata_only["metadata"]["license"]["notice"] =
+            Value::String("Other notice".to_string());
+        metadata_only["metadata"]["extensions"] = serde_json::json!({
+            "org.constructresearch.instrumentstudio.other": {"source": "different"}
+        });
+        let metadata_theme = NativeThemeV1::decode_canonical(&canonical_with_hash(metadata_only)).unwrap();
+        assert_eq!(metadata_theme.semantic_sha256(), baseline.semantic_sha256());
+        assert_ne!(metadata_theme.canonical_bytes(), baseline.canonical_bytes());
+
+        let mut renderable = golden_value();
+        renderable["variants"]["dark"]["primitives"]["accent"] =
+            Value::String("#000000ff".to_string());
+        let renderable_theme = NativeThemeV1::decode_canonical(&canonical_with_hash(renderable)).unwrap();
+        assert_ne!(renderable_theme.semantic_sha256(), baseline.semantic_sha256());
     }
 
     #[test]

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import contextlib
 import importlib.util
@@ -509,6 +510,27 @@ class NativeThemeV1ContractTests(unittest.TestCase):
                 mutate(candidate)
                 with self.assertRaisesRegex(contract.ContractError, "^" + code + ":"):
                     contract.validate_package(candidate)
+
+    def test_complete_package_semantic_hash_excludes_inert_metadata_only(self):
+        package = contract.load_json_strict(self.FIXTURES / "native-theme-v1-package.json")
+        baseline_semantic = contract.package_semantic_identity(package)
+        baseline_bytes = contract.canonical_json_bytes(package)
+
+        metadata_only = copy.deepcopy(package)
+        metadata_only["metadata"]["provenance"]["source_identity"] = "profiles/other-source.json"
+        metadata_only["metadata"]["provenance"]["content_hash"] = "sha256:" + "1" * 64
+        metadata_only["metadata"]["provenance"]["license"] = "MIT"
+        metadata_only["metadata"]["provenance"]["attribution"] = "Other contributor"
+        metadata_only["metadata"]["license"] = {"spdx": "MIT", "notice": "Other notice"}
+        metadata_only["metadata"]["extensions"] = {
+            "org.constructresearch.instrumentstudio.other": {"source": "different"}
+        }
+        self.assertEqual(contract.package_semantic_identity(metadata_only), baseline_semantic)
+        self.assertNotEqual(contract.canonical_json_bytes(metadata_only), baseline_bytes)
+
+        renderable = copy.deepcopy(package)
+        renderable["variants"]["dark"]["semantic"]["surface.canvas"] = "#000000ff"
+        self.assertNotEqual(contract.package_semantic_identity(renderable), baseline_semantic)
 
     def test_canonical_bytes_duplicate_keys_numbers_and_semantic_hash(self):
         package = contract.load_json_strict(self.FIXTURES / "native-theme-v1-package.json")
