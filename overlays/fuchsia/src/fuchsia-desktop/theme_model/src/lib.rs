@@ -1,0 +1,431 @@
+//! Strict, immutable NativeThemeV1 package decoding.
+
+mod codec;
+mod validate;
+
+use serde_json::{Map, Value};
+use sha2::{Digest, Sha256};
+use std::error::Error;
+use std::fmt;
+
+pub const SOURCE_BYTES_LIMIT: usize = 1_048_576;
+pub const COMPILED_PACK_BYTES_LIMIT: usize = 262_144;
+pub const CATALOG_BYTES_LIMIT: usize = 8_388_608;
+pub const TOKEN_LIMIT: usize = 1_024;
+pub const ALIAS_LIMIT: usize = 2_048;
+pub const ALIAS_DEPTH_LIMIT: usize = 32;
+pub const NESTING_LIMIT: usize = 32;
+pub const STRING_BYTES_LIMIT: usize = 4_096;
+pub const SEMANTIC_ASSET_LIMIT: usize = 64;
+pub const DECODED_ASSET_BYTES_LIMIT: usize = 524_288;
+pub const DECODED_ASSETS_TOTAL_BYTES_LIMIT: usize = 4_194_304;
+pub const RUNTIME_SNAPSHOT_BYTES_LIMIT: usize = 524_288;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ThemeError {
+    code: &'static str,
+    message: &'static str,
+}
+
+impl ThemeError {
+    pub fn code(&self) -> &'static str {
+        self.code
+    }
+
+    pub fn message(&self) -> &'static str {
+        self.message
+    }
+}
+
+impl fmt::Display for ThemeError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}: {}", self.code, self.message)
+    }
+}
+
+impl Error for ThemeError {}
+
+pub(crate) fn reject<T>(code: &'static str, message: &'static str) -> Result<T, ThemeError> {
+    Err(ThemeError { code, message })
+}
+
+/// An immutable, fully validated NativeThemeV1 package.
+#[derive(Clone, Debug)]
+pub struct NativeThemeV1 {
+    value: Value,
+    canonical_bytes: Box<[u8]>,
+    semantic_sha256: [u8; 32],
+}
+
+impl NativeThemeV1 {
+    pub fn decode_canonical(bytes: &[u8]) -> Result<Self, ThemeError> {
+        let value = codec::decode_canonical_value(bytes)?;
+        validate::validate_package(&value)?;
+        let semantic_sha256 = semantic_digest(&value)?;
+        let declared = value["metadata"]["provenance"]["semantic_hash"]
+            .as_str()
+            .expect("validated semantic hash");
+        if declared != format!("sha256:{}", hex::encode(semantic_sha256)) {
+            return reject("E_HASH", "semantic identity hash mismatch");
+        }
+        Ok(Self {
+            value,
+            canonical_bytes: bytes.into(),
+            semantic_sha256,
+        })
+    }
+
+    pub fn canonical_bytes(&self) -> &[u8] {
+        &self.canonical_bytes
+    }
+
+    pub fn semantic_sha256(&self) -> [u8; 32] {
+        self.semantic_sha256
+    }
+
+    pub fn semantic_sha256_hex(&self) -> String {
+        hex::encode(self.semantic_sha256)
+    }
+
+    pub fn schema_version(&self) -> &str {
+        self.value["schema_version"]
+            .as_str()
+            .expect("validated schema version")
+    }
+
+    pub fn profile_name(&self) -> &str {
+        self.value["profile"]["name"]
+            .as_str()
+            .expect("validated profile name")
+    }
+
+    pub fn profile_version(&self) -> &str {
+        self.value["profile"]["version"]
+            .as_str()
+            .expect("validated profile version")
+    }
+
+    pub fn theme_id(&self) -> &str {
+        self.value["theme"]["id"]
+            .as_str()
+            .expect("validated theme id")
+    }
+
+    pub fn display_name(&self) -> &str {
+        self.value["theme"]["display_name"]
+            .as_str()
+            .expect("validated display name")
+    }
+
+    pub fn revision(&self) -> u64 {
+        self.value["theme"]["revision"]
+            .as_u64()
+            .expect("validated revision")
+    }
+
+    pub fn variants(&self) -> &Map<String, Value> {
+        self.value["variants"]
+            .as_object()
+            .expect("validated variants")
+    }
+
+    pub fn variant(&self, name: &str) -> Option<&Value> {
+        self.variants().get(name)
+    }
+
+    pub fn fallback(&self) -> &Value {
+        &self.value["fallback"]
+    }
+
+    pub fn policy(&self) -> &Value {
+        &self.value["policy"]
+    }
+
+    pub fn metadata(&self) -> &Value {
+        &self.value["metadata"]
+    }
+
+    pub fn metadata_extensions(&self) -> &Map<String, Value> {
+        self.value["metadata"]["extensions"]
+            .as_object()
+            .expect("validated metadata extensions")
+    }
+}
+
+fn semantic_digest(value: &Value) -> Result<[u8; 32], ThemeError> {
+    let mut projected = value.clone();
+    projected["metadata"]["provenance"]
+        .as_object_mut()
+        .expect("validated provenance")
+        .remove("semantic_hash");
+    let bytes = codec::canonical_json_bytes(&projected)?;
+    let digest = Sha256::digest(bytes);
+    let mut output = [0u8; 32];
+    output.copy_from_slice(&digest);
+    Ok(output)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::NativeThemeV1;
+    use serde_json::{Map, Value};
+    use sha2::{Digest, Sha256};
+
+    const GOLDEN: &[u8] = include_bytes!("../testdata/native-theme-v1-package.json");
+    const GOLDEN_BYTE_HASH: &str =
+        "9e93c0a6cb1a7b13532d7929a2103a218db92cca37bec5dd55b14ea1e4c371af";
+    const GOLDEN_SEMANTIC_HASH: &str =
+        "df8221ecea037e9cd3c449f4dff9a1d4229d3d528e286d4e557cba31661573f6";
+
+    fn code(bytes: &[u8]) -> &'static str {
+        NativeThemeV1::decode_canonical(bytes).unwrap_err().code()
+    }
+
+    fn golden_value() -> Value {
+        serde_json::from_slice(GOLDEN).unwrap()
+    }
+
+    fn canonical_with_hash(mut value: Value) -> Vec<u8> {
+        value["metadata"]["provenance"]
+            .as_object_mut()
+            .unwrap()
+            .remove("semantic_hash");
+        let semantic_bytes = super::codec::canonical_json_bytes(&value).unwrap();
+        let semantic_hash = format!("sha256:{}", hex::encode(Sha256::digest(&semantic_bytes)));
+        value["metadata"]["provenance"]["semantic_hash"] = Value::String(semantic_hash);
+        let mut bytes = super::codec::canonical_json_bytes(&value).unwrap();
+        bytes.push(b'\n');
+        bytes
+    }
+
+    #[test]
+    fn golden_decode_hash_and_read_only_accessors() {
+        assert_eq!(hex::encode(Sha256::digest(GOLDEN)), GOLDEN_BYTE_HASH);
+        let theme = NativeThemeV1::decode_canonical(GOLDEN).unwrap();
+        assert_eq!(theme.schema_version(), "1.0.0");
+        assert_eq!(theme.profile_name(), "instrument-studio-dtcg-subset");
+        assert_eq!(theme.profile_version(), "2025.10");
+        assert_eq!(theme.theme_id(), "instrument-studio");
+        assert_eq!(theme.display_name(), "Instrument Studio");
+        assert_eq!(theme.revision(), 1);
+        assert_eq!(theme.semantic_sha256_hex(), GOLDEN_SEMANTIC_HASH);
+        assert_eq!(hex::encode(theme.semantic_sha256()), GOLDEN_SEMANTIC_HASH);
+        assert_eq!(
+            theme.variant("dark").unwrap()["semantic"]["interaction.selection"],
+            "#8150d6ff"
+        );
+        assert_eq!(theme.variants().len(), 3);
+        assert_eq!(theme.fallback()["missing_token"], "fail");
+        assert_eq!(theme.policy()["unknown_required_version"], "fail-closed");
+        assert_eq!(theme.metadata()["license"]["spdx"], "BSD-3-Clause");
+    }
+
+    #[test]
+    fn golden_round_trip_preserves_exact_bytes() {
+        let theme = NativeThemeV1::decode_canonical(GOLDEN).unwrap();
+        assert_eq!(theme.canonical_bytes(), GOLDEN);
+        let decoded_again = NativeThemeV1::decode_canonical(theme.canonical_bytes()).unwrap();
+        assert_eq!(decoded_again.canonical_bytes(), GOLDEN);
+    }
+
+    #[test]
+    fn duplicate_keys_are_rejected_distinctly() {
+        assert_eq!(
+            code(b"{\"schema_version\":\"1.0.0\",\"schema_version\":\"1.0.0\"}\n"),
+            "E_JSON_DUPLICATE"
+        );
+    }
+
+    #[test]
+    fn unknown_schema_and_profile_versions_fail_closed() {
+        let schema = String::from_utf8(GOLDEN.to_vec()).unwrap().replace(
+            "\"schema_version\":\"1.0.0\"",
+            "\"schema_version\":\"2.0.0\"",
+        );
+        assert_eq!(code(schema.as_bytes()), "E_VERSION_REQUIRED");
+
+        let profile = String::from_utf8(GOLDEN.to_vec())
+            .unwrap()
+            .replace("\"version\":\"2025.10\"", "\"version\":\"2026.1\"");
+        assert_eq!(code(profile.as_bytes()), "E_VERSION_PROFILE");
+    }
+
+    #[test]
+    fn additive_namespaced_metadata_is_preserved_exactly() {
+        let mut value = golden_value();
+        value["metadata"]["extensions"]["org.constructresearch.instrumentstudio.future"] =
+            serde_json::json!({"enabled": true, "label": "Δ"});
+        let bytes = canonical_with_hash(value);
+        let theme = NativeThemeV1::decode_canonical(&bytes).unwrap();
+        assert_eq!(theme.canonical_bytes(), bytes);
+        assert_eq!(
+            theme.metadata_extensions()["org.constructresearch.instrumentstudio.future"]["label"],
+            "Δ"
+        );
+    }
+
+    #[test]
+    fn package_string_nesting_and_token_limits_are_bounded() {
+        assert_eq!(code(&vec![b' '; 262_146]), "E_LIMIT_PACK");
+
+        let long_string = format!("{{\"x\":\"{}\"}}\n", "x".repeat(4097));
+        assert_eq!(code(long_string.as_bytes()), "E_LIMIT_STRING");
+
+        let deeply_nested = format!("{{\"x\":{}0{}}}\n", "[".repeat(33), "]".repeat(33));
+        assert_eq!(code(deeply_nested.as_bytes()), "E_LIMIT_NESTING");
+
+        let mut value = golden_value();
+        let variants = value["variants"].as_object_mut().unwrap();
+        let current: usize = variants
+            .values()
+            .map(|variant| {
+                ["primitives", "semantic", "components"]
+                    .iter()
+                    .map(|layer| variant[*layer].as_object().unwrap().len())
+                    .sum::<usize>()
+            })
+            .sum();
+        let primitives = variants.get_mut("dark").unwrap()["primitives"]
+            .as_object_mut()
+            .unwrap();
+        for index in 0..(1025 - current) {
+            primitives.insert(
+                format!("extra{index:04}"),
+                Value::String("#000000ff".into()),
+            );
+        }
+        assert_eq!(code(&canonical_with_hash(value)), "E_LIMIT_TOKENS");
+    }
+
+    #[test]
+    fn asset_count_individual_and_total_decoded_limits_are_bounded() {
+        let mut count_value = golden_value();
+        let items = count_value["variants"]["dark"]["assets"]["items"]
+            .as_object_mut()
+            .unwrap();
+        let template = items["status.error"].clone();
+        for index in items.len()..65 {
+            items.insert(format!("extra.asset.{index:02}"), template.clone());
+        }
+        assert_eq!(code(&canonical_with_hash(count_value)), "E_LIMIT_ASSETS");
+
+        let mut individual_value = golden_value();
+        individual_value["variants"]["dark"]["assets"]["items"]["status.error"]["decoded_bytes"] =
+            Value::from(524_289);
+        assert_eq!(
+            code(&canonical_with_hash(individual_value)),
+            "E_LIMIT_ASSET_BYTES"
+        );
+
+        let mut total_value = golden_value();
+        for variant in total_value["variants"]
+            .as_object_mut()
+            .unwrap()
+            .values_mut()
+        {
+            for asset in variant["assets"]["items"]
+                .as_object_mut()
+                .unwrap()
+                .values_mut()
+            {
+                asset["decoded_bytes"] = Value::from(524_288);
+            }
+        }
+        assert_eq!(
+            code(&canonical_with_hash(total_value)),
+            "E_LIMIT_ASSETS_TOTAL"
+        );
+    }
+
+    #[test]
+    fn noncanonical_and_malformed_json_are_distinct() {
+        let mut spaced = GOLDEN.to_vec();
+        spaced.insert(1, b' ');
+        assert_eq!(code(&spaced), "E_JSON_NONCANONICAL");
+        assert_eq!(code(b"{\"x\":-0}\n"), "E_JSON_NONCANONICAL");
+        assert_eq!(code(b"{\"x\":1.0}\n"), "E_JSON_NONCANONICAL");
+        assert_eq!(code(b"{\"b\":0,\"a\":0}\n"), "E_JSON_NONCANONICAL");
+        assert_eq!(code(b"{\"x\":0}"), "E_JSON_NONCANONICAL");
+        assert_eq!(code(b"{\"x\":01}\n"), "E_JSON_MALFORMED");
+        assert_eq!(code(b"{\"x\":NaN}\n"), "E_NUMBER_NONFINITE");
+        assert_eq!(code(b"{\"x\":1e400}\n"), "E_NUMBER_NONFINITE");
+    }
+
+    #[test]
+    fn invalid_utf8_is_rejected_distinctly() {
+        assert_eq!(
+            code(&[b'{', b'\"', 0xff, b'\"', b':', b'0', b'}', b'\n']),
+            "E_UTF8"
+        );
+    }
+
+    #[test]
+    fn unknown_structural_fields_are_rejected_outside_extensions() {
+        let mut root = golden_value();
+        root.as_object_mut()
+            .unwrap()
+            .insert("command".into(), Value::String("no".into()));
+        assert_eq!(code(&canonical_with_hash(root)), "E_FIELD_FORBIDDEN");
+
+        let mut nested = golden_value();
+        nested["theme"]
+            .as_object_mut()
+            .unwrap()
+            .insert("future".into(), Value::Bool(true));
+        assert_eq!(code(&canonical_with_hash(nested)), "E_FIELD_FORBIDDEN");
+
+        let mut variant = golden_value();
+        variant["variants"]["dark"]
+            .as_object_mut()
+            .unwrap()
+            .insert("script".into(), Value::String("no".into()));
+        assert_eq!(code(&canonical_with_hash(variant)), "E_FIELD_FORBIDDEN");
+    }
+
+    #[test]
+    fn identity_hash_and_provenance_tampering_are_distinct() {
+        let mut identity = golden_value();
+        identity["metadata"]["provenance"]["source_identity"] = Value::String("../secret".into());
+        assert_eq!(code(&canonical_with_hash(identity)), "E_IDENTITY");
+
+        let mut hash = GOLDEN.to_vec();
+        let position = hash
+            .windows(64)
+            .position(|window| window == GOLDEN_SEMANTIC_HASH.as_bytes())
+            .unwrap();
+        hash[position] = b'0';
+        assert_eq!(code(&hash), "E_HASH");
+
+        let mut provenance = golden_value();
+        provenance["metadata"]["provenance"]["tokens"]["surface.canvas"]["kind"] =
+            Value::String("invented".into());
+        assert_eq!(code(&canonical_with_hash(provenance)), "E_PROVENANCE");
+    }
+
+    #[test]
+    fn semantic_color_focus_and_contrast_rules_are_enforced() {
+        let mut color = golden_value();
+        color["variants"]["dark"]["semantic"]["text.normal"] = Value::String("#FFFFFFff".into());
+        assert_eq!(code(&canonical_with_hash(color)), "E_COLOR_CANONICAL");
+
+        let mut focus = golden_value();
+        let selection = focus["variants"]["dark"]["semantic"]["interaction.selection"].clone();
+        focus["variants"]["dark"]["semantic"]["border.focusConfirmed"] = selection;
+        assert_eq!(code(&canonical_with_hash(focus)), "E_FOCUS_DISTINCT");
+
+        let mut contrast = golden_value();
+        contrast["variants"]["dark"]["semantic"]["text.normal"] =
+            contrast["variants"]["dark"]["semantic"]["surface.canvas"].clone();
+        assert_eq!(code(&canonical_with_hash(contrast)), "E_CONTRAST_NORMAL");
+    }
+
+    #[test]
+    fn extensions_reject_unreserved_namespaces() {
+        let mut value = golden_value();
+        value["metadata"]["extensions"]
+            .as_object_mut()
+            .unwrap()
+            .insert("com.example.unsupported".into(), Value::Object(Map::new()));
+        assert_eq!(code(&canonical_with_hash(value)), "E_EXTENSION_NAMESPACE");
+    }
+}
