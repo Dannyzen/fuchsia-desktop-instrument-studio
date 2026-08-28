@@ -169,11 +169,7 @@ def allowed_subprocess(argv: object, root: Path) -> bool:
             "scripts/test-native-theme-v1.py", "scripts/test-native-theme-legacy-oracle.py",
             "scripts/test-native-theme-sq01-harness.py",
         }: return True
-        if len(argv) == 8 and argv[1:7] == ["-m", "coverage", "run", "--branch", "--append", "--source=tools/native_theme"]:
-            return argv[7] in {"scripts/test-native-theme-v1.py", "scripts/test-native-theme-legacy-oracle.py",
-                               "scripts/test-native-theme-sq01-harness.py"}
-        return (len(argv) == 6 and argv[1:5] == ["-m", "coverage", "json", "-o"] and
-                Path(argv[5]).name == "coverage.json")
+        return False
     if argv[0] == "git":
         return list(argv[1:]) in (["rev-parse", "HEAD"], ["rev-parse", "HEAD^{tree}"],
                                  ["status", "--porcelain=v1", "--untracked-files=all"],
@@ -949,23 +945,50 @@ def _public_scan(root: Path) -> dict[str, Any]:
             "skipped_required": skipped}
 
 
-def _coverage(root: Path, temp: Path) -> dict[str, Any]:
-    data_file = temp / ".coverage"
-    env = dict(os.environ); env["COVERAGE_FILE"] = str(data_file); env["PYTHONDONTWRITEBYTECODE"] = "1"
-    commands = ["scripts/test-native-theme-v1.py", "scripts/test-native-theme-legacy-oracle.py", "scripts/test-native-theme-sq01-harness.py"]
+def _write_coverage_support(temp: Path) -> Path:
+    config = temp / "coverage.ini"
+    config.write_text("[run]\nsource = tools/native_theme\nbranch = true\nparallel = true\nrelative_files = true\n")
+    (temp / "sitecustomize.py").write_text("import coverage\ncoverage.process_startup()\n")
+    return config.resolve()
+
+
+def _coverage_run(root: Path, temp: Path, commands: list[str],
+                  module_paths: tuple[str, ...] | None = None,
+                  parent_coverage: Any | None = None) -> dict[str, Any]:
+    import coverage as coverage_api
+    config = _write_coverage_support(temp)
+    data_file = (temp / ".coverage-sq01").resolve()
+    env = dict(os.environ)
+    env.update({"COVERAGE_PROCESS_START": str(config), "COVERAGE_FILE": str(data_file),
+                "PYTHONDONTWRITEBYTECODE": "1"})
+    old_pythonpath = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = str(temp.resolve()) + (os.pathsep + old_pythonpath if old_pythonpath else "")
     test_results = []
     for script in commands:
-        result = run_allowed([sys.executable, "-m", "coverage", "run", "--branch", "--append", "--source=tools/native_theme", script],
-                             root, env=env, capture_output=True, text=True)
+        result = run_allowed([sys.executable, script], root, env=env, check=True,
+                             capture_output=True, text=True)
         count = len(re.findall(r"^test_.*\.\.\. ok$", result.stderr, re.M))
         test_results.append({"script": script, "returncode": result.returncode, "tests": count})
+
+    if parent_coverage is not None:
+        parent_coverage.stop()
+        parent_coverage.save()
+    data_parts = sorted(temp.glob(data_file.name + ".*"))
+    if not data_parts:
+        raise RuntimeError("no coverage data produced by test processes")
+    measured = coverage_api.Coverage(config_file=str(config), data_file=str(data_file))
+    try:
+        measured.combine(data_paths=[str(temp)], strict=True)
+        measured.load()
+    except coverage_api.CoverageException as exc:
+        raise RuntimeError("coverage data combine failed") from exc
     report_path = temp / "coverage.json"
-    run_allowed([sys.executable, "-m", "coverage", "json", "-o", str(report_path)],
-                root, env=env, check=True, capture_output=True)
+    measured.json_report(outfile=str(report_path))
     report = json.loads(report_path.read_text())
     modules = []
     total_functions = hit_functions = 0
-    for rel in SAFETY_MODULES:
+    paths = module_paths if module_paths is not None else tuple(sorted(report["files"]))
+    for rel in paths:
         entry = report["files"].get(rel, {"executed_lines": [], "missing_lines": [], "summary": {"num_branches": 0, "covered_branches": 0, "missing_branches": 0}})
         executed = set(entry["executed_lines"])
         tree = ast.parse((root / rel).read_text())
@@ -985,6 +1008,23 @@ def _coverage(root: Path, temp: Path) -> dict[str, Any]:
             "function_coverage": {"covered": hit_functions, "total": total_functions, "percent": 100 * hit_functions / total_functions if total_functions else 100},
             "branch_coverage": {"covered": branch_hit, "total": branch_total, "percent": 100 * branch_hit / branch_total if branch_total else 100},
             "target_met": hit_functions == total_functions and branch_hit == branch_total}
+
+
+def _coverage(root: Path, temp: Path) -> dict[str, Any]:
+    import coverage as coverage_api
+    config = _write_coverage_support(temp)
+    parent = coverage_api.Coverage(config_file=str(config),
+                                   data_file=str((temp / ".coverage-sq01").resolve()),
+                                   data_suffix=True)
+    parent.start()
+    try:
+        commands = ["scripts/test-native-theme-v1.py", "scripts/test-native-theme-legacy-oracle.py",
+                    "scripts/test-native-theme-sq01-harness.py"]
+        return _coverage_run(root, temp, commands, SAFETY_MODULES, parent)
+    finally:
+        parent.stop()
+        if temp.exists():
+            shutil.rmtree(temp)
 
 
 def run_gate(root: Path, source_sha: str, output: Path, *, safe_temp_root: Path | None = None) -> int:

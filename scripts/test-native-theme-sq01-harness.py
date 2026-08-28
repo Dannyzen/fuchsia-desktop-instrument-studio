@@ -5,7 +5,10 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import types
 import unittest
@@ -425,6 +428,73 @@ class Sq01HarnessTests(unittest.TestCase):
                         "sys.modules", {"sq01_semantic_validator": types.SimpleNamespace(validate_paths=lambda *_: {"status": "PASS", "errors": []})}):
                     self.assertEqual(self.h.run_gate(ROOT, "1" * 40, output, safe_temp_root=Path(td)), 0)
             self.assertEqual({p.name for p in output.iterdir()}, set(self.h.ALL_RECEIPTS))
+
+    def test_coverage_environment_measures_real_grandchild_module(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "scripts").mkdir()
+            native = root / "tools/native_theme"
+            native.mkdir(parents=True)
+            (native / "child_only.py").write_text("def child_only():\n    return 17\n\nchild_only()\n")
+            (root / "scripts/test-native-theme-v1.py").write_text(
+                "import subprocess, sys\n"
+                "raise SystemExit(subprocess.run([sys.executable, 'tools/native_theme/child_only.py']).returncode)\n")
+            temp = root / "private-coverage"
+            temp.mkdir()
+            runner = (
+                "import importlib.util,json,sys; from pathlib import Path; "
+                "p=Path(sys.argv[1]); s=importlib.util.spec_from_file_location('coverage_probe',p); "
+                "h=importlib.util.module_from_spec(s); s.loader.exec_module(h); "
+                "print(json.dumps(h._coverage_run(Path(sys.argv[2]),Path(sys.argv[3]),"
+                "['scripts/test-native-theme-v1.py'])))"
+            )
+            env = dict(os.environ)
+            env.pop("COVERAGE_PROCESS_START", None)
+            env.pop("COVERAGE_FILE", None)
+            result = subprocess.run([sys.executable, "-c", runner, str(ROOT / "tools/native_theme/sq01_harness.py"), str(root), str(temp)],
+                                    cwd=root, env=env, check=True, capture_output=True, text=True)
+            report = json.loads(result.stdout)
+            row = next(item for item in report["modules"] if item["path"] == "tools/native_theme/child_only.py")
+            self.assertEqual(row["statements"], {"covered": 3, "total": 3, "missing_lines": []})
+
+    def test_coverage_config_is_exact_and_has_no_omissions(self):
+        with tempfile.TemporaryDirectory() as td:
+            config = self.h._write_coverage_support(Path(td))
+            text = config.read_text()
+        self.assertIn("source = tools/native_theme", text)
+        self.assertIn("branch = true", text)
+        self.assertIn("parallel = true", text)
+        self.assertIn("relative_files = true", text)
+        self.assertNotRegex(text, r"(?im)^\s*(omit|exclude_lines)\s*=")
+
+    def test_coverage_missing_child_data_fails_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            with mock.patch.object(self.h, "run_allowed", return_value=subprocess.CompletedProcess([], 0, "", "")):
+                with self.assertRaisesRegex(RuntimeError, "coverage data"):
+                    self.h._coverage_run(ROOT, Path(td), ["scripts/test-native-theme-v1.py"])
+
+    def test_coverage_support_is_private_and_cleaned_without_receipt_changes(self):
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            output = base / "receipts"
+            output.mkdir()
+            originals = {}
+            for index, name in enumerate(self.h.ALL_RECEIPTS):
+                raw = f"receipt-{index}".encode()
+                (output / name).write_bytes(raw)
+                originals[name] = raw
+            private = base / "coverage-private"
+            private.mkdir()
+            self.assertFalse(private.is_relative_to(output))
+            fake_parent = mock.Mock()
+            fake_coverage = types.SimpleNamespace(Coverage=mock.Mock(return_value=fake_parent))
+            with mock.patch.dict(sys.modules, {"coverage": fake_coverage}), mock.patch.object(
+                    self.h, "_coverage_run", return_value={"target_met": True}):
+                self.assertEqual(self.h._coverage(ROOT, private), {"target_met": True})
+            fake_parent.start.assert_called_once_with()
+            fake_parent.stop.assert_called_once_with()
+            self.assertFalse(private.exists())
+            self.assertEqual({name: (output / name).read_bytes() for name in originals}, originals)
 
 
 def load_module(path, name):
