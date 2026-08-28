@@ -107,16 +107,21 @@ class Sq01HarnessTests(unittest.TestCase):
             with self.subTest(argv=argv):
                 self.assertFalse(self.h.allowed_subprocess(argv, ROOT))
 
-    def test_git_diff_allowlist_requires_exact_pinned_ref_shape(self):
+    def test_git_diff_allowlist_requires_config_immune_pinned_ref_shape(self):
         source_sha = "1" * 40
-        command = ["git", "diff", "--binary", self.h.BASE_SHA, source_sha]
+        command = [
+            "git", "diff", "--binary", "--full-index", "--no-color", "--no-ext-diff",
+            "--no-textconv", "--src-prefix=a/", "--dst-prefix=b/",
+            "--diff-algorithm=myers", "--no-renames", self.h.BASE_SHA, source_sha, "--",
+        ]
         self.assertTrue(self.h.allowed_subprocess(command, ROOT))
         denied = (
-            ["git", "diff", "--binary", source_sha],
-            ["git", "diff", "--binary", self.h.BASE_SHA],
+            ["git", "diff", "--binary", self.h.BASE_SHA, source_sha],
+            command[:5] + command[6:],
+            command[:-1],
             command + ["--stat"],
-            ["git", "diff", "--binary", "HEAD", source_sha],
-            ["git", "diff", "--binary", self.h.BASE_SHA, "HEAD"],
+            command[:-3] + ["HEAD", source_sha, "--"],
+            command[:-2] + ["HEAD", "--"],
             ["git", "clone", "https://example.invalid/repository"],
             ["git", "fetch", "origin"],
             ["git", "push", "origin", "HEAD"],
@@ -125,6 +130,13 @@ class Sq01HarnessTests(unittest.TestCase):
         for argv in denied:
             with self.subTest(argv=argv):
                 self.assertFalse(self.h.allowed_subprocess(argv, ROOT))
+
+    def test_ci_pins_exact_python_and_preserves_clean_source_before_gate(self):
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text("utf-8")
+        self.assertIn("fetch-depth: 0", workflow)
+        self.assertIn("python-version: '3.12.9'", workflow)
+        self.assertIn("run: bash scripts/secret-scan.sh", workflow)
+        self.assertNotIn("chmod +x scripts/*.sh scripts/*.py", workflow)
 
     def test_receipt_shape_canonicality_and_hash_are_enforced(self):
         receipt = {"schema_version": "1.0.0", "status": "PASS"}

@@ -21,6 +21,11 @@ import urllib.request
 
 BASE_SHA = "e30546cbc5f6309fbd76c2bcdce69ec1cb96f0de"
 PINNED = {"jsonschema": "4.25.1", "coverage": "7.6.12"}
+BINARY_DIFF_ARGS = (
+    "diff", "--binary", "--full-index", "--no-color", "--no-ext-diff",
+    "--no-textconv", "--src-prefix=a/", "--dst-prefix=b/",
+    "--diff-algorithm=myers", "--no-renames", BASE_SHA,
+)
 COMPONENT_RECEIPTS = (
     "profile-fixture-inventory.json", "schema-validation.json",
     "semantic-conformance.json", "mutation-results.json",
@@ -173,9 +178,12 @@ def allowed_subprocess(argv: object, root: Path) -> bool:
     if argv[0] == "git":
         return list(argv[1:]) in (["rev-parse", "HEAD"], ["rev-parse", "HEAD^{tree}"],
                                  ["status", "--porcelain=v1", "--untracked-files=all"],
-                                 ["ls-files"]) or (len(argv) == 5 and
-                                                   argv[1:4] == ["diff", "--binary", BASE_SHA] and
-                                                   re.fullmatch(r"[0-9a-f]{40}", argv[4]) is not None)
+                                 ["ls-files"]) or (
+                                     len(argv) == len(BINARY_DIFF_ARGS) + 3 and
+                                     tuple(argv[1:-2]) == BINARY_DIFF_ARGS and
+                                     re.fullmatch(r"[0-9a-f]{40}", argv[-2]) is not None and
+                                     argv[-1] == "--"
+                                 )
     return False
 
 
@@ -498,7 +506,7 @@ def _file_record(root: Path, path: Path) -> dict[str, Any]:
 def _source_manifest(root: Path, ident: SourceIdentity) -> dict[str, Any]:
     tracked = sorted(str(git(root, "ls-files")).splitlines())
     records = [_file_record(root, root / p) for p in tracked]
-    diff = bytes(git(root, "diff", "--binary", BASE_SHA, ident.sha, binary=True))
+    diff = bytes(git(root, *BINARY_DIFF_ARGS, ident.sha, "--", binary=True))
     def hashed(path: str) -> str:
         return sha256((root / path).read_bytes())
     versions = {}
@@ -508,7 +516,11 @@ def _source_manifest(root: Path, ident: SourceIdentity) -> dict[str, Any]:
     return {
         "schema_version": "1.0.0", "status": "PASS", "source_sha": ident.sha,
         "source_tree": ident.tree, "comparison_base_sha": BASE_SHA,
-        "binary_diff_serialization": "raw bytes from git diff --binary <base-sha> <source-sha>",
+        "binary_diff_serialization": (
+            "raw bytes from git diff --binary --full-index --no-color --no-ext-diff "
+            "--no-textconv --src-prefix=a/ --dst-prefix=b/ --diff-algorithm=myers "
+            "--no-renames <base-sha> <source-sha> --"
+        ),
         "binary_diff_sha256": sha256(diff), "tracked_files": records,
         "tracked_manifest_sha256": sha256(canonical_json_bytes(records)),
         "schema_sha256": hashed("tools/native_theme/native-theme-v1.schema.json"),

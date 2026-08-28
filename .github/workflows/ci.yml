@@ -11,7 +11,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.12.9'
       - name: Secret and structure scan
         run: bash scripts/secret-scan.sh
       - name: Package structure checks
