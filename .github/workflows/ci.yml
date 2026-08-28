@@ -13,9 +13,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Secret and structure scan
-        run: |
-          chmod +x scripts/*.sh scripts/*.py || true
-          ./scripts/secret-scan.sh
+        run: bash scripts/secret-scan.sh
       - name: Package structure checks
         run: |
           test -f versions.env
