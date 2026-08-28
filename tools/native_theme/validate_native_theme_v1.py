@@ -10,7 +10,13 @@ import re
 import sys
 from typing import NoReturn
 
-from native_theme_v1 import ContractError, canonical_json_bytes, load_json_strict, semantic_identity, validate_package
+from native_theme_v1 import (
+    ContractError,
+    canonical_json_bytes,
+    load_json_strict,
+    package_semantic_identity,
+    validate_package,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = Path(__file__).with_name("native-theme-v1.schema.json")
@@ -176,10 +182,16 @@ def main(argv: list[str]) -> int:
         path = Path(argv[1])
         candidate = load_json_strict(path)
         if "variants" in candidate:
-            if path.read_bytes() != canonical_json_bytes(candidate) + b"\n":
+            exact_package_bytes = canonical_json_bytes(candidate) + b"\n"
+            if path.read_bytes() != exact_package_bytes:
                 fail("E_JSON_NONCANONICAL: package must be canonical JSON plus final newline")
             validate_package(candidate)
-            print(f"VALID NativeThemeV1 {semantic_identity(candidate)}")
+            semantic_hash = package_semantic_identity(candidate)
+            package_sha256 = "sha256:" + hashlib.sha256(exact_package_bytes).hexdigest()
+            print(
+                f"VALID NativeThemeV1 semantic_hash={semantic_hash} "
+                f"package_sha256={package_sha256}"
+            )
             return 0
         validate(path)
     except (ContractError, ValidationError, OSError, json.JSONDecodeError, TypeError, KeyError) as error:

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import contextlib
 import importlib.util
@@ -26,6 +27,40 @@ SCHEMA = ROOT / "tools/native_theme/native-theme-v1.schema.json"
 MANIFEST = ROOT / "tools/native_theme/fixtures/profile-fixture-manifest.json"
 LEGACY = ROOT / "overlays/fuchsia/src/fuchsia-desktop/desktop_ui/src/tokens.rs"
 EXPECTED_SEMANTIC_HASH = "sha256:455014e692f51a536550a1e0368b66b1758bdfb7e7037f35acc2dc570aa24051"
+EXPECTED_PACKAGE_SEMANTIC_HASH = "sha256:5270267e6a857aaae560e5a161b110ae643b4ad3b016c2eceaae90331ae7230a"
+EXPECTED_PACKAGE_SHA256 = "sha256:f1975d2511b5b4c711ef8b299389a07793b3113077cad32bb8272dcde7b1738b"
+EXPECTED_PACKAGE_VALIDATION_LINE = (
+    f"VALID NativeThemeV1 semantic_hash={EXPECTED_PACKAGE_SEMANTIC_HASH} "
+    f"package_sha256={EXPECTED_PACKAGE_SHA256}"
+)
+
+
+def package_with_canonical_body_size(size: int) -> dict[str, object]:
+    package = json.loads((ROOT / "tools/native_theme/fixtures/native-theme-v1-package.json").read_text())
+    extensions = package["metadata"]["extensions"]
+    extensions.clear()
+    prior_key = None
+    index = 0
+    while True:
+        body = contract.canonical_json_bytes(package)
+        remaining = size - len(body)
+        if remaining == 0:
+            return package
+        if remaining < 0:
+            raise AssertionError(f"cannot construct canonical body of {size} bytes")
+        key = f"org.constructresearch.instrumentstudio.padding-{index:03d}"
+        extensions[key] = ""
+        overhead = len(contract.canonical_json_bytes(package)) - len(body)
+        if remaining >= overhead:
+            extensions[key] = "x" * min(4000, remaining - overhead)
+            prior_key = key
+            index += 1
+        else:
+            extensions.pop(key)
+            if prior_key is None:
+                raise AssertionError("target leaves no room for canonical padding")
+            extensions[prior_key] = extensions[prior_key][:-(overhead - remaining)]
+            extensions[key] = ""
 
 
 def run(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -510,6 +545,33 @@ class NativeThemeV1ContractTests(unittest.TestCase):
                 with self.assertRaisesRegex(contract.ContractError, "^" + code + ":"):
                     contract.validate_package(candidate)
 
+    def test_complete_package_semantic_hash_excludes_inert_metadata_only(self):
+        package = contract.load_json_strict(self.FIXTURES / "native-theme-v1-package.json")
+        baseline_semantic = contract.package_semantic_identity(package)
+        baseline_bytes = contract.canonical_json_bytes(package)
+        baseline_package_sha256 = "sha256:" + hashlib.sha256(baseline_bytes + b"\n").hexdigest()
+        self.assertEqual(baseline_semantic, EXPECTED_PACKAGE_SEMANTIC_HASH)
+        self.assertEqual(baseline_package_sha256, EXPECTED_PACKAGE_SHA256)
+
+        metadata_only = copy.deepcopy(package)
+        metadata_only["metadata"]["provenance"]["source_identity"] = "profiles/other-source.json"
+        metadata_only["metadata"]["provenance"]["content_hash"] = "sha256:" + "1" * 64
+        metadata_only["metadata"]["provenance"]["license"] = "MIT"
+        metadata_only["metadata"]["provenance"]["attribution"] = "Other contributor"
+        metadata_only["metadata"]["license"] = {"spdx": "MIT", "notice": "Other notice"}
+        metadata_only["metadata"]["extensions"] = {
+            "org.constructresearch.instrumentstudio.other": {"source": "different"}
+        }
+        self.assertEqual(contract.package_semantic_identity(metadata_only), baseline_semantic)
+        metadata_only_bytes = contract.canonical_json_bytes(metadata_only)
+        metadata_only_package_sha256 = "sha256:" + hashlib.sha256(metadata_only_bytes + b"\n").hexdigest()
+        self.assertNotEqual(metadata_only_bytes, baseline_bytes)
+        self.assertNotEqual(metadata_only_package_sha256, baseline_package_sha256)
+
+        renderable = copy.deepcopy(package)
+        renderable["variants"]["dark"]["semantic"]["surface.canvas"] = "#000000ff"
+        self.assertNotEqual(contract.package_semantic_identity(renderable), baseline_semantic)
+
     def test_canonical_bytes_duplicate_keys_numbers_and_semantic_hash(self):
         package = contract.load_json_strict(self.FIXTURES / "native-theme-v1-package.json")
         canonical = contract.canonical_json_bytes(package)
@@ -544,6 +606,39 @@ class NativeThemeV1ContractTests(unittest.TestCase):
         with self.assertRaisesRegex(contract.ContractError, "E_EXTENSION_NAMESPACE"):
             contract.validate_package(candidate)
 
+    def test_full_file_pack_boundaries_and_dominated_runtime_invariant(self):
+        for raw_size in (262143, 262144):
+            with self.subTest(raw_size=raw_size):
+                package = package_with_canonical_body_size(raw_size - 1)
+                raw = contract.canonical_json_bytes(package) + b"\n"
+                self.assertEqual(len(raw), raw_size)
+                self.assertEqual(contract.canonical_package_file_size(raw[:-1]), raw_size)
+                contract.validate_package(package)
+        oversized = package_with_canonical_body_size(262144)
+        oversized_raw = contract.canonical_json_bytes(oversized) + b"\n"
+        self.assertEqual(len(oversized_raw), 262145)
+        self.assertEqual(contract.canonical_package_file_size(oversized_raw[:-1]), 262145)
+        with self.assertRaisesRegex(contract.ContractError, "^E_LIMIT_PACK:"):
+            contract.validate_package(oversized)
+
+        with mock.patch.dict(contract.LIMITS, {"compiled_pack_bytes": 2, "runtime_snapshot_bytes": 1}):
+            with self.assertRaisesRegex(RuntimeError, "E_INTERNAL_LIMIT_CONTRACT"):
+                contract.assert_dominated_runtime_snapshot(1)
+        with mock.patch.dict(contract.LIMITS, {"compiled_pack_bytes": 1, "runtime_snapshot_bytes": 2}):
+            with self.assertRaisesRegex(RuntimeError, "E_INTERNAL_LIMIT_CONTRACT"):
+                contract.assert_dominated_runtime_snapshot(3)
+
+    def test_all_approved_packages_fit_both_full_file_limits(self):
+        package_paths = [self.FIXTURES / "native-theme-v1-package.json"]
+        package_paths.extend(sorted((ROOT / "overlays/fuchsia/src/fuchsia-desktop/theme_catalog/catalog").glob("*.package.json")))
+        self.assertEqual(len(package_paths), 5)
+        for path in package_paths:
+            raw = path.read_bytes()
+            with self.subTest(path=path.name):
+                self.assertTrue(raw.endswith(b"\n"))
+                self.assertLessEqual(len(raw), contract.LIMITS["compiled_pack_bytes"])
+                self.assertLessEqual(len(raw), contract.LIMITS["runtime_snapshot_bytes"])
+
     def test_domain_shapes_assets_licensing_and_ui_contrast_are_enforced(self):
         package = contract.load_json_strict(self.FIXTURES / "native-theme-v1-package.json")
         cases = [
@@ -567,7 +662,7 @@ class NativeThemeV1ContractTests(unittest.TestCase):
         first = run(VALIDATOR, fixture)
         second = run(VALIDATOR, fixture)
         self.assertEqual(first.stdout, second.stdout)
-        self.assertRegex(first.stdout, r"VALID NativeThemeV1 sha256:[0-9a-f]{64}")
+        self.assertEqual(first.stdout, EXPECTED_PACKAGE_VALIDATION_LINE + "\n")
 
     def test_schema_publishes_machine_readable_contract_policy(self):
         schema = json.loads(SCHEMA.read_text())
@@ -577,6 +672,20 @@ class NativeThemeV1ContractTests(unittest.TestCase):
         self.assertEqual(policy["canonical_color"], "lowercase-rrggbbaa-srgb")
         self.assertEqual(policy["extension_namespace"], "org.constructresearch.instrumentstudio.*")
         self.assertEqual(policy["limits"], contract.LIMITS)
+        self.assertEqual(policy["limit_units"], {
+            "compiled_pack_bytes": "canonical_utf8_package_file_bytes_including_final_lf",
+            "runtime_snapshot_bytes": "retained_canonical_utf8_package_file_bytes_including_final_lf",
+        })
+        self.assertEqual(policy["limit_relations"], [{
+            "additive_bytes": 0,
+            "dominated": "runtime_snapshot_bytes",
+            "proof": "compiled_pack_bytes <= runtime_snapshot_bytes",
+            "stricter": "compiled_pack_bytes",
+        }])
+        self.assertLessEqual(
+            policy["limits"]["compiled_pack_bytes"],
+            policy["limits"]["runtime_snapshot_bytes"],
+        )
         self.assertEqual(policy["contrast_targets"], {
             "ordinary": {"normal_text": 4.5, "selection": 3.0, "focus": 3.0},
             "high-contrast": {"normal_text": 7.0, "selection": 4.5, "focus": 4.5},

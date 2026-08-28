@@ -12,4 +12,6 @@ The fixed product thresholds are narrow through 719 px, regular through 1199 px,
 
 No external asset packs are accepted in the first release. Semantic assets are package-relative and bounded to 64 IDs, 512 KiB decoded each, and 4 MiB decoded total. Source, compiled pack, catalog, token, alias, depth, nesting, string, and runtime snapshot limits are machine-readable in the schema.
 
+`compiled_pack_bytes` counts the complete canonical UTF-8 package file, including exactly one required final LF byte. `runtime_snapshot_bytes` counts that same exact canonical byte string retained by the immutable `NativeThemeV1` model, including the final LF; it is not decoded heap, allocator, RSS, or other process-memory accounting. The 512 KiB runtime snapshot cap is therefore dominated by the 256 KiB full-file compiled package cap: every accepted package is already within the runtime cap, so oversize package input remains an `E_LIMIT_PACK` rejection rather than a separate runtime rejection.
+
 This contract does not authorize runtime import, arbitrary commands, scripts, templates, hooks, user-managed themes, hot activation, services, persistence, FIDL, Product Assembly, or live-system mutation.

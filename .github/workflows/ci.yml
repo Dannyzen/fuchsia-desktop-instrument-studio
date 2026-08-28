@@ -107,6 +107,47 @@ jobs:
             artifacts/quality/sq-01/mutation-results.json
             artifacts/quality/sq-01/public-boundary-and-license-scan.json
             artifacts/quality/sq-01/verdict.json
+      - name: Prepare NativeThemeV1 sq-02 Python dependencies
+        run: python3 -m pip install --requirement tools/native_theme/sq02-requirements.txt
+      - name: Prepare NativeThemeV1 sq-02 Rust toolchain
+        run: |
+          rustup set profile minimal
+          rustup toolchain install nightly-2026-08-13 --profile minimal
+          cargo_path="$(rustup which --toolchain nightly-2026-08-13 cargo)"
+          rustc_path="$(rustup which --toolchain nightly-2026-08-13 rustc)"
+          test -x "$cargo_path"
+          test -x "$rustc_path"
+          printf 'SQ02_CARGO=%s\n' "$cargo_path" >> "$GITHUB_ENV"
+          printf 'SQ02_RUSTC=%s\n' "$rustc_path" >> "$GITHUB_ENV"
+          printf 'SQ02_CARGO_HOME=%s\n' "$RUNNER_TEMP/sq02-cargo-home" >> "$GITHUB_ENV"
+          printf 'SQ02_TARGET_ROOT=%s\n' "$RUNNER_TEMP/sq02-target" >> "$GITHUB_ENV"
+      - name: Prepare NativeThemeV1 sq-02 locked crates
+        run: |
+          mkdir -p "$SQ02_CARGO_HOME"
+          CARGO_HOME="$SQ02_CARGO_HOME" "$SQ02_CARGO" fetch --locked --manifest-path tools/native_theme/sq02-rust-qualifier/Cargo.toml
+      - name: NativeThemeV1 sq-02 native Rust compiler packaging gate
+        run: >-
+          python3 scripts/run-native-theme-sq02.py
+          --source-sha "$GITHUB_SHA"
+          --output-dir artifacts/quality/sq-02
+          --cargo "$SQ02_CARGO"
+          --rustc "$SQ02_RUSTC"
+          --cargo-home "$SQ02_CARGO_HOME"
+          --target-root "$SQ02_TARGET_ROOT"
+      - name: Upload NativeThemeV1 sq-02 receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-theme-sq-02-${{ github.sha }}
+          path: |
+            artifacts/quality/sq-02/source-toolchain-manifest.json
+            artifacts/quality/sq-02/cross-language-parity.json
+            artifacts/quality/sq-02/fuzz-corpus-manifest.json
+            artifacts/quality/sq-02/resource-bounds.json
+            artifacts/quality/sq-02/coverage.json
+            artifacts/quality/sq-02/reproducible-builds.json
+            artifacts/quality/sq-02/package-and-catalog-scan.json
+            artifacts/quality/sq-02/verdict.json
       - name: Instrument Studio desktop_ui host contract
         run: python3 scripts/test-desktop-ui-host.py
       - name: Design feedback empty fixture

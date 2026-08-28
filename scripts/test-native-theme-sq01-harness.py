@@ -148,6 +148,144 @@ class Sq01HarnessTests(unittest.TestCase):
                 self.h.validate_receipt_bytes(bad, {"schema_version", "status"})
         self.assertFalse(self.h.verify_receipt_hash(raw, "0" * 64))
 
+    def test_machine_limit_contract_extraction_is_exact_and_mutation_sensitive(self):
+        schema = json.loads((ROOT / "tools/native_theme/native-theme-v1.schema.json").read_text())
+        extracted = self.h.extract_machine_limit_contract(schema)
+        self.assertEqual(extracted, {
+            "limit_relations": [{
+                "additive_bytes": 0,
+                "dominated": "runtime_snapshot_bytes",
+                "proof": "compiled_pack_bytes <= runtime_snapshot_bytes",
+                "stricter": "compiled_pack_bytes",
+            }],
+            "limit_units": self.h.EXPECTED_LIMIT_UNITS,
+            "limits": self.h.EXPECTED_LIMITS,
+        })
+
+        def candidate():
+            return json.loads(json.dumps(schema))
+
+        required_mutations = []
+        changed_runtime = candidate()
+        changed_runtime["x-native-theme-v1-contract"]["limits"]["runtime_snapshot_bytes"] += 1
+        required_mutations.append(changed_runtime)
+        deleted_runtime = candidate()
+        del deleted_runtime["x-native-theme-v1-contract"]["limits"]["runtime_snapshot_bytes"]
+        required_mutations.append(deleted_runtime)
+        changed_unit = candidate()
+        changed_unit["x-native-theme-v1-contract"]["limit_units"]["runtime_snapshot_bytes"] = "heap_bytes"
+        required_mutations.append(changed_unit)
+        reversed_relation = candidate()
+        reversed_relation["x-native-theme-v1-contract"]["limit_relations"] = [{
+            "additive_bytes": 0,
+            "dominated": "compiled_pack_bytes",
+            "proof": "runtime_snapshot_bytes <= compiled_pack_bytes",
+            "stricter": "runtime_snapshot_bytes",
+        }]
+        required_mutations.append(reversed_relation)
+        failed_dominance = candidate()
+        failed_dominance["x-native-theme-v1-contract"]["limits"]["compiled_pack_bytes"] = 524289
+        required_mutations.append(failed_dominance)
+        unaccounted = candidate()
+        unaccounted["x-native-theme-v1-contract"]["limits"]["new_limit"] = 1
+        required_mutations.append(unaccounted)
+        for mutation in required_mutations:
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                self.h.extract_machine_limit_contract(mutation)
+
+    def test_machine_limit_extractor_rejects_every_malformed_structure(self):
+        schema = json.loads((ROOT / "tools/native_theme/native-theme-v1.schema.json").read_text())
+
+        def mutate(change):
+            value = json.loads(json.dumps(schema))
+            change(value["x-native-theme-v1-contract"])
+            return value
+
+        malformed = [
+            [],
+            {},
+            mutate(lambda policy: policy.__setitem__("limits", [])),
+            mutate(lambda policy: policy["limits"].__setitem__("aliases", True)),
+            mutate(lambda policy: policy["limits"].__setitem__("aliases", 0)),
+            mutate(lambda policy: policy.__setitem__("limit_units", [])),
+            mutate(lambda policy: policy["limit_units"].pop("compiled_pack_bytes")),
+            mutate(lambda policy: policy["limit_units"].__setitem__("extra", "bytes")),
+            mutate(lambda policy: policy["limit_units"].__setitem__("compiled_pack_bytes", 1)),
+            mutate(lambda policy: policy.__setitem__("limit_relations", {})),
+            mutate(lambda policy: policy.__setitem__("limit_relations", [None])),
+            mutate(lambda policy: policy["limit_relations"][0].pop("proof")),
+            mutate(lambda policy: policy["limit_relations"][0].__setitem__("stricter", 1)),
+            mutate(lambda policy: policy["limit_relations"][0].__setitem__("dominated", "unknown")),
+            mutate(lambda policy: policy["limit_relations"].append(dict(policy["limit_relations"][0]))),
+            mutate(lambda policy: policy["limit_relations"].append({
+                "additive_bytes": 0,
+                "dominated": "compiled_pack_bytes",
+                "proof": "runtime_snapshot_bytes <= compiled_pack_bytes",
+                "stricter": "runtime_snapshot_bytes",
+            })),
+            mutate(lambda policy: policy["limit_relations"][0].__setitem__("additive_bytes", True)),
+            mutate(lambda policy: policy["limit_relations"][0].__setitem__("additive_bytes", -1)),
+            mutate(lambda policy: policy["limit_relations"][0].__setitem__("proof", "asserted")),
+            mutate(lambda policy: policy["limit_relations"][0].__setitem__("proof", 1)),
+            mutate(lambda policy: policy.__setitem__("limit_relations", [])),
+            mutate(lambda policy: policy["limits"].__setitem__("aliases", 2049)),
+            mutate(lambda policy: policy.__setitem__("limit_relations", [{
+                "additive_bytes": 0,
+                "dominated": "compiled_pack_bytes",
+                "proof": "compiled_pack_bytes <= compiled_pack_bytes",
+                "stricter": "compiled_pack_bytes",
+            }])),
+        ]
+        for value in malformed:
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                self.h.extract_machine_limit_contract(value)
+
+    def test_source_manifest_deep_machine_contract_validation_rejects_all_nested_mutations(self):
+        schema = json.loads((ROOT / "tools/native_theme/native-theme-v1.schema.json").read_text())
+        expected = self.h.extract_machine_limit_contract(schema)
+
+        def manifest(contract):
+            value = {field: None for field in self.h.SOURCE_MANIFEST_FIELDS}
+            value["machine_limit_contract"] = contract
+            return value
+
+        self.assertEqual(
+            self.h.validate_source_manifest_bytes(self.h.canonical_json_bytes(manifest(expected))),
+            manifest(expected),
+        )
+
+        def changed(change):
+            contract = json.loads(json.dumps(expected))
+            change(contract)
+            return manifest(contract)
+
+        mutations = [
+            manifest(None),
+            changed(lambda contract: contract.pop("limits")),
+            changed(lambda contract: contract.__setitem__("extra", {})),
+            changed(lambda contract: contract["limits"].pop("runtime_snapshot_bytes")),
+            changed(lambda contract: contract["limits"].__setitem__("extra", 1)),
+            changed(lambda contract: contract["limits"].__setitem__("runtime_snapshot_bytes", 524289)),
+            changed(lambda contract: contract["limit_units"].pop("runtime_snapshot_bytes")),
+            changed(lambda contract: contract["limit_units"].__setitem__("extra", "bytes")),
+            changed(lambda contract: contract["limit_units"].__setitem__(
+                "runtime_snapshot_bytes", "heap_bytes")),
+            changed(lambda contract: contract.__setitem__("limit_relations", {})),
+            changed(lambda contract: contract["limit_relations"][0].pop("proof")),
+            changed(lambda contract: contract["limit_relations"][0].__setitem__("extra", True)),
+            changed(lambda contract: contract["limit_relations"][0].__setitem__("proof", "malformed")),
+            changed(lambda contract: contract.__setitem__("limit_relations", [{
+                "additive_bytes": 0,
+                "dominated": "compiled_pack_bytes",
+                "proof": "runtime_snapshot_bytes <= compiled_pack_bytes",
+                "stricter": "runtime_snapshot_bytes",
+            }])),
+            changed(lambda contract: contract["limits"].__setitem__("compiled_pack_bytes", 524289)),
+        ]
+        for mutation in mutations:
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                self.h.validate_source_manifest_bytes(self.h.canonical_json_bytes(mutation))
+
     def test_verdict_fails_for_each_failed_component_and_skips(self):
         names = self.h.VERDICT_INPUT_RECEIPTS
         passing = {name: {"status": "PASS", "skipped_required": 0} for name in names}
@@ -205,7 +343,7 @@ class Sq01HarnessTests(unittest.TestCase):
         self.assertEqual({case["id"] for case in cases}, set(self.h.REQUIRED_MUTATIONS))
         executed = [case for case in cases if not case["skipped"]]
         skipped = [case for case in cases if case["skipped"]]
-        self.assertEqual(len(executed), 34)
+        self.assertEqual(len(executed), 37)
         self.assertEqual({case["id"] for case in executed if case["expected_layer"] == "bounds"},
                          {"bounds.overlong-string", "bounds.deep-nesting", "bounds.oversized-input"})
         self.assertEqual(receipt["skipped_required"], len(skipped))
@@ -242,7 +380,7 @@ class Sq01HarnessTests(unittest.TestCase):
         self.assertEqual(set(cases), set(self.h.REQUIRED_MUTATIONS))
         self.assertEqual((receipt["total"], receipt["passed"], receipt["failed"],
                           receipt["skipped_required"], receipt["status"]),
-                         (34, 34, 0, 0, "PASS"))
+                         (37, 37, 0, 0, "PASS"))
         for case_id, (layer, code) in self.h.REQUIRED_MUTATIONS.items():
             with self.subTest(case_id=case_id):
                 case = cases[case_id]
@@ -257,8 +395,19 @@ class Sq01HarnessTests(unittest.TestCase):
         receipt = self.h.execute_mutations(ROOT, contract_executor=accept)
         survivors = [case for case in receipt["cases"] if case["id"].startswith("contract.") and not case["pass"]]
         self.assertEqual(len(survivors), 27)
-        self.assertEqual(receipt["passed"], 7)
+        self.assertEqual(receipt["passed"], 10)
         self.assertEqual(receipt["status"], "FAIL")
+
+    def test_machine_contract_receipt_executor_runs_real_extractor(self):
+        schema = json.loads((ROOT / "tools/native_theme/native-theme-v1.schema.json").read_text())
+        self.assertEqual(
+            self.h._machine_contract_executor(self.h.canonical_json_bytes(schema)),
+            (0, "accepted", None, None),
+        )
+        self.assertEqual(
+            self.h._machine_contract_executor(b"not-json"),
+            (2, "rejected", "source-manifest", "E_MACHINE_LIMIT_CONTRACT"),
+        )
 
     def test_public_scan_finds_private_identifiers_paths_and_credentials(self):
         with tempfile.TemporaryDirectory() as td:
@@ -431,12 +580,17 @@ class Sq01HarnessTests(unittest.TestCase):
             output = Path(td) / "receipts"
             output.mkdir()
             (output / "stale").write_text("stale")
+            source_manifest = {field: None for field in self.h.SOURCE_MANIFEST_FIELDS}
+            source_manifest.update({"status": "PASS", "skipped_required": 0})
+            source_manifest["machine_limit_contract"] = self.h.extract_machine_limit_contract(
+                json.loads((ROOT / "tools/native_theme/native-theme-v1.schema.json").read_text())
+            )
             with mock.patch.object(self.h, "source_identity", return_value=self.h.SourceIdentity("1" * 40, "2" * 40, ())):
                 with mock.patch.object(self.h, "assert_source_identity"), mock.patch.object(
-                        self.h, "_source_manifest", return_value={"status": "PASS", "skipped_required": 0}), mock.patch.object(
+                        self.h, "_source_manifest", return_value=source_manifest), mock.patch.object(
                         self.h, "_inventory", return_value={"status": "PASS", "skipped_required": 0, "completeness_percent": 100, "uncovered": []}), mock.patch.object(
                         self.h, "_schema_validation", return_value={"status": "PASS", "skipped_required": 0, "negative_cases": []}), mock.patch.object(
-                        self.h, "execute_mutations", return_value={"status": "PASS", "skipped_required": 0, "cases": [], "total": 34, "passed": 34, "failed": 0}), mock.patch.object(
+                        self.h, "execute_mutations", return_value={"status": "PASS", "skipped_required": 0, "cases": [], "total": 37, "passed": 37, "failed": 0}), mock.patch.object(
                         self.h, "_public_scan", return_value={"status": "PASS", "skipped_required": 0, "checks": []}), mock.patch.object(
                         self.h, "_coverage", return_value={"tests": [], "modules": [], "function_coverage": {"covered": 1, "total": 1, "percent": 100}, "branch_coverage": {"covered": 1, "total": 1, "percent": 100}, "target_met": True}), mock.patch.dict(
                         "sys.modules", {"sq01_semantic_validator": types.SimpleNamespace(validate_paths=lambda *_: {"status": "PASS", "errors": []})}):
@@ -558,6 +712,17 @@ class Sq01HarnessTests(unittest.TestCase):
         with mock.patch.object(self.h, "git", side_effect=["", b"diff-bytes"]):
             manifest = self.h._source_manifest(ROOT, self.h.SourceIdentity("a" * 40, "b" * 40, ()))
         self.assertEqual((manifest["status"], manifest["tracked_files"]), ("PASS", []))
+        self.assertEqual(manifest["machine_limit_contract"], self.h.extract_machine_limit_contract(
+            json.loads((ROOT / "tools/native_theme/native-theme-v1.schema.json").read_text())
+        ))
+        raw_manifest = self.h.canonical_json_bytes(manifest)
+        self.assertEqual(self.h.validate_source_manifest_bytes(raw_manifest), manifest)
+        missing_contract = dict(manifest); missing_contract.pop("machine_limit_contract")
+        with self.assertRaisesRegex(ValueError, "receipt fields differ"):
+            self.h.validate_source_manifest_bytes(self.h.canonical_json_bytes(missing_contract))
+        extra_contract = dict(manifest); extra_contract["extra"] = True
+        with self.assertRaisesRegex(ValueError, "receipt fields differ"):
+            self.h.validate_source_manifest_bytes(self.h.canonical_json_bytes(extra_contract))
         self.assertEqual(self.h._schema_property_rows({"$defs": {"x": None}}, "x"), [])
         self.assertEqual(self.h._bounds_executor(b"not-json", "bounds.overlong-string")[3], "E_BOUND_EXECUTOR")
         self.assertEqual(self.h._bounds_executor(b"{}", "unknown")[1], "accepted")
@@ -631,12 +796,17 @@ class Sq01HarnessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             output = Path(td) / "receipts"
             passing = {"status": "PASS", "skipped_required": 0}
+            source_passing = {field: None for field in self.h.SOURCE_MANIFEST_FIELDS}
+            source_passing.update(passing)
+            source_passing["machine_limit_contract"] = self.h.extract_machine_limit_contract(
+                json.loads((ROOT / "tools/native_theme/native-theme-v1.schema.json").read_text())
+            )
             with mock.patch.object(self.h.importlib.metadata, "version", side_effect=lambda name: self.h.PINNED[name]), mock.patch.object(
                     self.h, "source_identity", return_value=self.h.SourceIdentity("1" * 40, "2" * 40, ())), mock.patch.object(
-                    self.h, "assert_source_identity"), mock.patch.object(self.h, "_source_manifest", return_value=passing.copy()), mock.patch.object(
+                    self.h, "assert_source_identity"), mock.patch.object(self.h, "_source_manifest", return_value=source_passing), mock.patch.object(
                     self.h, "_inventory", return_value={**passing, "completeness_percent": 100}), mock.patch.object(
                     self.h, "_schema_validation", return_value=passing.copy()), mock.patch.object(
-                    self.h, "execute_mutations", return_value={**passing, "cases": [], "total": 34, "passed": 34, "failed": 0}), mock.patch.object(
+                    self.h, "execute_mutations", return_value={**passing, "cases": [], "total": 37, "passed": 37, "failed": 0}), mock.patch.object(
                     self.h, "_public_scan", return_value=passing.copy()), mock.patch.object(
                     self.h, "_coverage", return_value={"tests": [], "modules": [], "function_coverage": {"covered": 0, "total": 1}, "branch_coverage": {"covered": 0, "total": 1}, "target_met": False}), mock.patch.dict(
                     sys.modules, {"sq01_semantic_validator": types.SimpleNamespace(validate_paths=lambda *_: {"status": "PASS", "errors": []})}):

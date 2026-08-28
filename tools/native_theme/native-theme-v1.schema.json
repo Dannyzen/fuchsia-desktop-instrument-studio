@@ -2188,6 +2188,18 @@
       "string_bytes": 4096,
       "tokens": 1024
     },
+    "limit_units": {
+      "compiled_pack_bytes": "canonical_utf8_package_file_bytes_including_final_lf",
+      "runtime_snapshot_bytes": "retained_canonical_utf8_package_file_bytes_including_final_lf"
+    },
+    "limit_relations": [
+      {
+        "additive_bytes": 0,
+        "dominated": "runtime_snapshot_bytes",
+        "proof": "compiled_pack_bytes <= runtime_snapshot_bytes",
+        "stricter": "compiled_pack_bytes"
+      }
+    ],
     "optional_fields": [
       "metadata.extensions.org.constructresearch.instrumentstudio.*"
     ],
