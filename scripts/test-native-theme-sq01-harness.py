@@ -6,7 +6,6 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
-import shutil
 import tempfile
 import types
 import unittest
@@ -60,18 +59,19 @@ class Sq01HarnessTests(unittest.TestCase):
 
     def test_helper_suite_does_not_collide_with_existing_canonical_output(self):
         canonical = ROOT / "artifacts/quality/sq-01"
-        self.assertFalse(canonical.exists(), "test requires a clean output baseline")
-        canonical.mkdir(parents=True)
-        try:
+        before = ({p.name: p.read_bytes() for p in canonical.iterdir()}
+                  if canonical.is_dir() else None)
+        with tempfile.TemporaryDirectory() as td:
+            safe = Path(td)
+            output = safe / "receipts"
+            self.assertEqual(self.h.validate_output_path(ROOT, output, safe_temp_root=safe), output)
+            output.mkdir()
             for name, raw in self.h.build_synthetic_bundle(self.h.synthetic_test_context("1" * 40)).items():
-                (canonical / name).write_bytes(raw)
-            self.assertEqual({p.name for p in canonical.iterdir()}, set(self.h.ALL_RECEIPTS))
-            with tempfile.TemporaryDirectory() as td:
-                safe = Path(td)
-                self.assertEqual(self.h.validate_output_path(ROOT, safe / "receipts", safe_temp_root=safe),
-                                 safe / "receipts")
-        finally:
-            shutil.rmtree(canonical)
+                (output / name).write_bytes(raw)
+            self.assertEqual({p.name for p in output.iterdir()}, set(self.h.ALL_RECEIPTS))
+        after = ({p.name: p.read_bytes() for p in canonical.iterdir()}
+                 if canonical.is_dir() else None)
+        self.assertEqual(after, before)
 
     def test_source_identity_rejects_wrong_dirty_and_moving(self):
         clean = self.h.SourceIdentity("a" * 40, "b" * 40, ())
