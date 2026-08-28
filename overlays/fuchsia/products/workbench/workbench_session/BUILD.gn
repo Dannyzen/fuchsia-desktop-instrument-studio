@@ -52,6 +52,22 @@ fuchsia_package("workbench_session") {
   deps = [ ":workbench_session_component" ]
 }
 
+# Runtime-negative proof package: the real Workbench session graph with the
+# lazy NativeTheme subpackage physically absent. The optional route must not
+# block eager shell children from becoming healthy.
+fuchsia_package("workbench_session_no_native_theme") {
+  package_name = "workbench_session_no_native_theme"
+  subpackages = [
+    ":workbench_element_manager",
+    "//src/fuchsia-desktop/files:input_driver_package",
+    "//src/fuchsia-desktop/settings:input_driver_package",
+    "//src/fuchsia-desktop/terminal:input_driver_package",
+    "//src/ui/bin/tiling_wm",
+    "//src/ui/bin/tiling_wm:driver_package",
+  ]
+  deps = [ ":workbench_session_component" ]
+}
+
 # Make `workbench_session` available to products assembled with Bazel.
 #
 # TODO: b/295034058 - Make this less verbose.
