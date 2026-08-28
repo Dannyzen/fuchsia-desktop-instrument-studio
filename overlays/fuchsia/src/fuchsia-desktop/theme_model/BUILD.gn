@@ -1,4 +1,5 @@
 import("//build/rust/rustc_library.gni")
+import("//build/rust/rustc_test.gni")
 
 rustc_library("theme_model") {
   name = "theme_model"
@@ -18,4 +19,27 @@ rustc_library("theme_model") {
   ]
 
   inputs = [ "testdata/native-theme-v1-package.json" ]
+}
+
+rustc_test("theme_model_qualification") {
+  name = "theme_model_qualification"
+  edition = "2024"
+  testonly = true
+
+  deps = [
+    ":theme_model",
+    "//third_party/rust_crates:hex",
+    "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:sha2",
+  ]
+
+  source_root = "src/qualification.rs"
+  sources = [ "src/qualification.rs" ]
+  inputs = [
+    "../theme_catalog/catalog/instrument-studio-base16.package.json",
+    "../theme_catalog/catalog/instrument-studio-base24.package.json",
+    "../theme_catalog/catalog/instrument-studio-dtcg.package.json",
+    "../theme_catalog/catalog/instrument-studio-omarchy.package.json",
+    "testdata/native-theme-v1-package.json",
+  ]
 }
