@@ -45,6 +45,7 @@ fuchsia_package("workbench_session") {
     "//src/fuchsia-desktop/files:input_driver_package",
     "//src/fuchsia-desktop/settings:input_driver_package",
     "//src/fuchsia-desktop/terminal:input_driver_package",
+    "//src/fuchsia-desktop/theme_service:package",
     "//src/ui/bin/tiling_wm",
     "//src/ui/bin/tiling_wm:driver_package",
   ]

@@ -1,0 +1,47 @@
+// Copyright 2026 The Fuchsia Authors.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+@available(added=HEAD)
+library fuchsia.instrumentstudio.theme;
+
+using zx;
+
+const MAX_THEME_ID_BYTES uint32 = 128;
+const MAX_DISPLAY_NAME_BYTES uint32 = 256;
+const MAX_THEMES uint32 = 64;
+const MAX_SNAPSHOT_BYTES uint32 = 524288;
+
+/// Public, non-sensitive identity for one packaged immutable theme.
+type ThemeMetadata = struct {
+    id string:MAX_THEME_ID_BYTES;
+    display_name string:MAX_DISPLAY_NAME_BYTES;
+    revision uint64;
+    semantic_sha256 array<uint8, 32>;
+};
+
+/// Immutable active theme value. Generation is scoped to one service process.
+type ThemeSnapshot = struct {
+    generation uint64;
+    metadata ThemeMetadata;
+    canonical_package vector<uint8>:MAX_SNAPSHOT_BYTES;
+};
+
+/// Read-only NativeTheme authority for ordinary shell and application consumers.
+@discoverable(server="platform")
+closed protocol NativeTheme {
+    /// Returns deterministic ID-sorted packaged theme metadata.
+    strict ListThemes() -> (struct { themes vector<ThemeMetadata>:MAX_THEMES; });
+    /// Returns metadata for `id`, or NOT_FOUND. This never changes active state.
+    strict GetTheme(struct { id string:MAX_THEME_ID_BYTES; })
+        -> (struct { metadata ThemeMetadata; }) error zx.Status;
+    /// Returns the current immutable snapshot immediately. Clients must call this after
+    /// reconnecting because generations are scoped to one service process.
+    strict GetCurrent() -> (struct { snapshot ThemeSnapshot; });
+    /// Hangs only when `observed_generation` equals this process's current generation.
+    /// Any unequal observation returns immediately, including a value from an older process
+    /// that is greater than the new process's generation.
+    /// Only one outstanding call is allowed per connection.
+    strict WatchCurrent(struct { observed_generation uint64; })
+        -> (struct { snapshot ThemeSnapshot; });
+};
