@@ -1,0 +1,15 @@
+accent = "#9e66fa"
+muted = "#a8b3c7"
+selection = "#66449a"
+mode = "dark"
+variant = "instrument-studio"
+background.ramp = ["#08090c", "#12141a", "#1a1f29"]
+foreground.ramp = ["#a8b3c7", "#d8e0ec", "#edf2fa"]
+ansi.normal = ["#12141a", "#f25966", "#4dd98c", "#f5d76e", "#81a9ff", "#d16dff", "#00d1ff", "#d8e0ec"]
+ansi.bright = ["#333b47", "#ff7480", "#6df0a5", "#ffe58a", "#81a9ff", "#e99bff", "#5eeaff", "#f5f7fb"]
+
+[status]
+danger = "#f25966"
+info = "#5eeaff"
+success = "#4dd98c"
+warning = "#f5d76e"
