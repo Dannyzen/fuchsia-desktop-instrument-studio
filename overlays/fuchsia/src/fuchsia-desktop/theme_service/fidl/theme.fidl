@@ -35,8 +35,9 @@ closed protocol NativeTheme {
     /// Returns metadata for `id`, or NOT_FOUND. This never changes active state.
     strict GetTheme(struct { id string:MAX_THEME_ID_BYTES; })
         -> (struct { metadata ThemeMetadata; }) error zx.Status;
-    /// Returns the current immutable snapshot immediately. Clients must call this after
-    /// reconnecting because generations are scoped to one service process.
+    /// Returns the current immutable snapshot immediately. After an old channel closes,
+    /// clients reconnect to the new service process and must call GetCurrent first; only
+    /// then may they watch using the new process generation. No generation is persisted.
     strict GetCurrent() -> (struct { snapshot ThemeSnapshot; });
     /// Hangs only when `observed_generation` equals this process's current generation.
     /// Any unequal observation returns immediately, including a value from an older process

@@ -39,8 +39,8 @@ class NativeThemeServiceContract(unittest.TestCase):
                        "disconnect_drops_only_its_responder"]:
             self.assertIn(f"fn {marker}", authority)
         self.assertIn("pub struct ConnectionWatch", authority)
-        self.assertIn("ConnectionWatch::default()", server)
-        self.assertRegex(server, r"watch_state\.observe\(")
+        self.assertIn("ConnectionWatch::default()", authority)
+        self.assertRegex(authority, r"watch_state\.observe\(")
         self.assertIn("generation: 0", authority)
 
     def test_p3s1_codec_fallback_and_diagnostics(self):
@@ -48,19 +48,23 @@ class NativeThemeServiceContract(unittest.TestCase):
         source = self.text(SERVICE / "src/authority.rs")
         server = self.text(SERVICE / "src/main.rs")
         self.assertIn('"//src/fuchsia-desktop/theme_model"', build)
-        self.assertIn('"//sdk/rust/zx"', build)
+        self.assertIn('"//sdk/rust/zx-status"', build)
+        self.assertNotIn('"//sdk/rust/zx",', build)
         self.assertNotIn('"//zircon/system/ulib/zx:zx_rust"', build)
         self.assertNotIn('"//third_party/rust_crates:serde_json"', build)
         self.assertIn("inputs = [", build)
         for package in ["base16", "base24", "dtcg", "omarchy"]:
             self.assertIn(f'//src/fuchsia-desktop/theme_catalog/catalog/instrument-studio-{package}.package.json', build)
-        self.assertIn("use fidl::endpoints::RequestStream;", server)
-        self.assertIn("use zx::Status;", server)
-        self.assertIn("Status::NOT_FOUND", server)
-        self.assertIn("metadata.as_ref().ok_or_else", server)
-        self.assertIn("Status::BAD_STATE", server)
+        self.assertIn("fidl::endpoints::create_proxy_and_stream", source)
+        self.assertIn("use fidl::endpoints::RequestStream;", source)
+        self.assertIn("let mut themes: BTreeMap<String, Snapshot>", source)
+        self.assertIn("zx_status::Status::NOT_FOUND", source)
+        self.assertRegex(source, r"metadata\s*\.as_ref\(\)\s*\.ok_or_else")
+        self.assertIn("zx_status::Status::BAD_STATE", source)
+        self.assertIn("shutdown_with_epitaph(zx_status::Status::BAD_STATE)", source)
+        self.assertNotIn("shutdown_with_epitaph(zx_status::Status::BAD_STATE.into())", source)
         self.assertIn("#[cfg(test)]\n    pub fn drain_if_changed", source)
-        self.assertNotIn("fuchsia_zircon::", server)
+        self.assertNotIn("fuchsia_zircon::", source)
         self.assertIn("NativeThemeV1::decode_canonical", source)
         self.assertIn("FALLBACK_THEME_ID", source)
         self.assertIn("MAX_DIAGNOSTIC_ERROR_BYTES", source)
@@ -86,9 +90,61 @@ class NativeThemeServiceContract(unittest.TestCase):
         self.assertNotIn("with_unit_tests = true", binary)
         self.assertIn('"../theme_model/testdata/native-theme-v1-package.json"', core)
         self.assertIn('":theme_service_core"', binary)
+        self.assertIn('"//third_party/rust_crates:futures"', binary)
+        self.assertNotIn('":fuchsia.instrumentstudio.theme_rust"', binary)
         self.assertIn('"//src/lib/diagnostics/inspect/rust:fuchsia-inspect"', binary)
+        self.assertIn("test_deps = [", core)
+        self.assertIn('"//src/lib/fuchsia"', core.split("test_deps = [", 1)[1])
+        self.assertIn('"//src/lib/fuchsia-async"', core.split("test_deps = [", 1)[1])
         self.assertIn("use theme_service_core::{", server)
         self.assertNotIn("mod authority;", server)
+
+    def test_p3s1_production_serve_loop_is_library_owned(self):
+        source = self.text(SERVICE / "src/authority.rs")
+        server = self.text(SERVICE / "src/main.rs")
+        self.assertIn("pub async fn serve_native_theme", source)
+        self.assertIn("serve_native_theme(authority, stream)", server)
+        self.assertNotIn("NativeThemeRequest::", server)
+        self.assertNotIn("ConnectionWatch", server)
+
+    def test_p3s1_all_production_packages_are_core_test_inputs(self):
+        build = self.text(SERVICE / "BUILD.gn")
+        core = build.split('rustc_library("theme_service_core")', 1)[1].split('rustc_binary("bin")', 1)[0]
+        for package in ["base16", "base24", "dtcg", "omarchy"]:
+            self.assertIn(
+                f'"//src/fuchsia-desktop/theme_catalog/catalog/instrument-studio-{package}.package.json"',
+                core,
+            )
+
+    def test_p3s1_duplicate_identity_policy_is_explicit(self):
+        source = self.text(SERVICE / "src/authority.rs")
+        feature = self.text(FEATURE)
+        for marker in [
+            "E_DUPLICATE_THEME_ID",
+            "production_catalog_collapses_equivalent_adapters",
+            "equivalent_duplicates_are_order_independent_and_choose_smallest_bytes",
+            "conflicting_duplicate_theme_id_fails_closed",
+        ]:
+            self.assertIn(marker, source)
+        self.assertIn("embedded theme.id", feature)
+        self.assertIn("semantic SHA-256", feature)
+
+    def test_p3s1_generated_fidl_transport_and_restart_tests_exist(self):
+        source = self.text(SERVICE / "src/authority.rs")
+        for marker in [
+            "proxy_list_get_current_and_not_found",
+            "proxy_unequal_watch_replies_immediately",
+            "proxy_equal_watch_stays_pending_until_disconnect",
+            "proxy_duplicate_watch_closes_with_bad_state",
+            "two_proxies_park_and_disconnect_independently",
+            "restart_reconnect_get_current_then_watch",
+        ]:
+            self.assertIn(f"fn {marker}", source)
+        self.assertIn("create_proxy_and_stream::<ftheme::NativeThemeMarker>", source)
+        self.assertIn("serve_native_theme(authority, stream)", source)
+        fidl = self.text(FIDL / "theme.fidl")
+        self.assertIn("must call GetCurrent first", fidl)
+        self.assertIn("No generation is persisted", fidl)
 
     def test_p3s1_component_and_routes_are_optional_read_only(self):
         cml = self.text(SERVICE / "meta/native_theme_service.cml")
@@ -114,7 +170,7 @@ class NativeThemeServiceContract(unittest.TestCase):
         self.assertIn("Apply and Restart", feature)
         self.assertIn("full product restarts", feature)
         self.assertIn("last-known-good or built-in", feature)
-        self.assertEqual(len(re.findall(r"^    def test_p3s1_", tests, re.MULTILINE)), 7)
+        self.assertEqual(len(re.findall(r"^    def test_p3s1_", tests, re.MULTILINE)), 11)
 
 
 if __name__ == "__main__":
