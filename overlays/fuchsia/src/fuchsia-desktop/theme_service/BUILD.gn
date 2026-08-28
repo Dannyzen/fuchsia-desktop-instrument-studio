@@ -14,11 +14,25 @@ rustc_library("theme_service_core") {
   with_unit_tests = true
   source_root = "src/authority.rs"
   sources = [ "src/authority.rs" ]
-  inputs = [ "../theme_model/testdata/native-theme-v1-package.json" ]
+  inputs = [
+    "../theme_model/testdata/native-theme-v1-package.json",
+    "testdata/instrument-studio-conflict.package.json",
+    "//src/fuchsia-desktop/theme_catalog/catalog/instrument-studio-base16.package.json",
+    "//src/fuchsia-desktop/theme_catalog/catalog/instrument-studio-base24.package.json",
+    "//src/fuchsia-desktop/theme_catalog/catalog/instrument-studio-dtcg.package.json",
+    "//src/fuchsia-desktop/theme_catalog/catalog/instrument-studio-omarchy.package.json",
+  ]
   deps = [
     ":fuchsia.instrumentstudio.theme_rust",
+    "//sdk/rust/zx-status",
     "//src/fuchsia-desktop/theme_model",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/diagnostics/inspect/rust:fuchsia-inspect",
+    "//third_party/rust_crates:futures",
+  ]
+  test_deps = [
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
   ]
 }
 
@@ -33,10 +47,7 @@ rustc_binary("bin") {
     "//src/fuchsia-desktop/theme_catalog/catalog/instrument-studio-omarchy.package.json",
   ]
   deps = [
-    ":fuchsia.instrumentstudio.theme_rust",
     ":theme_service_core",
-    "//sdk/rust/zx",
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",

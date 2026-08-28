@@ -22,6 +22,8 @@ Feature: Choose a NativeTheme and keep it across restart
     When the NativeTheme authority starts
     Then generation zero identifies the built-in fallback
     And bounded diagnostics record a validation failure without payload bytes or paths
+    And equivalent adapters with the same embedded theme.id and semantic SHA-256 collapse deterministically
+    But conflicting semantic SHA-256 values for one embedded theme.id expose no packaged themes
 
   @implemented @p3-s1 @scenario:P3S1-OPTIONAL
   Scenario: Shell boot does not require the NativeTheme authority
