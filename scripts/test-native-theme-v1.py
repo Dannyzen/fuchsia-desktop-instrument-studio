@@ -4,12 +4,16 @@
 from __future__ import annotations
 
 import hashlib
+import contextlib
+import importlib.util
+import io
 import json
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools/native_theme"))
@@ -170,6 +174,234 @@ class NativeThemeV1ProofTests(unittest.TestCase):
 
 class NativeThemeV1ContractTests(unittest.TestCase):
     FIXTURES = ROOT / "tools/native_theme/fixtures"
+
+    def package(self):
+        return contract.load_json_strict(self.FIXTURES / "native-theme-v1-package.json")
+
+    def assert_package_code(self, code, mutate):
+        candidate = json.loads(json.dumps(self.package()))
+        mutate(candidate)
+        with self.assertRaisesRegex(contract.ContractError, "^" + code + ":"):
+            contract.validate_package(candidate)
+
+    def test_coverage_strict_loading_canonical_limits_and_structural_dispatch(self):
+        schema = contract.load_json_strict(SCHEMA)
+        package = self.package()
+        contract.validate_root_schema_structural(schema, package)
+        contract.validate_root_schema_structural(schema, {"colors": {}})
+        with self.assertRaisesRegex(contract.ContractError, "^E_SCHEMA_ROOT:"):
+            contract.validate_root_schema_structural({}, {})
+        with self.assertRaisesRegex(contract.ContractError, "^E_SCHEMA_ROOT:"):
+            contract.validate_root_schema_structural(schema, {})
+        contract._exact_object({"a": 1}, {"a"}, "E_SHAPE")
+        with self.assertRaisesRegex(contract.ContractError, "^E_SHAPE:"):
+            contract._exact_object([], {"a"}, "E_SHAPE")
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "value.json"
+            path.write_bytes(b"\xff")
+            with self.assertRaisesRegex(contract.ContractError, "^E_UTF8:"):
+                contract.load_json_strict(path)
+            path.write_text("[]")
+            with self.assertRaisesRegex(contract.ContractError, "^E_JSON_ROOT:"):
+                contract.load_json_strict(path)
+            path.write_bytes(b" " * (contract.LIMITS["source_bytes"] + 1))
+            with self.assertRaisesRegex(contract.ContractError, "^E_LIMIT_SOURCE:"):
+                contract.load_json_strict(path)
+        with self.assertRaisesRegex(contract.ContractError, "^E_LIMIT_STRING:"):
+            contract.canonical_json_bytes("x" * (contract.LIMITS["string_bytes"] + 1))
+        nested = None
+        for _ in range(contract.LIMITS["nesting"] + 2):
+            nested = [nested]
+        with self.assertRaisesRegex(contract.ContractError, "^E_LIMIT_NESTING:"):
+            contract.canonical_json_bytes(nested)
+
+    def test_coverage_profile_and_manifest_rejections_are_exact(self):
+        good = contract.load_json_strict(self.FIXTURES / "profiles/base24-positive.json")
+        cases = [
+            ("E_PROFILE_FIELDS", lambda d: d.__setitem__("extra", 1)),
+            ("E_VERSION_PROFILE", lambda d: d.__setitem__("profile_version", "future")),
+            ("E_PROFILE_TOKENS", lambda d: d.__setitem__("tokens", {})),
+        ]
+        for code, mutate in cases:
+            candidate = json.loads(json.dumps(good)); mutate(candidate)
+            with self.assertRaisesRegex(contract.ContractError, "^" + code + ":"):
+                contract.validate_profile_fixture(candidate)
+        manifest = contract.load_json_strict(MANIFEST)
+        for mutate, code in (
+            (lambda d: d.__setitem__("schema_version", "0"), "E_MANIFEST"),
+            (lambda d: d.__setitem__("profiles", []), "E_MANIFEST"),
+            (lambda d: d["profiles"][0].pop("type"), "E_MANIFEST"),
+            (lambda d: d["profiles"][0].__setitem__("complete_package", {}), "E_MANIFEST_COVERAGE"),
+            (lambda d: d["profiles"][0]["positive_cases"].append({"file": "missing.json"}), "E_MANIFEST_COVERAGE"),
+            (lambda d: d["profiles"][0]["diagnostics"].append("E_NOT_CATALOGED"), "E_MANIFEST_COVERAGE"),
+        ):
+            candidate = json.loads(json.dumps(manifest)); mutate(candidate)
+            with self.assertRaisesRegex(contract.ContractError, "^" + code + ":"):
+                contract.validate_profile_manifest(candidate, self.FIXTURES / "profiles")
+
+    def test_coverage_package_rejection_matrix(self):
+        cases = [
+            ("E_FIELD_REQUIRED", lambda p: p.pop("theme")),
+            ("E_VERSION_PROFILE", lambda p: p.__setitem__("profile", {})),
+            ("E_METADATA_REQUIRED", lambda p: p.__setitem__("metadata", [])),
+            ("E_PROVENANCE", lambda p: p["metadata"]["provenance"].__setitem__("source_identity", "/private")),
+            ("E_PROVENANCE", lambda p: p["metadata"]["provenance"].__setitem__("tokens", {"x": {"kind": "bad"}})),
+            ("E_COMPATIBILITY", lambda p: p.__setitem__("policy", [])),
+            ("E_DOMAIN_REQUIRED", lambda p: p["variants"].__setitem__("dark", [])),
+            ("E_LAYER_REQUIRED", lambda p: p["variants"]["dark"].__setitem__("components", {})),
+            ("E_COLOR_CANONICAL", lambda p: p["variants"]["dark"]["semantic"].__setitem__("text.normal", 3)),
+            ("E_LIMIT_ASSETS", lambda p: p["variants"]["dark"]["assets"]["items"].update({f"a{i}": {} for i in range(64)})),
+            ("E_TYPOGRAPHY", lambda p: p["variants"]["dark"]["typography"].__setitem__("families", {"ui": []})),
+            ("E_TYPOGRAPHY", lambda p: p["variants"]["dark"]["typography"]["roles"]["body"].pop("family")),
+            ("E_GEOMETRY", lambda p: p["variants"]["dark"]["geometry"].__setitem__("density", "huge")),
+            ("E_ELEVATION", lambda p: p["variants"]["dark"]["elevation"].__setitem__("levels", {})),
+            ("E_ELEVATION", lambda p: p["variants"]["dark"]["elevation"]["levels"].__setitem__("flat", {})),
+            ("E_OPACITY", lambda p: p["variants"]["dark"].__setitem__("opacity", [])),
+            ("E_MOTION", lambda p: p["variants"]["dark"].__setitem__("motion", {})),
+        ]
+        for code, mutate in cases:
+            with self.subTest(code=code): self.assert_package_code(code, mutate)
+
+    def test_coverage_parser_legacy_and_atomic_write_failures(self):
+        good = FIXTURE.read_text()
+        malformed = [
+            (" nested", "indentation"), ("plain", "expected key"),
+            ("x" * 129 + ": v", "identifier exceeds"),
+            ("scheme: a\nscheme: b", "duplicate key"),
+            ("scheme: [x]", "structured YAML"),
+            ("scheme: " + "x" * 129, "value exceeds"),
+            (good.replace('variant: "dark"', 'variant: "light"'), "variant must be dark"),
+        ]
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "input.yaml"
+            path.write_bytes(b"\xff")
+            with self.assertRaisesRegex(contract.ContractError, "valid UTF-8"):
+                contract.read_bounded(path)
+            for body, message in malformed:
+                path.write_text(body)
+                with self.assertRaisesRegex(contract.ContractError, message): contract.parse_flat_base24(path)
+            legacy = Path(td) / "tokens.rs"
+            legacy.write_text(LEGACY.read_text().replace("panel_bg:", "removed_panel_bg:"))
+            with self.assertRaisesRegex(contract.ContractError, "missing legacy colors"):
+                contract.compile_legacy(legacy)
+            legacy.write_text(LEGACY.read_text().replace("panel_bg: ColorRgba::new(0.07", "panel_bg: ColorRgba::new(1.5"))
+            with self.assertRaisesRegex(contract.ContractError, "outside 0..1"):
+                contract.compile_legacy(legacy)
+            legacy.write_text(LEGACY.read_text().replace(", 1.0),", ", 0.5),", 1))
+            with self.assertRaisesRegex(contract.ContractError, "alpha must be 1.0"):
+                contract.compile_legacy(legacy)
+            self.assertEqual(contract.quantize_channel("0.5"), 128)
+            output = Path(td) / "result.json"
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(contract.main(["compile-base24", "--input", str(FIXTURE), "--output", str(output)]), 0)
+            self.assertTrue(output.is_file())
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(contract.main(["compile-base24", "--input", str(path / "missing"), "--output", str(output)]), 2)
+
+    def test_independent_validator_complete_failure_matrix_and_cli_usage(self):
+        spec = importlib.util.spec_from_file_location("independent_validator_coverage", VALIDATOR)
+        validator = importlib.util.module_from_spec(spec); spec.loader.exec_module(validator)
+        golden = json.loads(GOLDEN.read_text())
+        cases = [
+            "not-object", "oversized", "missing-top", "schema", "compiler", "variant", "identity",
+            "colors-object", "colors-roles", "color", "source-object", "source-fields", "hash-format",
+            "format", "source-missing", "provenance-roles", "provenance-entry", "provenance-mismatch", "bounds",
+        ]
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "candidate.json"
+            for name in cases:
+                data = json.loads(json.dumps(golden))
+                if name == "not-object": data = []
+                elif name == "oversized": path.write_bytes(b" " * (128 * 1024 + 1)); data = None
+                elif name == "missing-top": data.pop("theme_id")
+                elif name == "schema": data["schema_version"] = "2"
+                elif name == "compiler": data["compiler_version"] = "2"
+                elif name == "variant": data["variant"] = "light"
+                elif name == "identity": data["theme_id"] = "other"
+                elif name == "colors-object": data["colors"] = []
+                elif name == "colors-roles": data["colors"].pop("text.muted")
+                elif name == "color": data["colors"]["text.muted"] = "BAD"
+                elif name == "source-object": data["source"] = []
+                elif name == "source-fields": data["source"]["extra"] = 1
+                elif name == "hash-format": data["source"]["content_sha256"] = "bad"
+                elif name == "format": data["source"]["format"] = "unknown"
+                elif name == "source-missing": data["source"]["identity"] = "missing.yaml"
+                elif name == "provenance-roles": data["provenance"].pop("text.muted")
+                elif name == "provenance-entry": data["provenance"]["text.muted"] = []
+                elif name == "provenance-mismatch": data["provenance"]["text.muted"]["source_token"] = "base00"
+                elif name == "bounds": data["bounds"]["tokens"] = 1
+                if data is not None: path.write_text(json.dumps(data))
+                with self.subTest(name=name), self.assertRaises(validator.ValidationError): validator.validate(path)
+            duplicate = Path(td) / "duplicate.json"; duplicate.write_text('{"a":1,"a":2}')
+            with self.assertRaisesRegex(validator.ValidationError, "duplicate JSON key"):
+                json.loads(duplicate.read_bytes(), object_pairs_hook=validator.no_duplicates)
+            with self.assertRaisesRegex(validator.ValidationError, "must be a string"):
+                validator.bounded_text(1, "field")
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(validator.main(["validator"]), 2)
+
+    def test_coverage_remaining_native_contract_limits_and_cleanup(self):
+        manifest = contract.load_json_strict(MANIFEST)
+        candidate = json.loads(json.dumps(manifest))
+        candidate["profiles"][0]["complete_package"]["sha256"] = "sha256:" + "0" * 64
+        with self.assertRaisesRegex(contract.ContractError, "^E_MANIFEST_COVERAGE:"):
+            contract.validate_profile_manifest(candidate, self.FIXTURES / "profiles")
+
+        self.assert_package_code("E_LIMIT_TOKENS", lambda p: [
+            p["variants"]["dark"]["components"].__setitem__(f"component{i}", "fixed")
+            for i in range(contract.LIMITS["tokens"])
+        ])
+        self.assert_package_code("E_LIMIT_PACK", lambda p: [
+            p["variants"]["dark"]["components"].__setitem__(f"component{i}", "x" * 4096)
+            for i in range(64)
+        ])
+        self.assert_package_code("E_PROVENANCE", lambda p: p["metadata"]["provenance"].__setitem__("semantic_hash", "sha256:" + "0" * 64))
+
+        class LateInvalid(dict):
+            calls = 0
+            def get(self, key, default=None):
+                if key == "text.normal":
+                    self.calls += 1
+                    if self.calls >= 1: return 3
+                return super().get(key, default)
+        package = self.package()
+        package["variants"]["dark"]["semantic"] = LateInvalid(package["variants"]["dark"]["semantic"])
+        with self.assertRaisesRegex(contract.ContractError, "^E_COLOR_CANONICAL:"):
+            contract.validate_package(package)
+
+        with tempfile.TemporaryDirectory() as td:
+            source = Path(td) / "tokens.yaml"
+            source.write_text("\n# comment\n" + FIXTURE.read_text())
+            with mock.patch.object(contract, "MAX_TOKENS", 1):
+                with self.assertRaisesRegex(contract.ContractError, "token count exceeds 1"):
+                    contract.parse_flat_base24(source)
+            output = Path(td) / "out.json"
+            with mock.patch.object(contract.os, "replace", side_effect=OSError("replace denied")):
+                with self.assertRaisesRegex(OSError, "replace denied"):
+                    contract.write_canonical({"accepted": True}, output)
+            self.assertEqual(list(Path(td).glob("out.json.*")), [])
+
+    def test_independent_validator_remaining_source_and_package_cli_branches(self):
+        spec = importlib.util.spec_from_file_location("independent_validator_tail", VALIDATOR)
+        validator = importlib.util.module_from_spec(spec); spec.loader.exec_module(validator)
+        golden = json.loads(GOLDEN.read_text())
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "candidate.json"
+            for mutate, message in (
+                (lambda d: d["source"].__setitem__("profile_version", "wrong"), "profile_version does not match"),
+            ):
+                data = json.loads(json.dumps(golden)); mutate(data); path.write_text(json.dumps(data))
+                with self.assertRaisesRegex(validator.ValidationError, message): validator.validate(path)
+            data = json.loads(json.dumps(golden))
+            missing = "tools/native_theme/fixtures/not-present.yaml"
+            data["source"]["identity"] = missing; path.write_text(json.dumps(data))
+            with mock.patch.dict(validator.PROFILES[data["source"]["format"]], {"identity": missing}):
+                with self.assertRaisesRegex(validator.ValidationError, "source file unavailable"):
+                    validator.validate(path)
+            package = self.package()
+            path.write_text(json.dumps(package, indent=2))
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(validator.main(["validator", str(path)]), 2)
 
     def test_root_schema_explicitly_selects_legacy_or_complete_package(self):
         schema = contract.load_json_strict(SCHEMA)

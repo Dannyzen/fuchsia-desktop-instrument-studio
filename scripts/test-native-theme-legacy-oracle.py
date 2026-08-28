@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 ORACLE = ROOT / "docs/native-theme-v1-legacy-oracle.json"
@@ -67,6 +68,28 @@ class LegacyOracleTests(unittest.TestCase):
             result = run(VALIDATOR, path, check=False)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(code, result.stderr)
+
+    def test_coverage_generator_rejects_wrong_tree_and_localizes_unmatched_reference(self):
+        with mock.patch.object(self.generator, "git", return_value=b"wrong-tree\n"):
+            with self.assertRaisesRegex(SystemExit, "E_BASE_TREE"):
+                self.generator.generate()
+        reference = {
+            "id": "legacy-reference", "path": "synthetic.rs", "line": 7, "span": "L7",
+            "declaration": "paint", "source_line_sha256": "0" * 64,
+            "category": "color", "source_kind": "reference", "authority_status": "non-authority",
+            "authority_key": None, "disposition": "consumer-reference", "target": "unmatched",
+            "rationale": "synthetic direct use",
+        }
+        def git_result(*args):
+            return (self.generator.BASE_TREE + "\n").encode()
+        with mock.patch.object(self.generator, "git", side_effect=git_result), mock.patch.object(
+                self.generator, "target_files", return_value=["synthetic.rs"]), mock.patch.object(
+                self.generator, "blob", return_value=b"paint();\n"), mock.patch.object(
+                self.generator, "scan_file", return_value=[reference.copy()]):
+            document = self.generator.generate()
+        row = document["entries"][0]
+        self.assertEqual((row["disposition"], row["target"]),
+                         ("retain-local-nontheme", "local.color-reference"))
 
     def test_two_exact_commit_generations_are_identical_and_validate(self):
         with tempfile.TemporaryDirectory() as td:

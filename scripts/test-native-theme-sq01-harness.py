@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import importlib.util
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
@@ -495,6 +497,140 @@ class Sq01HarnessTests(unittest.TestCase):
             fake_parent.stop.assert_called_once_with()
             self.assertFalse(private.exists())
             self.assertEqual({name: (output / name).read_bytes() for name in originals}, originals)
+
+    def test_coverage_semantic_validator_all_observable_rejections_and_paths(self):
+        semantic = load_module(ROOT / "tools/native_theme/sq01_semantic_validator.py", "sq01_semantic_coverage")
+        package = json.loads((ROOT / "tools/native_theme/fixtures/native-theme-v1-package.json").read_text())
+        schema = json.loads((ROOT / "tools/native_theme/native-theme-v1.schema.json").read_text())
+        oracle = json.loads((ROOT / "docs/native-theme-v1-legacy-oracle.json").read_text())
+        result = semantic.validate_paths(ROOT / "tools/native_theme/fixtures/native-theme-v1-package.json",
+                                         ROOT / "tools/native_theme/native-theme-v1.schema.json",
+                                         ROOT / "docs/native-theme-v1-legacy-oracle.json")
+        self.assertEqual(result["status"], "PASS")
+        with mock.patch.object(semantic, "jsonschema", None):
+            self.assertEqual(semantic.validate(package, schema, oracle)["status"], "PASS")
+        cases = [
+            ("E_VARIANT_REQUIRED", lambda p, s, o: p["variants"].pop("light")),
+            ("E_SEMANTIC_ROLES", lambda p, s, o: p["variants"]["dark"]["semantic"].pop("text.normal")),
+            ("E_COLOR_CANONICAL", lambda p, s, o: p["variants"]["dark"]["semantic"].__setitem__("text.normal", "#FFFFFFff")),
+            ("E_FOCUS_COLLAPSE", lambda p, s, o: p["variants"]["dark"]["semantic"].__setitem__("interaction.selection", p["variants"]["dark"]["semantic"]["border.focusConfirmed"])),
+            ("E_CONTRAST_TEXT", lambda p, s, o: p["variants"]["dark"]["semantic"].__setitem__("text.normal", p["variants"]["dark"]["semantic"]["surface.canvas"])),
+            ("E_CONTRAST_FOCUS", lambda p, s, o: p["variants"]["dark"]["semantic"].__setitem__("border.focusConfirmed", p["variants"]["dark"]["semantic"]["surface.canvas"])),
+            ("E_CONTRAST_STATUS", lambda p, s, o: p["variants"]["dark"]["semantic"].__setitem__("status.danger", p["variants"]["dark"]["semantic"]["surface.canvas"])),
+            ("E_STATUS_NONCOLOR", lambda p, s, o: p["variants"]["dark"]["assets"]["items"].pop("status.error")),
+            ("E_ASSET_LICENSE", lambda p, s, o: p["variants"]["dark"]["assets"]["items"]["status.error"].__setitem__("spdx", "")),
+            ("E_PROVENANCE", lambda p, s, o: p["metadata"]["provenance"].pop("attribution")),
+            ("E_LEGACY_FOCUS", lambda p, s, o: o["policies"]["focus"].__setitem__("selection_target", o["policies"]["focus"]["confirmed_target"])),
+            ("E_SETTINGS_MAPPING", lambda p, s, o: o["policies"]["settings_migration"].pop("Dark")),
+            ("E_ORACLE_HASH", lambda p, s, o: o.__setitem__("semantic_sha256", "short")),
+        ]
+        for code, mutate in cases:
+            p, s, o = json.loads(json.dumps(package)), json.loads(json.dumps(schema)), json.loads(json.dumps(oracle))
+            mutate(p, s, o)
+            with self.subTest(code=code):
+                self.assertIn(code, {row["code"] for row in semantic.validate(p, s, o)["errors"]})
+
+    def test_coverage_harness_identity_manifest_and_executor_edges(self):
+        completed = subprocess.CompletedProcess([], 0, stdout=b"binary")
+        with mock.patch.object(self.h, "run_allowed", return_value=completed) as guarded:
+            self.assertEqual(self.h.git(ROOT, "diff", binary=True), b"binary")
+            self.assertFalse(guarded.call_args.kwargs["text"])
+        responses = ["?? artifacts/quality/sq-01/file\n M kept\n", "a" * 40 + "\n", "b" * 40 + "\n"]
+        with mock.patch.object(self.h, "git", side_effect=responses):
+            ident = self.h.source_identity(ROOT, ROOT / "artifacts/quality/sq-01")
+        self.assertEqual(ident.dirty, (" M kept",))
+        with mock.patch.object(self.h, "git", side_effect=["", "a" * 40, "b" * 40]):
+            self.assertEqual(self.h.source_identity(ROOT).dirty, ())
+        record = self.h._file_record(ROOT, ROOT / "versions.env")
+        self.assertEqual(record["sha256"], self.h.sha256((ROOT / "versions.env").read_bytes()))
+        with mock.patch.object(self.h, "git", side_effect=["", b"diff-bytes"]):
+            manifest = self.h._source_manifest(ROOT, self.h.SourceIdentity("a" * 40, "b" * 40, ()))
+        self.assertEqual((manifest["status"], manifest["tracked_files"]), ("PASS", []))
+        self.assertEqual(self.h._schema_property_rows({"$defs": {"x": None}}, "x"), [])
+        self.assertEqual(self.h._bounds_executor(b"not-json", "bounds.overlong-string")[3], "E_BOUND_EXECUTOR")
+        self.assertEqual(self.h._bounds_executor(b"{}", "unknown")[1], "accepted")
+        with mock.patch.object(importlib.util, "spec_from_file_location", return_value=None):
+            with self.assertRaisesRegex(RuntimeError, "cannot load"):
+                self.h._load_contract_validator(ROOT)
+        self.assertEqual(self.h._contract_executor(ROOT, b"not-json", "package")[1], "executor-error")
+
+    def test_coverage_harness_registry_scan_and_fail_closed_edges(self):
+        with mock.patch.dict(self.h.REQUIRED_MUTATIONS, {"synthetic.unimplemented": ("x", "E_X")}):
+            receipt = self.h.execute_mutations(ROOT)
+        skipped = next(row for row in receipt["cases"] if row["id"] == "synthetic.unimplemented")
+        self.assertTrue(skipped["skipped"])
+        with self.assertRaisesRegex(ValueError, "receipt hash inputs differ"):
+            self.h.receipt_hash_map({})
+        with tempfile.TemporaryDirectory() as td:
+            duplicate = Path(td) / "duplicate.json"; duplicate.write_text('{"a":1,"a":2}')
+            with self.assertRaisesRegex(ValueError, "E_JSON_DUPLICATE"): self.h._strict_load(duplicate)
+        self.assertEqual(self.h._resolve_path({"rows": [{"value": 7}]}, ["rows", "[]", "value"]), 7)
+        rows = [{"id": "schema.nativePackage.schema_version:optional", "_definition": "nativePackage",
+                 "_property_path": ["schema_version"], "_mode": "optional"}]
+        with self.assertRaisesRegex(RuntimeError, "optional schema row"):
+            self.h._schema_registry_cases(ROOT, rows)
+        self.assertIsNone(self.h.execute_diagnostic_rule("E_HASH", {"actual": 1, "expected": 1}))
+        self.assertIsNone(self.h.execute_diagnostic_rule("E_HASH", None))
+        self.assertIsNone(self.h.execute_diagnostic_rule("UNKNOWN", {}))
+        checked = self.h.attach_registry_evidence([{"id": "r", "positive_case_ids": [], "negative_case_ids": []}],
+                                                   [{"pass": False, "skipped": False}])
+        self.assertEqual(checked["uncovered"], ["r"])
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td); fixture = root / "docs/native-theme-v1-large.md"; fixture.parent.mkdir()
+            fixture.write_bytes(b"x" * 2_000_001)
+            scan = self.h._public_scan(root)
+        self.assertIn("docs/native-theme-v1-large.md", scan["scope"])
+        self.assertEqual(scan["unclassified_findings"], [])
+        self.assertTrue(all(check["skipped"] for check in scan["checks"]))
+        self.assertEqual(scan["status"], "FAIL")
+        with mock.patch.object(importlib.metadata, "version", return_value="wrong"):
+            with self.assertRaisesRegex(RuntimeError, "dependency version mismatch"):
+                self.h.run_gate(ROOT, "a" * 40, Path(tempfile.gettempdir()) / "sq01-never-created", safe_temp_root=Path(tempfile.gettempdir()))
+
+    def test_coverage_derivation_fallback_and_coverage_report_iteration(self):
+        original_load = self.h._strict_load
+        def altered(path):
+            value = original_load(path)
+            if path.name == "native-theme-v1-legacy-oracle.json":
+                value["policies"]["legacy_token_roles"] = {}
+            return value
+        with mock.patch.object(self.h, "_strict_load", side_effect=altered):
+            cases = self.h._derivation_registry_cases(ROOT, [{"id": "derivation.unknown"}])
+        self.assertEqual(cases[1]["actual_code"], "E_DERIVATION_MISMATCH")
+
+        with tempfile.TemporaryDirectory() as td:
+            root, temp = Path(td) / "root", Path(td) / "coverage"
+            root.mkdir(); temp.mkdir(); (root / "mod.py").write_text("def hit():\n    return 1\n\ndef missed():\n    return 2\n")
+            (temp / ".coverage-sq01.part").write_text("data")
+            report = {"files": {"mod.py": {"executed_lines": [2], "missing_lines": [5],
+                      "summary": {"covered_lines": 2, "num_statements": 4, "num_branches": 0,
+                                  "covered_branches": 0, "missing_branches": 0}, "missing_branches": []}}}
+            class Measured:
+                def combine(self, **_kwargs): pass
+                def load(self): pass
+                def json_report(self, outfile): Path(outfile).write_text(json.dumps(report))
+            fake = types.SimpleNamespace(Coverage=lambda **_kwargs: Measured(), CoverageException=Exception)
+            with mock.patch.dict(sys.modules, {"coverage": fake}):
+                result = self.h._coverage_run(root, temp, [], ("mod.py",))
+        rows = result["modules"][0]["functions"]
+        self.assertEqual([(row["name"], row["covered"]) for row in rows], [("hit", True), ("missed", False)])
+
+    def test_coverage_run_gate_marks_failed_coverage_receipt(self):
+        with tempfile.TemporaryDirectory() as td:
+            output = Path(td) / "receipts"
+            passing = {"status": "PASS", "skipped_required": 0}
+            with mock.patch.object(self.h.importlib.metadata, "version", side_effect=lambda name: self.h.PINNED[name]), mock.patch.object(
+                    self.h, "source_identity", return_value=self.h.SourceIdentity("1" * 40, "2" * 40, ())), mock.patch.object(
+                    self.h, "assert_source_identity"), mock.patch.object(self.h, "_source_manifest", return_value=passing.copy()), mock.patch.object(
+                    self.h, "_inventory", return_value={**passing, "completeness_percent": 100}), mock.patch.object(
+                    self.h, "_schema_validation", return_value=passing.copy()), mock.patch.object(
+                    self.h, "execute_mutations", return_value={**passing, "cases": [], "total": 34, "passed": 34, "failed": 0}), mock.patch.object(
+                    self.h, "_public_scan", return_value=passing.copy()), mock.patch.object(
+                    self.h, "_coverage", return_value={"tests": [], "modules": [], "function_coverage": {"covered": 0, "total": 1}, "branch_coverage": {"covered": 0, "total": 1}, "target_met": False}), mock.patch.dict(
+                    sys.modules, {"sq01_semantic_validator": types.SimpleNamespace(validate_paths=lambda *_: {"status": "PASS", "errors": []})}):
+                self.assertEqual(self.h.run_gate(ROOT, "1" * 40, output, safe_temp_root=Path(td)), 1)
+            mutation = json.loads((output / "mutation-results.json").read_text())
+            self.assertTrue(mutation["coverage_failure"])
 
 
 def load_module(path, name):
