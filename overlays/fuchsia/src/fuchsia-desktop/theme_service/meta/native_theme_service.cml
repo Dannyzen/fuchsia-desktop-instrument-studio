@@ -1,0 +1,9 @@
+{
+    include: [ "inspect/client.shard.cml", "syslog/client.shard.cml" ],
+    program: { runner: "elf", binary: "bin/native_theme_service" },
+    capabilities: [ { protocol: "fuchsia.instrumentstudio.theme.NativeTheme" } ],
+    expose: [ {
+        protocol: "fuchsia.instrumentstudio.theme.NativeTheme",
+        from: "self",
+    } ],
+}
