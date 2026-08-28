@@ -1,0 +1,15 @@
+copy("catalog_artifacts") {
+  sources = [
+    "catalog/catalog-index.json",
+    "catalog/generation-manifest.json",
+    "catalog/instrument-studio-base16.package.json",
+    "catalog/instrument-studio-base16.receipt.json",
+    "catalog/instrument-studio-base24.package.json",
+    "catalog/instrument-studio-base24.receipt.json",
+    "catalog/instrument-studio-dtcg.package.json",
+    "catalog/instrument-studio-dtcg.receipt.json",
+    "catalog/instrument-studio-omarchy.package.json",
+    "catalog/instrument-studio-omarchy.receipt.json",
+  ]
+  outputs = [ "${target_gen_dir}/catalog/{{source_file_part}}" ]
+}
