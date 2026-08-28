@@ -625,6 +625,12 @@ def authority_scan(root: Path, receipts: dict[str, bytes]) -> dict[str, Any]:
     }
 
 
+def coverage_machine_sha256(machine: dict[str, Any]) -> str:
+    normalized = json.loads(json.dumps(machine))
+    normalized.get("meta", {}).pop("timestamp", None)
+    return sha256(canonical_json_bytes(normalized))
+
+
 def measure_coverage(root: Path, workspace: Path) -> tuple[dict[str, dict[str, int]], str]:
     workspace.mkdir(parents=True, exist_ok=False)
     data_file = workspace / ".coverage-sq02"
@@ -671,7 +677,7 @@ def measure_coverage(root: Path, workspace: Path) -> tuple[dict[str, dict[str, i
         if metric["statements_covered"] != metric["statements_total"] or metric["branches_covered"] != metric["branches_total"] or metric["functions_with_body_execution"] != metric["functions_total"]:
             fail("CI_COVERAGE", f"safety-bearing coverage gap in {relative}")
         metrics[relative] = metric
-    return metrics, sha256(machine_raw)
+    return metrics, coverage_machine_sha256(machine)
 
 
 def _tracked_hashes(root: Path) -> dict[str, str]:

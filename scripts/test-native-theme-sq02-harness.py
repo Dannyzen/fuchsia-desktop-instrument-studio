@@ -336,6 +336,11 @@ class CoreTests(unittest.TestCase):
             with mock.patch.object(h, "run_allowed", side_effect=coverage_run):
                 metrics, artifact = h.measure_coverage(ROOT, workspace)
             self.assertEqual(len(metrics), 2); self.assertEqual(len(artifact), 64)
+            machine_a = {"meta": {"timestamp": "2026-08-28T00:00:00", "version": "7.6.12"}, "files": source_rows}
+            machine_b = {"meta": {"timestamp": "2026-08-28T01:00:00", "version": "7.6.12"}, "files": source_rows}
+            self.assertEqual(h.coverage_machine_sha256(machine_a), h.coverage_machine_sha256(machine_b))
+            self.assertNotEqual(h.coverage_machine_sha256(machine_a),
+                                h.coverage_machine_sha256({"meta": {"version": "different"}, "files": source_rows}))
 
         first = payload_fixture(); second = copy = json.loads(json.dumps(first))
         metric = {name: {"branches_covered": 1, "branches_total": 1, "functions_with_body_execution": 1,
