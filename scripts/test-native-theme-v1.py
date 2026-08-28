@@ -223,6 +223,9 @@ class NativeThemeV1ContractTests(unittest.TestCase):
         self.assertGreaterEqual(report["positive_cases"], 5)
         self.assertGreaterEqual(report["negative_cases"], 25)
         self.assertEqual(report["uncovered"], 0)
+        outputs = [entry["complete_package"] for entry in manifest["profiles"]]
+        self.assertEqual(len(outputs), 5)
+        self.assertTrue(all(output == outputs[0] for output in outputs))
 
     def test_complete_package_covers_required_variants_layers_and_domains(self):
         package = contract.load_json_strict(self.FIXTURES / "native-theme-v1-package.json")
@@ -235,6 +238,15 @@ class NativeThemeV1ContractTests(unittest.TestCase):
             })
             self.assertEqual(len(variant["terminal"]), 16)
             self.assertNotEqual(variant["semantic"]["border.focusConfirmed"], variant["semantic"]["interaction.selection"])
+
+    def test_complete_package_selection_meets_variant_ui_contrast_policy(self):
+        package = contract.load_json_strict(self.FIXTURES / "native-theme-v1-package.json")
+        for name, target in (("light", 3.0), ("dark", 3.0), ("high-contrast", 4.5)):
+            with self.subTest(variant=name):
+                semantic = package["variants"][name]["semantic"]
+                ratio = contract.contrast(
+                    semantic["interaction.selection"][1:7], semantic["surface.canvas"][1:7])
+                self.assertGreaterEqual(ratio, target, f"{name} selection contrast {ratio} below {target}")
 
     def test_contract_rejections_have_stable_codes(self):
         package = contract.load_json_strict(self.FIXTURES / "native-theme-v1-package.json")
@@ -297,6 +309,8 @@ class NativeThemeV1ContractTests(unittest.TestCase):
             ("E_ASSET_PATH", lambda p: p["variants"]["dark"]["assets"]["items"]["status.error"].__setitem__("path", "../escape.svg")),
             ("E_REDUCED_MOTION", lambda p: p["variants"]["dark"]["motion"].__setitem__("reduced", {"duration_ms": 1, "essential_only": True})),
             ("E_CONTRAST_UI", lambda p: p["variants"]["dark"]["semantic"].__setitem__("border.focusConfirmed", "#12141aff")),
+            ("E_CONTRAST_SELECTION", lambda p: p["variants"]["dark"]["semantic"].__setitem__("interaction.selection", "#12141aff")),
+            ("E_FOCUS_DISTINCT", lambda p: p["variants"]["dark"]["semantic"].__setitem__("interaction.selection", p["variants"]["dark"]["semantic"]["border.focusConfirmed"])),
         ]
         for code, mutate in cases:
             with self.subTest(code=code):
@@ -319,6 +333,10 @@ class NativeThemeV1ContractTests(unittest.TestCase):
         self.assertEqual(policy["canonical_color"], "lowercase-rrggbbaa-srgb")
         self.assertEqual(policy["extension_namespace"], "org.constructresearch.instrumentstudio.*")
         self.assertEqual(policy["limits"], contract.LIMITS)
+        self.assertEqual(policy["contrast_targets"], {
+            "ordinary": {"normal_text": 4.5, "selection": 3.0, "focus": 3.0},
+            "high-contrast": {"normal_text": 7.0, "selection": 4.5, "focus": 4.5},
+        })
         self.assertIn("command", policy["forbidden_fields"])
         self.assertIn("semantic_hash", policy["derived_fields"])
         self.assertEqual(set(policy["import_profiles"]), set(contract.PROFILE_LAYERS))

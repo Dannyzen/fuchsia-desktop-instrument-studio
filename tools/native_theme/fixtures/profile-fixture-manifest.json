@@ -1,6 +1,16 @@
 {
   "profiles": [
     {
+      "complete_package": {
+        "file": "native-theme-v1-package.json",
+        "selection": {
+          "dark": "#8150d6ff",
+          "high-contrast": "#65ffffff",
+          "light": "#8150d6ff"
+        },
+        "semantic_hash": "sha256:778b825bd62ce574281a35d5abd207d3b7c8d13367277d027e05f6674a061090",
+        "sha256": "sha256:54a062c10dbc12f53af52902c7bc2658b0b4bc61f37d89d62833fc9f899d658a"
+      },
       "derivations": [
         "curly-alias-resolution",
         "srgb-alpha-preservation"
@@ -107,6 +117,16 @@
       ]
     },
     {
+      "complete_package": {
+        "file": "native-theme-v1-package.json",
+        "selection": {
+          "dark": "#8150d6ff",
+          "high-contrast": "#65ffffff",
+          "light": "#8150d6ff"
+        },
+        "semantic_hash": "sha256:778b825bd62ce574281a35d5abd207d3b7c8d13367277d027e05f6674a061090",
+        "sha256": "sha256:54a062c10dbc12f53af52902c7bc2658b0b4bc61f37d89d62833fc9f899d658a"
+      },
       "derivations": [
         "base-role-map"
       ],
@@ -166,6 +186,16 @@
       ]
     },
     {
+      "complete_package": {
+        "file": "native-theme-v1-package.json",
+        "selection": {
+          "dark": "#8150d6ff",
+          "high-contrast": "#65ffffff",
+          "light": "#8150d6ff"
+        },
+        "semantic_hash": "sha256:778b825bd62ce574281a35d5abd207d3b7c8d13367277d027e05f6674a061090",
+        "sha256": "sha256:54a062c10dbc12f53af52902c7bc2658b0b4bc61f37d89d62833fc9f899d658a"
+      },
       "derivations": [
         "base16-plus-bright-ansi",
         "base-role-map"
@@ -226,6 +256,16 @@
       ]
     },
     {
+      "complete_package": {
+        "file": "native-theme-v1-package.json",
+        "selection": {
+          "dark": "#8150d6ff",
+          "high-contrast": "#65ffffff",
+          "light": "#8150d6ff"
+        },
+        "semantic_hash": "sha256:778b825bd62ce574281a35d5abd207d3b7c8d13367277d027e05f6674a061090",
+        "sha256": "sha256:54a062c10dbc12f53af52902c7bc2658b0b4bc61f37d89d62833fc9f899d658a"
+      },
       "derivations": [
         "normal-bright-ansi",
         "ramp-role-map"
@@ -287,6 +327,16 @@
       ]
     },
     {
+      "complete_package": {
+        "file": "native-theme-v1-package.json",
+        "selection": {
+          "dark": "#8150d6ff",
+          "high-contrast": "#65ffffff",
+          "light": "#8150d6ff"
+        },
+        "semantic_hash": "sha256:778b825bd62ce574281a35d5abd207d3b7c8d13367277d027e05f6674a061090",
+        "sha256": "sha256:54a062c10dbc12f53af52902c7bc2658b0b4bc61f37d89d62833fc9f899d658a"
+      },
       "derivations": [
         "legacy-quantize-half-up",
         "declared-proof-role-map"
@@ -347,5 +397,5 @@
       ]
     }
   ],
-  "schema_version": "1.0.0"
+  "schema_version": "1.1.0"
 }

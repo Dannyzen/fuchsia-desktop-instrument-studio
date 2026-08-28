@@ -20,16 +20,14 @@ except ModuleNotFoundError:  # dependency prep is deliberately outside the gate
     jsonschema = None
 
 ROLES = {
-    "surface.canvas", "surface.raised", "surface.sunken", "surface.overlay",
-    "text.normal", "text.muted", "text.bright", "text.inverse",
-    "border.normal", "border.muted", "border.focusConfirmed", "border.danger",
-    "interaction.accent", "interaction.accentHover", "interaction.selection",
-    "interaction.selectionInactive", "interaction.disabled", "interaction.link",
-    "status.info", "status.success", "status.warning", "status.danger",
-    "status.neutral", "terminal.background", "terminal.foreground",
-    "terminal.black", "terminal.red", "terminal.green", "terminal.yellow",
-    "terminal.blue", "terminal.magenta", "terminal.cyan", "terminal.white",
-    "terminal.brightBlack", "terminal.brightWhite",
+    "border.active", "border.focusConfirmed", "border.normal", "border.strong",
+    "border.subtle", "interaction.accent", "interaction.disabled", "interaction.hover",
+    "interaction.pressed", "interaction.selected", "interaction.selection",
+    "status.danger", "status.info", "status.success", "status.warning", "surface.base",
+    "surface.canvas", "surface.deep", "surface.overlay", "surface.raised", "surface.sunken",
+    "terminal.background", "terminal.cursor", "terminal.foreground", "terminal.selection",
+    "text.bright", "text.disabled", "text.inverse", "text.muted", "text.normal",
+    "text.strong", "text.subtle", "window.active", "window.inactive", "window.urgent",
 }
 
 
@@ -72,10 +70,11 @@ def validate(package: dict[str, Any], schema: dict[str, Any], oracle: dict[str, 
                 errors.append({"code": "E_COLOR_CANONICAL", "detail": f"{variant_name}:{role}"})
         if semantic.get("border.focusConfirmed") == semantic.get("interaction.selection"):
             errors.append({"code": "E_FOCUS_COLLAPSE", "detail": variant_name})
+        ui_minimum = 4.5 if variant_name == "high-contrast" else 3.0
         for fg, bg, minimum, code in (
             ("text.normal", "surface.canvas", 4.5, "E_CONTRAST_TEXT"),
-            ("border.focusConfirmed", "surface.canvas", 3.0, "E_CONTRAST_FOCUS"),
-            ("interaction.selection", "surface.canvas", 3.0, "E_CONTRAST_SELECTION"),
+            ("border.focusConfirmed", "surface.canvas", ui_minimum, "E_CONTRAST_FOCUS"),
+            ("interaction.selection", "surface.canvas", ui_minimum, "E_CONTRAST_SELECTION"),
             ("status.danger", "surface.canvas", 3.0, "E_CONTRAST_STATUS"),
         ):
             try:

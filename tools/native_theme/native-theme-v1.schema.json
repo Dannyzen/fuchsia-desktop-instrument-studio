@@ -2141,6 +2141,18 @@
   ],
   "x-native-theme-v1-contract": {
     "canonical_color": "lowercase-rrggbbaa-srgb",
+    "contrast_targets": {
+      "high-contrast": {
+        "focus": 4.5,
+        "normal_text": 7.0,
+        "selection": 4.5
+      },
+      "ordinary": {
+        "focus": 3.0,
+        "normal_text": 4.5,
+        "selection": 3.0
+      }
+    },
     "derived_fields": [
       "semantic_hash",
       "canonical_bytes",

@@ -281,6 +281,20 @@ class Sq01HarnessTests(unittest.TestCase):
         result = semantic.validate(package, schema, oracle)
         self.assertNotIn("E_SETTINGS_MAPPING", {e["code"] for e in result["errors"]})
 
+    def test_semantic_selection_thresholds_are_variant_specific(self):
+        semantic = load_module(ROOT / "tools/native_theme/sq01_semantic_validator.py", "sq01_selection_thresholds")
+        package = json.loads((ROOT / "tools/native_theme/fixtures/native-theme-v1-package.json").read_text())
+        schema = json.loads((ROOT / "tools/native_theme/native-theme-v1.schema.json").read_text())
+        oracle = json.loads((ROOT / "docs/native-theme-v1-legacy-oracle.json").read_text())
+        ordinary = json.loads(json.dumps(package))
+        ordinary["variants"]["dark"]["semantic"]["interaction.selection"] = "#55406fff"
+        errors = semantic.validate(ordinary, schema, oracle)["errors"]
+        self.assertIn({"code": "E_CONTRAST_SELECTION", "detail": "dark"}, errors)
+        high_contrast = json.loads(json.dumps(package))
+        high_contrast["variants"]["high-contrast"]["semantic"]["interaction.selection"] = "#005fccff"
+        errors = semantic.validate(high_contrast, schema, oracle)["errors"]
+        self.assertIn({"code": "E_CONTRAST_SELECTION", "detail": "high-contrast"}, errors)
+
     def test_guarded_subprocess_rejects_unknown_and_shell(self):
         with self.assertRaises(PermissionError):
             self.h.run_allowed(["curl", "https://example.invalid"], ROOT)
@@ -297,6 +311,36 @@ class Sq01HarnessTests(unittest.TestCase):
         self.assertFalse(any(case["id"] in {"overlong", "deep", "oversized"} and
                              case["pass"] and case["validator_name"] == "none"
                              for case in receipt["cases"]))
+
+    def test_repair_exact_roles_match_every_package_variant(self):
+        semantic = load_module(ROOT / "tools/native_theme/sq01_semantic_validator.py", "sq01_roles")
+        package = json.loads((ROOT / "tools/native_theme/fixtures/native-theme-v1-package.json").read_text())
+        self.assertEqual(len(semantic.ROLES), 35)
+        for variant in package["variants"].values():
+            self.assertEqual(semantic.ROLES, set(variant["semantic"]))
+
+    def test_repair_public_scan_executes_and_passes_all_sixteen_checks(self):
+        receipt = self.h._public_scan(ROOT)
+        self.assertEqual((len(receipt["checks"]), sum(c["pass"] for c in receipt["checks"])), (16, 16))
+        self.assertEqual(receipt["unclassified_findings"], [])
+        self.assertEqual(receipt["status"], "PASS")
+
+    def test_repair_coverage_temp_is_outside_output_and_removed(self):
+        with tempfile.TemporaryDirectory() as td:
+            output = Path(td) / "receipts"
+            output.mkdir()
+            (output / "stale").write_text("stale")
+            with mock.patch.object(self.h, "source_identity", return_value=self.h.SourceIdentity("1" * 40, "2" * 40, ())):
+                with mock.patch.object(self.h, "assert_source_identity"), mock.patch.object(
+                        self.h, "_source_manifest", return_value={"status": "PASS", "skipped_required": 0}), mock.patch.object(
+                        self.h, "_inventory", return_value={"status": "PASS", "skipped_required": 0, "completeness_percent": 100, "uncovered": []}), mock.patch.object(
+                        self.h, "_schema_validation", return_value={"status": "PASS", "skipped_required": 0, "negative_cases": []}), mock.patch.object(
+                        self.h, "execute_mutations", return_value={"status": "PASS", "skipped_required": 0, "cases": [], "total": 34, "passed": 34, "failed": 0}), mock.patch.object(
+                        self.h, "_public_scan", return_value={"status": "PASS", "skipped_required": 0, "checks": []}), mock.patch.object(
+                        self.h, "_coverage", return_value={"tests": [], "modules": [], "function_coverage": {"covered": 1, "total": 1, "percent": 100}, "branch_coverage": {"covered": 1, "total": 1, "percent": 100}, "target_met": True}), mock.patch.dict(
+                        "sys.modules", {"sq01_semantic_validator": types.SimpleNamespace(validate_paths=lambda *_: {"status": "PASS", "errors": []})}):
+                    self.assertEqual(self.h.run_gate(ROOT, "1" * 40, output, safe_temp_root=Path(td)), 0)
+            self.assertEqual({p.name for p in output.iterdir()}, set(self.h.ALL_RECEIPTS))
 
 
 def load_module(path, name):

@@ -20,7 +20,7 @@ Tokens declared at a profile-inappropriate layer fail with `E_PROFILE_LAYER`. Un
 
 The checked-in positive and negative fixtures are normative examples. The legacy profile and existing Base24 golden preserve the bounded proof; migration is deterministic decimal half-up quantization with its prior semantic hash retained by the proof tests.
 
-`profile-fixture-manifest.json` is the coverage authority: it binds each profile to its type, accepted layers, variants, deterministic derivations, role map, diagnostics, positive fixtures, and expected-layer negative cases. The legacy entry covers only the P1-C1 declared proof constants and roles; it does not claim the later full consumer inventory.
+`profile-fixture-manifest.json` is the coverage authority: it binds each profile to its type, accepted layers, variants, deterministic derivations, role map, diagnostics, positive fixtures, expected-layer negative cases, and the canonical complete-package bytes, semantic hash, and selection values they identify. The legacy entry covers only the P1-C1 declared proof constants and roles; it does not claim that the historical Base24 snapshot itself is a complete native package or satisfies the later complete-package selection policy.
 
 ## Canonical JSON and diagnostics
 

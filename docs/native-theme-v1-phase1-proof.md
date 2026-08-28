@@ -30,8 +30,8 @@ Assembly, native consumers, deployment, and release remain out of scope.
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-native-theme-v1.py
-python3 tools/native_theme/native_theme_v1.py compile-base24   --input tools/native_theme/fixtures/base24-instrument-studio.yaml   --output /tmp/native-theme-v1.json
-python3 tools/native_theme/validate_native_theme_v1.py /tmp/native-theme-v1.json
+python3 tools/native_theme/native_theme_v1.py compile-base24 --input tools/native_theme/fixtures/base24-instrument-studio.yaml --output artifacts/native-theme-v1.json
+python3 tools/native_theme/validate_native_theme_v1.py artifacts/native-theme-v1.json
 ```
 
 Legacy equivalence is semantic for the ten proof roles. Float constants are

@@ -4,7 +4,7 @@ Every packaged theme supplies `light`, `dark`, and `high-contrast`. A compiled s
 
 The semantic taxonomy distinguishes surfaces, text, borders, selection, confirmed focus, and success/warning/error status. Confirmed focus is distinct from selection. Status is not conveyed by color alone: semantic status asset IDs are required and deterministically fall back to built-in assets.
 
-Ordinary variants target WCAG 2.2 AA: 4.5 for normal text and 3.0 for large text, UI boundaries, and focus. High-contrast targets are 7.0 for normal text and 4.5 for large text. Reduced motion has a zero-duration deterministic selection while essential state transitions remain available.
+Ordinary variants target WCAG 2.2 AA: 4.5 for normal text and 3.0 for large text, UI boundaries, selection, and focus. High-contrast targets are 7.0 for normal text and 4.5 for large text, selection, and focus. Reduced motion has a zero-duration deterministic selection while essential state transitions remain available.
 
 Typography includes proportional and monospace selections, size, weight, and line height. Geometry includes spacing, radius, density, and responsive selections. Elevation, opacity, motion, the complete ANSI 16-color terminal palette, provenance, SPDX licensing, fallback, and version policy are required domains.
 

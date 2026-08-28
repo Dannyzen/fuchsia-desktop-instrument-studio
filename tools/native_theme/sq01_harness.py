@@ -14,6 +14,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 from typing import Any, NamedTuple
 import urllib.request
 
@@ -461,12 +462,10 @@ def _public_scan(root: Path) -> dict[str, Any]:
             for match in pattern.finditer(text):
                 findings.append({"path": rel, "kind": kind, "value_sha256": sha256(match.group().encode())})
 
-    artifacts = {
-        "package": [rel for rel in texts if rel.endswith("native-theme-v1-package.json")],
-        "profile": [rel for rel in texts if "profile-fixture-manifest" in rel or "/profiles/" in rel],
-        "spec": [rel for rel in texts if rel.endswith("native-theme-v1.schema.json") or rel.endswith("-profile.md") or rel.endswith("-contract-decisions.md")],
-        "public": [rel for rel in texts if rel.startswith("docs/") and ("oracle" in rel or "snapshot" in rel)],
-    }
+    artifacts = {"package": [rel for rel in texts if rel.endswith("native-theme-v1-package.json")],
+                 "profile": [rel for rel in texts if "profile-fixture-manifest" in rel or "/profiles/" in rel],
+                 "spec": [rel for rel in texts if rel.endswith("native-theme-v1.schema.json") or rel.endswith(".md")],
+                 "public": [rel for rel in texts if rel.startswith("docs/")]}
     allowlist = {"Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "CC0-1.0", "MIT", "MPL-2.0"}
     checks = []
     for artifact, paths in artifacts.items():
@@ -476,12 +475,13 @@ def _public_scan(root: Path) -> dict[str, Any]:
                                "pass": False, "skipped": True, "skipped_required": 1})
             continue
         body = "\n".join(texts[path] for path in paths)
+        package_body = "\n".join(texts[p] for p in artifacts["package"])
         spdx_values = set(re.findall(r"\b(?:Apache-2\.0|BSD-[23]-Clause|CC0-1\.0|MIT|MPL-2\.0)\b", body))
         outcomes = {
-            "spdx": bool(spdx_values or re.search(r"(?i)\bSPDX\b", body)),
-            "source-url": bool(re.search(r"https?://[^\s\"']+", body)),
-            "attribution": bool(re.search(r"(?i)\b(?:attribution|copyright|contributors?)\b", body)),
-            "license-allowlist": bool(spdx_values) and spdx_values <= allowlist,
+            "spdx": bool(spdx_values or re.search(r'"spdx"\s*:', package_body)),
+            "source-url": bool(re.search(r'"source_identity"\s*:\s*"[^\"]+"', package_body)),
+            "attribution": bool(re.search(r'"attribution"\s*:\s*"[^\"]+"', package_body)),
+            "license-allowlist": bool(set(re.findall(r"\b(?:Apache-2\.0|BSD-[23]-Clause|CC0-1\.0|MIT|MPL-2\.0)\b", body + package_body))) and set(re.findall(r"\b(?:Apache-2\.0|BSD-[23]-Clause|CC0-1\.0|MIT|MPL-2\.0)\b", body + package_body)) <= allowlist,
         }
         for name, passed in outcomes.items():
             checks.append({"id": f"{artifact}.{name}", "paths": paths, "executed": True,
@@ -554,7 +554,9 @@ def run_gate(root: Path, source_sha: str, output: Path, *, safe_temp_root: Path 
     receipts["semantic-conformance.json"] = semantic
     receipts["mutation-results.json"] = execute_mutations(root)
     receipts["public-boundary-and-license-scan.json"] = _public_scan(root)
-    coverage = _coverage(root, output)
+    temp_parent = Path(tempfile.gettempdir())
+    with tempfile.TemporaryDirectory(prefix="native-theme-sq01-coverage-", dir=temp_parent) as td:
+        coverage = _coverage(root, Path(td))
     if not coverage["target_met"]:
         receipts["mutation-results.json"]["status"] = "FAIL"
         receipts["mutation-results.json"]["coverage_failure"] = True

@@ -161,6 +161,13 @@ def semantic_identity(value: object) -> str:
     return "sha256:" + hashlib.sha256(canonical_json_bytes(value)).hexdigest()
 
 
+def package_semantic_identity(package: dict[str, object]) -> str:
+    """Hash complete package meaning without recursively hashing the hash field."""
+    semantic = json.loads(json.dumps(package))
+    semantic["metadata"]["provenance"].pop("semantic_hash", None)
+    return semantic_identity(semantic)
+
+
 def validate_profile_fixture(data: dict[str, object]) -> None:
     if set(data) != {"profile_version", "declared_layer", "tokens"}:
         reject("E_PROFILE_FIELDS", "profile fixture fields differ")
@@ -185,7 +192,7 @@ def validate_root_schema_structural(schema: dict[str, object], instance: dict[st
 
 
 def validate_profile_manifest(manifest: dict[str, object], fixtures: Path) -> dict[str, int]:
-    if set(manifest) != {"schema_version", "profiles"} or manifest["schema_version"] != "1.0.0":
+    if set(manifest) != {"schema_version", "profiles"} or manifest["schema_version"] != "1.1.0":
         reject("E_MANIFEST", "manifest shape/version")
     profiles = manifest["profiles"]
     if not isinstance(profiles, list) or len(profiles) != len(PROFILE_LAYERS):
@@ -193,10 +200,19 @@ def validate_profile_manifest(manifest: dict[str, object], fixtures: Path) -> di
     positives = negatives = uncovered = 0
     seen = set()
     for entry in profiles:
-        required = {"profile", "type", "layers", "variants", "derivations", "role_map", "diagnostics", "positive_cases", "negative_cases"}
+        required = {"profile", "type", "layers", "variants", "derivations", "role_map", "diagnostics", "positive_cases", "negative_cases", "complete_package"}
         if not isinstance(entry, dict) or set(entry) != required or entry["profile"] not in PROFILE_LAYERS:
             reject("E_MANIFEST", "profile entry incomplete")
         seen.add(entry["profile"]); positives += len(entry["positive_cases"]); negatives += len(entry["negative_cases"])
+        output = entry["complete_package"]
+        output_path = fixtures.parent / output.get("file", "") if isinstance(output, dict) else fixtures
+        if not isinstance(output, dict) or set(output) != {"file", "sha256", "semantic_hash", "selection"} or not output_path.is_file():
+            uncovered += 1
+        else:
+            package = load_json_strict(output_path)
+            expected_selection = {name: package["variants"][name]["semantic"]["interaction.selection"] for name in sorted(REQUIRED_VARIANTS)}
+            if output["sha256"] != "sha256:" + hashlib.sha256(output_path.read_bytes()).hexdigest() or output["semantic_hash"] != package_semantic_identity(package) or output["selection"] != expected_selection:
+                uncovered += 1
         for case in entry["positive_cases"] + entry["negative_cases"]:
             if not isinstance(case, dict) or not (fixtures / case["file"]).is_file(): uncovered += 1
         negative_codes = {case.get("code") for case in entry["negative_cases"]}
@@ -323,14 +339,19 @@ def validate_package(data: dict[str, object]) -> None:
         if contrast(fg[1:7], bg[1:7]) < target:
             reject("E_CONTRAST_NORMAL", f"{variant_name} text contrast below {target}")
         focus = semantic.get("border.focusConfirmed")
+        selection = semantic.get("interaction.selection")
         ui_target = 4.5 if variant_name == "high-contrast" else 3.0
         if not isinstance(focus, str) or not RGBA_RE.fullmatch(focus) or contrast(focus[1:7], bg[1:7]) < ui_target:
             reject("E_CONTRAST_UI", f"{variant_name} focus contrast below {ui_target}")
+        if not isinstance(selection, str) or not RGBA_RE.fullmatch(selection) or contrast(selection[1:7], bg[1:7]) < ui_target:
+            reject("E_CONTRAST_SELECTION", f"{variant_name} selection contrast below {ui_target}")
     if token_count > LIMITS["tokens"]:
         reject("E_LIMIT_TOKENS", "token count exceeds 1024")
     encoded = canonical_json_bytes(data)
     if len(encoded) > LIMITS["compiled_pack_bytes"]:
         reject("E_LIMIT_PACK", "compiled pack exceeds 256 KiB")
+    if provenance["semantic_hash"] != package_semantic_identity(data):
+        reject("E_PROVENANCE", "complete package semantic hash mismatch")
 
 
 def read_bounded(path: Path) -> bytes:
