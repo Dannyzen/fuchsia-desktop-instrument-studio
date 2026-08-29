@@ -36,6 +36,7 @@ rustc_library("theme_service_core") {
     "//third_party/rust_crates:log",
   ]
   test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
   ]

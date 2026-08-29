@@ -98,6 +98,10 @@ impl AtomicStore {
             commits: 0,
         }
     }
+    #[cfg(test)]
+    pub(crate) fn fail_for_test(&mut self, point: FailurePoint) {
+        self.failure = Some(point);
+    }
     pub fn load(&self) -> Result<Option<PersistedState>, StateError> {
         match fs::read(&self.path) {
             Ok(bytes) => decode(&bytes).map(Some),
