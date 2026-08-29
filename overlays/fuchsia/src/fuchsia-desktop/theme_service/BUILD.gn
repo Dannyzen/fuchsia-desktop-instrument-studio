@@ -15,6 +15,7 @@ rustc_library("theme_service_core") {
   source_root = "src/authority.rs"
   sources = [
     "src/authority.rs",
+    "src/diagnostics.rs",
     "src/persistence.rs",
   ]
   inputs = [
@@ -32,6 +33,7 @@ rustc_library("theme_service_core") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/diagnostics/inspect/rust:fuchsia-inspect",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
   ]
   test_deps = [
     "//src/lib/fuchsia",
