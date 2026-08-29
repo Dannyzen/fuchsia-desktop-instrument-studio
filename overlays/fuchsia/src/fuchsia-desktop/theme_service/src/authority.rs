@@ -318,10 +318,10 @@ impl SettingsControl {
             self.diagnostics.finish_recovery_if_needed();
         }
     }
-    fn select_with_post_store_hook<F>(
+    fn select_with_post_receipt_hook<F>(
         &self,
         identity: persistence::Identity,
-        post_store_hook: F,
+        post_receipt_hook: F,
     ) -> Result<(), zx_status::Status>
     where
         F: FnOnce(),
@@ -334,25 +334,25 @@ impl SettingsControl {
                 .map_err(|_| zx_status::Status::IO)
         });
         let state = self.observed_state(&store);
-        post_store_hook();
         self.diagnostics.record_selection_result(&result, &state);
+        post_receipt_hook();
         drop(store);
         self.finish_recovery_if_needed(&result);
         result
     }
     pub fn select(&self, identity: persistence::Identity) -> Result<(), zx_status::Status> {
-        self.select_with_post_store_hook(identity, || {})
+        self.select_with_post_receipt_hook(identity, || {})
     }
     #[cfg(test)]
-    pub fn select_with_post_store_hook_for_test<F>(
+    pub fn select_with_post_receipt_hook_for_test<F>(
         &self,
         identity: persistence::Identity,
-        post_store_hook: F,
+        post_receipt_hook: F,
     ) -> Result<(), zx_status::Status>
     where
         F: FnOnce(),
     {
-        self.select_with_post_store_hook(identity, post_store_hook)
+        self.select_with_post_receipt_hook(identity, post_receipt_hook)
     }
     #[cfg(test)]
     pub fn fail_store_for_test(&self, point: persistence::FailurePoint) {
@@ -704,7 +704,7 @@ mod tests {
             let entered_a = entered.clone();
             let release_a = release.clone();
             let handle = scope.spawn(move || {
-                control_a.select_with_post_store_hook_for_test(first_identity, || {
+                control_a.select_with_post_receipt_hook_for_test(first_identity, || {
                     entered_a.wait();
                     release_a.wait();
                 })
@@ -721,6 +721,23 @@ mod tests {
         assert!(recent[0].contains("\"selected_theme_id\":\"instrument-studio\""));
         assert!(recent[1].contains("\"selected_theme_id\":\"\""));
         assert!(control.state().pending.is_none());
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn select_retains_store_lock_through_receipt_emission() {
+        let (path, control) = test_control();
+        let probe = control.clone();
+        let result = control.select_with_post_receipt_hook_for_test(
+            identity(persistence::Variant::Dark),
+            || {
+                assert!(
+                    probe.store.try_lock().is_err(),
+                    "store lock released before receipt emission completed"
+                );
+            },
+        );
+        assert!(result.is_ok());
         let _ = std::fs::remove_file(path);
     }
 
