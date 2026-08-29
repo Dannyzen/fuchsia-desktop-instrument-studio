@@ -2,6 +2,7 @@ use fidl::endpoints::RequestStream;
 use fidl_fuchsia_instrumentstudio_theme as ftheme;
 use futures::TryStreamExt;
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 use std::sync::{Arc, Mutex};
 use theme_model::NativeThemeV1;
 
@@ -228,6 +229,7 @@ pub struct SettingsControl {
     authority: Arc<Authority>,
     store: Mutex<persistence::AtomicStore>,
     diagnostics: Arc<Diagnostics>,
+    recovery_pending: AtomicBool,
 }
 
 impl SettingsControl {
@@ -236,10 +238,12 @@ impl SettingsControl {
         state_path: impl Into<std::path::PathBuf>,
         diagnostics: Arc<Diagnostics>,
     ) -> Self {
+        let recovery_pending = authority.selection_error_code().is_some();
         Self {
             authority,
             store: Mutex::new(persistence::AtomicStore::new(state_path)),
             diagnostics,
+            recovery_pending: AtomicBool::new(recovery_pending),
         }
     }
     fn active_identity(&self) -> persistence::Identity {
@@ -299,51 +303,92 @@ impl SettingsControl {
                 .record_last_known_good_result(&result, Some(observed));
         }
     }
-    pub fn select(&self, identity: persistence::Identity) -> Result<(), zx_status::Status> {
+    fn observed_state(&self, store: &persistence::AtomicStore) -> persistence::PersistedState {
+        store
+            .load()
+            .ok()
+            .flatten()
+            .unwrap_or_else(|| persistence::PersistedState {
+                pending: None,
+                last_known_good: self.active_identity(),
+            })
+    }
+    fn finish_recovery_if_needed(&self, result: &Result<(), zx_status::Status>) {
+        if result.is_ok() && self.recovery_pending.swap(false, AtomicOrdering::SeqCst) {
+            self.diagnostics.finish_recovery_if_needed();
+        }
+    }
+    fn select_with_post_store_hook<F>(
+        &self,
+        identity: persistence::Identity,
+        post_store_hook: F,
+    ) -> Result<(), zx_status::Status>
+    where
+        F: FnOnce(),
+    {
+        let mut store = self.store.lock().unwrap();
         let result = self.validate(&identity).and_then(|()| {
-            self.store
-                .lock()
-                .unwrap()
+            store
                 .select(identity, self.active_identity())
                 .map(|_| ())
                 .map_err(|_| zx_status::Status::IO)
         });
-        let state = self.state();
+        let state = self.observed_state(&store);
+        post_store_hook();
         self.diagnostics.record_selection_result(&result, &state);
+        drop(store);
+        self.finish_recovery_if_needed(&result);
         result
     }
+    pub fn select(&self, identity: persistence::Identity) -> Result<(), zx_status::Status> {
+        self.select_with_post_store_hook(identity, || {})
+    }
+    #[cfg(test)]
+    pub fn select_with_post_store_hook_for_test<F>(
+        &self,
+        identity: persistence::Identity,
+        post_store_hook: F,
+    ) -> Result<(), zx_status::Status>
+    where
+        F: FnOnce(),
+    {
+        self.select_with_post_store_hook(identity, post_store_hook)
+    }
+    #[cfg(test)]
+    pub fn fail_store_for_test(&self, point: persistence::FailurePoint) {
+        self.store.lock().unwrap().fail_for_test(point);
+    }
     pub fn restore(&self) -> Result<(), zx_status::Status> {
-        let result = self
-            .store
-            .lock()
-            .unwrap()
+        let mut store = self.store.lock().unwrap();
+        let result = store
             .restore(self.active_identity())
             .map(|_| ())
             .map_err(|_| zx_status::Status::IO);
-        let state = self.state();
+        let state = self.observed_state(&store);
         self.diagnostics.record_restore_result(&result, &state);
+        drop(store);
+        self.finish_recovery_if_needed(&result);
         result
     }
     pub fn migrate_legacy(&self, identity: persistence::Identity) -> Result<(), zx_status::Status> {
-        if let Err(status) = self.validate(&identity) {
-            let result = Err(status);
-            self.diagnostics.record_migration_result(&result, None);
-            return result;
-        }
         let mut store = self.store.lock().unwrap();
-        let result = match store.load() {
-            Ok(None) => store
-                .select(identity, self.active_identity())
-                .map(|_| ())
-                .map_err(|_| zx_status::Status::IO),
-            Ok(Some(state)) if state.pending.as_ref() == Some(&identity) => Ok(()),
-            Ok(Some(_)) => Err(zx_status::Status::ALREADY_EXISTS),
-            Err(_) => Err(zx_status::Status::IO_DATA_INTEGRITY),
+        let result = match self.validate(&identity) {
+            Err(status) => Err(status),
+            Ok(()) => match store.load() {
+                Ok(None) => store
+                    .select(identity.clone(), self.active_identity())
+                    .map(|_| ())
+                    .map_err(|_| zx_status::Status::IO),
+                Ok(Some(state)) if state.pending.as_ref() == Some(&identity) => Ok(()),
+                Ok(Some(_)) => Err(zx_status::Status::ALREADY_EXISTS),
+                Err(_) => Err(zx_status::Status::IO_DATA_INTEGRITY),
+            },
         };
-        drop(store);
-        let state = self.state();
+        let state = self.observed_state(&store);
         self.diagnostics
             .record_migration_result(&result, Some(&state));
+        drop(store);
+        self.finish_recovery_if_needed(&result);
         result
     }
 }
@@ -446,17 +491,16 @@ pub async fn serve_native_theme(
             ftheme::NativeThemeRequest::GetCurrent { responder } => {
                 let current = authority.current();
                 responder.send(&to_fidl(&current))?;
-                diagnostics.record_consumer_ack(current.generation);
             }
             ftheme::NativeThemeRequest::WatchCurrent {
                 observed_generation,
                 responder,
             } => {
+                diagnostics.record_consumer_ack(observed_generation);
                 let current = authority.current();
                 match watch_state.observe(observed_generation, current.generation, responder) {
                     WatchAction::Reply(responder) => {
                         responder.send(&to_fidl(&current))?;
-                        diagnostics.record_consumer_ack(current.generation);
                     }
                     WatchAction::Parked => {}
                     WatchAction::BadState(_responder) => {
@@ -500,6 +544,7 @@ pub fn to_fidl(snapshot: &Snapshot) -> ftheme::ThemeSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::diagnostics::{JOURNEY_RECOVERY, RESULT_STORAGE_ERROR};
     use fidl::endpoints::create_proxy_and_stream;
     use std::sync::atomic::{AtomicUsize, Ordering};
     const VALID: &[u8] = include_bytes!("../../theme_model/testdata/native-theme-v1-package.json");
@@ -535,20 +580,27 @@ mod tests {
         .unwrap()
     }
 
-    fn proxy(authority: Arc<Authority>) -> ftheme::NativeThemeProxy {
+    fn proxy_with_diagnostics(
+        authority: Arc<Authority>,
+    ) -> (
+        ftheme::NativeThemeProxy,
+        Arc<Diagnostics>,
+        fuchsia_inspect::Inspector,
+    ) {
         let (proxy, stream) = create_proxy_and_stream::<ftheme::NativeThemeMarker>();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let diagnostics = Arc::new(Diagnostics::record(inspector.root(), &authority, None));
+        let task_diagnostics = diagnostics.clone();
         fuchsia_async::Task::local(async move {
-            let diagnostics = Arc::new(Diagnostics::record(
-                &fuchsia_inspect::Inspector::default().root(),
-                &authority,
-                None,
-            ));
-            serve_native_theme(authority, diagnostics, stream)
+            serve_native_theme(authority, task_diagnostics, stream)
                 .await
                 .expect("serve generated FIDL");
         })
         .detach();
-        proxy
+        (proxy, diagnostics, inspector)
+    }
+    fn proxy(authority: Arc<Authority>) -> ftheme::NativeThemeProxy {
+        proxy_with_diagnostics(authority).0
     }
     fn control_proxy(control: Arc<SettingsControl>) -> ftheme::NativeThemeSettingsProxy {
         let (proxy, stream) = create_proxy_and_stream::<ftheme::NativeThemeSettingsMarker>();
@@ -579,6 +631,97 @@ mod tests {
             variant,
             semantic_sha256: snapshot.semantic_sha256,
         }
+    }
+
+    #[fuchsia::test]
+    async fn get_current_does_not_claim_consumer_acknowledgement() {
+        let (proxy, diagnostics, _inspector) = proxy_with_diagnostics(production_authority());
+        proxy.get_current().await.unwrap();
+        let receipt = diagnostics.last_receipt_for_test();
+        assert!(receipt.contains("\"consumer_ack_count\":0"));
+        assert!(receipt.contains("\"last_ack_generation\":0"));
+    }
+
+    #[fuchsia::test]
+    async fn watch_records_consumer_supplied_observed_generation() {
+        let (proxy, diagnostics, _inspector) = proxy_with_diagnostics(production_authority());
+        proxy.watch_current(42).await.unwrap();
+        let receipt = diagnostics.last_receipt_for_test();
+        assert!(receipt.contains("\"consumer_ack_count\":1"));
+        assert!(receipt.contains("\"last_ack_generation\":42"));
+    }
+
+    #[test]
+    fn settings_storage_failure_reaches_final_receipt() {
+        let (p, c) = test_control();
+        c.fail_store_for_test(persistence::FailurePoint::Write);
+        assert_eq!(
+            c.select(identity(persistence::Variant::Dark)),
+            Err(zx_status::Status::IO)
+        );
+        assert!(
+            c.diagnostics
+                .last_receipt_for_test()
+                .contains(RESULT_STORAGE_ERROR)
+        );
+        let _ = std::fs::remove_file(p);
+    }
+
+    #[test]
+    fn repaired_corrupt_state_emits_recovery_receipt() {
+        let path = std::env::temp_dir().join(format!(
+            "theme-recovery-{}-{:?}.v1",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::write(&path, b"corrupt").unwrap();
+        let authority = Arc::new(Authority::from_packaged_and_state([DTCG], Some(b"corrupt")));
+        let inspector = fuchsia_inspect::Inspector::default();
+        let diagnostics = Arc::new(Diagnostics::record(
+            inspector.root(),
+            &authority,
+            Some(b"corrupt"),
+        ));
+        let control = SettingsControl::new(authority, path.clone(), diagnostics.clone());
+        assert!(control.restore().is_ok());
+        assert!(
+            diagnostics
+                .last_receipt_for_test()
+                .contains(JOURNEY_RECOVERY)
+        );
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn concurrent_settings_receipts_remain_bound_to_each_operation() {
+        let (path, control) = test_control();
+        let diagnostics = control.diagnostics.clone();
+        let first_identity = identity(persistence::Variant::Dark);
+        let entered = Arc::new(std::sync::Barrier::new(2));
+        let release = Arc::new(std::sync::Barrier::new(2));
+        std::thread::scope(|scope| {
+            let control_a = control.clone();
+            let entered_a = entered.clone();
+            let release_a = release.clone();
+            let handle = scope.spawn(move || {
+                control_a.select_with_post_store_hook_for_test(first_identity, || {
+                    entered_a.wait();
+                    release_a.wait();
+                })
+            });
+            entered.wait();
+            let control_b = control.clone();
+            let second_handle = scope.spawn(move || control_b.restore());
+            release.wait();
+            assert!(handle.join().unwrap().is_ok());
+            assert!(second_handle.join().unwrap().is_ok());
+        });
+        let history = diagnostics.receipt_history_for_test();
+        let recent = &history[history.len() - 2..];
+        assert!(recent[0].contains("\"selected_theme_id\":\"instrument-studio\""));
+        assert!(recent[1].contains("\"selected_theme_id\":\"\""));
+        assert!(control.state().pending.is_none());
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]

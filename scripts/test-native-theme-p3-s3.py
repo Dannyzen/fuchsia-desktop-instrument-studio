@@ -182,5 +182,21 @@ class NativeThemeP3S3Contract(unittest.TestCase):
         self.assertIn('"//third_party/rust_crates:log"', build)
 
 
+    def test_12_review_blocker_contracts_are_production_wired(self):
+        for symbol in (
+            "RESULT_NOT_SERVED",
+            "ALL_RESULT_CODES",
+            "install_process_crash_hook",
+            "finish_recovery_if_needed",
+            "record_consumer_ack(observed_generation)",
+            "select_with_post_store_hook_for_test",
+            "receipt_history_for_test",
+        ):
+            self.assertIn(symbol, DIAGNOSTICS.read_text() + AUTHORITY.read_text() + MAIN.read_text())
+        self.assertIn("not-served", DOC.read_text())
+        self.assertIn("panic", DOC.read_text().lower())
+        self.assertIn("repair", DOC.read_text().lower())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

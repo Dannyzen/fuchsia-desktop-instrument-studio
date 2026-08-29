@@ -2,7 +2,7 @@
 
 use super::{Authority, FALLBACK_THEME_ID, SELECTION_LAST_KNOWN_GOOD, persistence};
 use fuchsia_inspect::{Node, Property, StringProperty, UintProperty};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 pub const DIAGNOSTICS_SCHEMA_VERSION: u64 = 1;
 pub const MAX_DIAGNOSTIC_CODE_BYTES: usize = 32;
@@ -32,6 +32,14 @@ pub const RESULT_OK: &str = "ok";
 pub const RESULT_RECOVERED: &str = "recovered";
 pub const RESULT_REJECTED: &str = "rejected";
 pub const RESULT_STORAGE_ERROR: &str = "storage-error";
+pub const RESULT_NOT_SERVED: &str = "not-served";
+pub const ALL_RESULT_CODES: &[&str] = &[
+    RESULT_OK,
+    RESULT_RECOVERED,
+    RESULT_REJECTED,
+    RESULT_STORAGE_ERROR,
+    RESULT_NOT_SERVED,
+];
 
 fn bounded(value: &str, limit: usize) -> String {
     value
@@ -142,6 +150,8 @@ struct Inner {
     elapsed_micros: UintProperty,
     resource_result_code: StringProperty,
     last_receipt: StringProperty,
+    #[cfg(test)]
+    receipt_history: Vec<String>,
 }
 
 pub struct Diagnostics {
@@ -208,7 +218,7 @@ impl Diagnostics {
             consumer_ack_count: 0,
             last_ack_generation: 0,
             elapsed_micros: 0,
-            resource_result_code: code("not-served"),
+            resource_result_code: code(RESULT_NOT_SERVED),
         };
         let node = root.create_child("native_theme");
         node.record_uint("schema_version", DIAGNOSTICS_SCHEMA_VERSION);
@@ -252,6 +262,8 @@ impl Diagnostics {
                 elapsed_micros,
                 resource_result_code,
                 last_receipt,
+                #[cfg(test)]
+                receipt_history: vec![initial_receipt],
             }),
         }
     }
@@ -261,6 +273,8 @@ impl Diagnostics {
         inner.receipt.result_code = code(result);
         let receipt = inner.receipt.machine_receipt();
         inner.last_receipt.set(&receipt);
+        #[cfg(test)]
+        inner.receipt_history.push(receipt.clone());
         log::info!(
             target: "native_theme_lifecycle",
             "NATIVE_THEME_LIFECYCLE_RECEIPT {}",
@@ -365,15 +379,56 @@ impl Diagnostics {
         );
     }
     pub fn record_process_crash(&self) {
-        let mut inner = self.inner.lock().unwrap();
-        inner.receipt.resource_result_code = code(RESULT_REJECTED);
-        inner.resource_result_code.set(RESULT_REJECTED);
-        Self::update(
-            &mut inner,
-            JOURNEY_CRASH,
-            EVENT_PROCESS_CRASH,
-            RESULT_REJECTED,
-        );
+        if let Ok(mut inner) = self.inner.try_lock() {
+            inner.receipt.resource_result_code = code(RESULT_REJECTED);
+            inner.resource_result_code.set(RESULT_REJECTED);
+            Self::update(
+                &mut inner,
+                JOURNEY_CRASH,
+                EVENT_PROCESS_CRASH,
+                RESULT_REJECTED,
+            );
+        } else {
+            let receipt = Receipt {
+                journey_code: code(JOURNEY_CRASH),
+                event_code: code(EVENT_PROCESS_CRASH),
+                result_code: code(RESULT_REJECTED),
+                active_theme_id: String::new(),
+                selected_theme_id: String::new(),
+                fallback_theme_id: id(FALLBACK_THEME_ID),
+                last_known_good_theme_id: String::new(),
+                theme_revision: 0,
+                theme_variant: String::new(),
+                semantic_sha256_prefix: "0000000000000000".to_string(),
+                generation: 0,
+                validation_result_code: code(RESULT_REJECTED),
+                selection_source: code("panic-lock-contention"),
+                selection_error_code: code(EVENT_PROCESS_CRASH),
+                consumer_ack_count: 0,
+                last_ack_generation: 0,
+                elapsed_micros: 0,
+                resource_result_code: code(RESULT_REJECTED),
+            }
+            .machine_receipt();
+            log::error!(
+                target: "native_theme_lifecycle",
+                "NATIVE_THEME_LIFECYCLE_RECEIPT {}",
+                receipt
+            );
+        }
+    }
+    pub fn install_process_crash_hook(diagnostics: &Arc<Self>) {
+        let weak = Arc::downgrade(diagnostics);
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            if let Some(diagnostics) = weak.upgrade() {
+                diagnostics.record_process_crash();
+            }
+            previous(info);
+        }));
+    }
+    pub fn finish_recovery_if_needed(&self) {
+        self.record_recovery();
     }
     pub fn record_recovery(&self) {
         let mut inner = self.inner.lock().unwrap();
@@ -385,6 +440,14 @@ impl Diagnostics {
             EVENT_RECOVERY_COMPLETE,
             RESULT_RECOVERED,
         );
+    }
+    #[cfg(test)]
+    pub fn last_receipt_for_test(&self) -> String {
+        self.inner.lock().unwrap().receipt.machine_receipt()
+    }
+    #[cfg(test)]
+    pub fn receipt_history_for_test(&self) -> Vec<String> {
+        self.inner.lock().unwrap().receipt_history.clone()
     }
 }
 
@@ -524,6 +587,118 @@ mod tests {
         d.record_process_crash();
         assert_eq!(d.inner.lock().unwrap().receipt.journey_code, JOURNEY_CRASH);
     }
+    #[fuchsia::test]
+    async fn inspect_hierarchy_retains_public_updates() {
+        use diagnostics_assertions::{AnyProperty, assert_data_tree};
+        let inspector = fuchsia_inspect::Inspector::default();
+        let authority = Authority::from_packaged([VALID]);
+        let diagnostics = Diagnostics::record(inspector.root(), &authority, None);
+        diagnostics.record_consumer_ack(7);
+        assert_data_tree!(inspector, root: {
+            native_theme: contains {
+                schema_version: 1u64,
+                consumer_ack_count: 1u64,
+                last_ack_generation: 7u64,
+                resource_result_code: RESULT_NOT_SERVED,
+                last_receipt: AnyProperty,
+            }
+        });
+    }
+
+    struct CaptureLogger {
+        records: Mutex<Vec<(String, String)>>,
+    }
+    impl log::Log for CaptureLogger {
+        fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
+            true
+        }
+        fn log(&self, record: &log::Record<'_>) {
+            if record.target() == "native_theme_lifecycle" {
+                self.records
+                    .lock()
+                    .unwrap()
+                    .push((record.target().to_string(), record.args().to_string()));
+            }
+        }
+        fn flush(&self) {}
+    }
+    static CAPTURE_LOGGER: CaptureLogger = CaptureLogger {
+        records: Mutex::new(Vec::new()),
+    };
+    static CAPTURE_LOGGER_INIT: std::sync::Once = std::sync::Once::new();
+
+    #[test]
+    fn structured_log_carries_the_exact_bounded_machine_receipt() {
+        CAPTURE_LOGGER_INIT.call_once(|| {
+            log::set_logger(&CAPTURE_LOGGER).expect("install capture logger");
+            log::set_max_level(log::LevelFilter::Info);
+        });
+        CAPTURE_LOGGER.records.lock().unwrap().clear();
+        let diagnostics = diagnostics(None);
+        diagnostics.record_consumer_ack(7);
+        let retained = diagnostics.last_receipt_for_test();
+        let records = CAPTURE_LOGGER.records.lock().unwrap();
+        let (target, message) = records.last().expect("lifecycle log record");
+        assert_eq!(target, "native_theme_lifecycle");
+        let payload = message
+            .strip_prefix("NATIVE_THEME_LIFECYCLE_RECEIPT ")
+            .expect("stable lifecycle marker");
+        assert_eq!(payload, retained);
+        assert!(payload.starts_with('{') && payload.ends_with('}'));
+        assert_eq!(payload.matches("\":").count(), 19);
+        assert!(payload.len() <= MAX_RECEIPT_BYTES);
+        assert!(payload.contains("\"event_code\":\"consumer-ack\""));
+        assert!(payload.contains("\"last_ack_generation\":7"));
+    }
+
+    #[test]
+    fn crash_lock_contention_still_emits_the_complete_receipt_schema() {
+        CAPTURE_LOGGER_INIT.call_once(|| {
+            log::set_logger(&CAPTURE_LOGGER).expect("install capture logger");
+            log::set_max_level(log::LevelFilter::Info);
+        });
+        CAPTURE_LOGGER.records.lock().unwrap().clear();
+        let diagnostics = diagnostics(None);
+        let guard = diagnostics.inner.lock().unwrap();
+        diagnostics.record_process_crash();
+        drop(guard);
+        let records = CAPTURE_LOGGER.records.lock().unwrap();
+        let (_, message) = records.last().expect("fallback crash log record");
+        let payload = message
+            .strip_prefix("NATIVE_THEME_LIFECYCLE_RECEIPT ")
+            .expect("stable lifecycle marker");
+        assert!(payload.starts_with('{') && payload.ends_with('}'));
+        assert_eq!(payload.matches("\":").count(), 19);
+        assert!(payload.len() <= MAX_RECEIPT_BYTES);
+        assert!(payload.contains("\"journey_code\":\"crash\""));
+        assert!(payload.contains("\"event_code\":\"process-crash\""));
+        assert!(payload.contains("\"resource_result_code\":\"rejected\""));
+    }
+
+    #[test]
+    fn every_emitted_result_code_is_in_the_closed_set() {
+        let d = diagnostics(None);
+        assert!(
+            ALL_RESULT_CODES.contains(
+                &d.inner
+                    .lock()
+                    .unwrap()
+                    .receipt
+                    .resource_result_code
+                    .as_str()
+            )
+        );
+        for value in [
+            RESULT_OK,
+            RESULT_RECOVERED,
+            RESULT_REJECTED,
+            RESULT_STORAGE_ERROR,
+            RESULT_NOT_SERVED,
+        ] {
+            assert!(ALL_RESULT_CODES.contains(&value));
+        }
+    }
+
     #[test]
     fn receipt_max_values_are_json_safe_and_bounded() {
         let max_id = "x".repeat(MAX_DIAGNOSTIC_ID_BYTES);

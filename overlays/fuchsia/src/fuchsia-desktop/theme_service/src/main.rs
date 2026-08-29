@@ -33,6 +33,7 @@ async fn main() -> Result<(), Error> {
         &authority,
         state.as_deref(),
     ));
+    Diagnostics::install_process_crash_hook(&diagnostics);
     let control = Arc::new(SettingsControl::new(
         authority.clone(),
         STATE_PATH,
