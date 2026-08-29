@@ -1,12 +1,15 @@
 use fidl::endpoints::RequestStream;
 use fidl_fuchsia_instrumentstudio_theme as ftheme;
-use fuchsia_inspect::{Node, UintProperty};
 use futures::TryStreamExt;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use theme_model::NativeThemeV1;
 
+pub mod diagnostics;
 pub mod persistence;
+pub use diagnostics::Diagnostics;
+// P3-S2 Inspect keys "selection_source" and "selection_error_code" are now
+// owned, retained, and updated by the first-class diagnostics module.
 
 pub const FALLBACK_THEME_ID: &str = "instrument-studio-builtin";
 pub const MAX_DIAGNOSTIC_ERROR_BYTES: usize = 96;
@@ -20,6 +23,7 @@ pub const SELECTION_LAST_KNOWN_GOOD: &str = "last-known-good";
 pub const SELECTION_BUILTIN_RESTORED: &str = "built-in-restored";
 pub const SELECTION_BUILTIN_RECOVERY: &str = "built-in-recovery";
 
+#[cfg(test)]
 fn bounded_diagnostic_error(error: &str) -> &str {
     &error[..error.len().min(MAX_DIAGNOSTIC_ERROR_BYTES)]
 }
@@ -165,11 +169,7 @@ impl Authority {
         let (chosen, selection_source, selection_error_code) = match state_bytes {
             None => (None, SELECTION_BUILTIN_DEFAULT, None),
             Some(bytes) => match persistence::decode(bytes) {
-                Err(error) => (
-                    None,
-                    SELECTION_BUILTIN_RECOVERY,
-                    Some(error.code()),
-                ),
+                Err(error) => (None, SELECTION_BUILTIN_RECOVERY, Some(error.code())),
                 Ok(state) => match state.pending.as_ref() {
                     None => (None, SELECTION_BUILTIN_RESTORED, None),
                     Some(identity) => match authority.snapshot_for(identity) {
@@ -227,13 +227,19 @@ impl Authority {
 pub struct SettingsControl {
     authority: Arc<Authority>,
     store: Mutex<persistence::AtomicStore>,
+    diagnostics: Arc<Diagnostics>,
 }
 
 impl SettingsControl {
-    pub fn new(authority: Arc<Authority>, state_path: impl Into<std::path::PathBuf>) -> Self {
+    pub fn new(
+        authority: Arc<Authority>,
+        state_path: impl Into<std::path::PathBuf>,
+        diagnostics: Arc<Diagnostics>,
+    ) -> Self {
         Self {
             authority,
             store: Mutex::new(persistence::AtomicStore::new(state_path)),
+            diagnostics,
         }
     }
     fn active_identity(&self) -> persistence::Identity {
@@ -268,35 +274,64 @@ impl SettingsControl {
     pub fn record_active_as_last_known_good(&self) {
         let active = self.active_identity();
         let mut store = self.store.lock().unwrap();
-        let Ok(Some(mut state)) = store.load() else {
-            return;
+        let mut state = match store.load() {
+            Ok(Some(state)) => state,
+            Ok(None) => return,
+            Err(_) => {
+                drop(store);
+                self.diagnostics.record_last_known_good_result(
+                    &Err(zx_status::Status::IO_DATA_INTEGRITY),
+                    None,
+                );
+                return;
+            }
         };
         if state.pending.as_ref() == Some(&active) && state.last_known_good != active {
+            let previous = state.clone();
             state.last_known_good = active;
-            let _ = store.commit(&state);
+            let result = store
+                .commit(&state)
+                .map(|_| ())
+                .map_err(|_| zx_status::Status::IO);
+            drop(store);
+            let observed = if result.is_ok() { &state } else { &previous };
+            self.diagnostics
+                .record_last_known_good_result(&result, Some(observed));
         }
     }
     pub fn select(&self, identity: persistence::Identity) -> Result<(), zx_status::Status> {
-        self.validate(&identity)?;
-        self.store
-            .lock()
-            .unwrap()
-            .select(identity, self.active_identity())
-            .map(|_| ())
-            .map_err(|_| zx_status::Status::IO)
+        let result = self.validate(&identity).and_then(|()| {
+            self.store
+                .lock()
+                .unwrap()
+                .select(identity, self.active_identity())
+                .map(|_| ())
+                .map_err(|_| zx_status::Status::IO)
+        });
+        let state = self.state();
+        self.diagnostics.record_selection_result(&result, &state);
+        result
     }
     pub fn restore(&self) -> Result<(), zx_status::Status> {
-        self.store
+        let result = self
+            .store
             .lock()
             .unwrap()
             .restore(self.active_identity())
             .map(|_| ())
-            .map_err(|_| zx_status::Status::IO)
+            .map_err(|_| zx_status::Status::IO);
+        let state = self.state();
+        self.diagnostics.record_restore_result(&result, &state);
+        result
     }
     pub fn migrate_legacy(&self, identity: persistence::Identity) -> Result<(), zx_status::Status> {
-        self.validate(&identity)?;
+        if let Err(status) = self.validate(&identity) {
+            let result = Err(status);
+            self.diagnostics.record_migration_result(&result, None);
+            return result;
+        }
         let mut store = self.store.lock().unwrap();
-        match store.load() {
+        let result = match store.load() {
             Ok(None) => store
                 .select(identity, self.active_identity())
                 .map(|_| ())
@@ -304,7 +339,12 @@ impl SettingsControl {
             Ok(Some(state)) if state.pending.as_ref() == Some(&identity) => Ok(()),
             Ok(Some(_)) => Err(zx_status::Status::ALREADY_EXISTS),
             Err(_) => Err(zx_status::Status::IO_DATA_INTEGRITY),
-        }
+        };
+        drop(store);
+        let state = self.state();
+        self.diagnostics
+            .record_migration_result(&result, Some(&state));
+        result
     }
 }
 
@@ -375,8 +415,11 @@ pub async fn serve_native_theme_settings(
 }
 
 /// Serves one generated-FIDL connection using connection-local hanging-get state.
+// P3-S1's `serve_native_theme(authority, stream)` shape is extended only with
+// the shared diagnostics observer; protocol behavior remains library-owned.
 pub async fn serve_native_theme(
     authority: Arc<Authority>,
+    diagnostics: Arc<Diagnostics>,
     mut stream: ftheme::NativeThemeRequestStream,
 ) -> Result<(), fidl::Error> {
     let mut watch_state = ConnectionWatch::default();
@@ -401,7 +444,9 @@ pub async fn serve_native_theme(
                 )?;
             }
             ftheme::NativeThemeRequest::GetCurrent { responder } => {
-                responder.send(&to_fidl(&authority.current()))?
+                let current = authority.current();
+                responder.send(&to_fidl(&current))?;
+                diagnostics.record_consumer_ack(current.generation);
             }
             ftheme::NativeThemeRequest::WatchCurrent {
                 observed_generation,
@@ -409,9 +454,13 @@ pub async fn serve_native_theme(
             } => {
                 let current = authority.current();
                 match watch_state.observe(observed_generation, current.generation, responder) {
-                    WatchAction::Reply(responder) => responder.send(&to_fidl(&current))?,
+                    WatchAction::Reply(responder) => {
+                        responder.send(&to_fidl(&current))?;
+                        diagnostics.record_consumer_ack(current.generation);
+                    }
                     WatchAction::Parked => {}
                     WatchAction::BadState(_responder) => {
+                        diagnostics.record_consumer_stale(observed_generation);
                         stream
                             .control_handle()
                             .shutdown_with_epitaph(zx_status::Status::BAD_STATE);
@@ -424,41 +473,6 @@ pub async fn serve_native_theme(
         }
     }
     Ok(())
-}
-
-pub struct Diagnostics {
-    _node: Node,
-    _generation: UintProperty,
-    _valid_theme_count: UintProperty,
-}
-
-impl Diagnostics {
-    pub fn record(root: &Node, authority: &Authority) -> Self {
-        let node = root.create_child("native_theme");
-        let generation = node.create_uint("generation", authority.current.generation);
-        let count = node.create_uint("valid_theme_count", authority.themes.len() as u64);
-        node.record_string("active_theme_id", authority.current.id.as_str());
-        node.record_string(
-            "load_status",
-            if authority.themes.is_empty() {
-                "fallback"
-            } else {
-                "ok"
-            },
-        );
-        let error = authority.load_error_code.unwrap_or("none");
-        node.record_string("load_error_code", bounded_diagnostic_error(error));
-        node.record_string("selection_source", authority.selection_source());
-        node.record_string(
-            "selection_error_code",
-            bounded_diagnostic_error(authority.selection_error_code().unwrap_or("none")),
-        );
-        Self {
-            _node: node,
-            _generation: generation,
-            _valid_theme_count: count,
-        }
-    }
 }
 
 pub fn to_fidl(snapshot: &Snapshot) -> ftheme::ThemeSnapshot {
@@ -524,7 +538,12 @@ mod tests {
     fn proxy(authority: Arc<Authority>) -> ftheme::NativeThemeProxy {
         let (proxy, stream) = create_proxy_and_stream::<ftheme::NativeThemeMarker>();
         fuchsia_async::Task::local(async move {
-            serve_native_theme(authority, stream)
+            let diagnostics = Arc::new(Diagnostics::record(
+                &fuchsia_inspect::Inspector::default().root(),
+                &authority,
+                None,
+            ));
+            serve_native_theme(authority, diagnostics, stream)
                 .await
                 .expect("serve generated FIDL");
         })
@@ -546,10 +565,12 @@ mod tests {
             std::thread::current().id()
         ));
         let _ = std::fs::remove_file(&path);
-        (
-            path.clone(),
-            Arc::new(SettingsControl::new(production_authority(), path)),
-        )
+        (path.clone(), {
+            let authority = production_authority();
+            let inspector = fuchsia_inspect::Inspector::default();
+            let diagnostics = Arc::new(Diagnostics::record(inspector.root(), &authority, None));
+            Arc::new(SettingsControl::new(authority, path, diagnostics))
+        })
     }
     fn fidl_id(variant: ftheme::ThemeVariant) -> ftheme::ThemeIdentity {
         let snapshot = production_authority().current();
@@ -700,7 +721,10 @@ mod tests {
         invalid.theme_id = "missing-theme".into();
         let bytes = state(Some(invalid), identity(persistence::Variant::HighContrast));
         let authority = Authority::from_packaged_and_state([DTCG], Some(&bytes));
-        assert_eq!(authority.current().variant, persistence::Variant::HighContrast);
+        assert_eq!(
+            authority.current().variant,
+            persistence::Variant::HighContrast
+        );
         assert_eq!(authority.selection_source(), SELECTION_LAST_KNOWN_GOOD);
         assert_eq!(
             authority.selection_error_code(),
