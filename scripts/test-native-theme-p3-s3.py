@@ -189,13 +189,26 @@ class NativeThemeP3S3Contract(unittest.TestCase):
             "install_process_crash_hook",
             "finish_recovery_if_needed",
             "record_consumer_ack(observed_generation)",
-            "select_with_post_store_hook_for_test",
+            "select_with_post_receipt_hook_for_test",
             "receipt_history_for_test",
         ):
             self.assertIn(symbol, DIAGNOSTICS.read_text() + AUTHORITY.read_text() + MAIN.read_text())
         self.assertIn("not-served", DOC.read_text())
         self.assertIn("panic", DOC.read_text().lower())
         self.assertIn("repair", DOC.read_text().lower())
+
+    def test_13_race_and_closed_set_proofs_are_enforced(self) -> None:
+        authority = text(AUTHORITY)
+        diagnostics = text(DIAGNOSTICS)
+        self.assertIn("select_with_post_receipt_hook_for_test", authority)
+        select_start = authority.index("fn select_with_post_receipt_hook")
+        select_end = authority.index("pub fn select(", select_start)
+        body = authority[select_start:select_end]
+        self.assertLess(body.index("record_selection_result"), body.index("post_receipt_hook()"))
+        self.assertLess(body.index("post_receipt_hook()"), body.index("drop(store)"))
+        self.assertIn("assert_known_result_code", diagnostics)
+        self.assertIn("machine_receipt_rejects_unknown_result_code", diagnostics)
+        self.assertIn("machine_receipt_rejects_unknown_resource_result_code", diagnostics)
 
 
 if __name__ == "__main__":

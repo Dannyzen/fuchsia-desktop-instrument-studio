@@ -102,8 +102,17 @@ struct Receipt {
     resource_result_code: String,
 }
 
+fn assert_known_result_code(value: &str) {
+    assert!(
+        ALL_RESULT_CODES.contains(&value),
+        "unknown diagnostic result code"
+    );
+}
+
 impl Receipt {
     fn machine_receipt(&self) -> String {
+        assert_known_result_code(&self.result_code);
+        assert_known_result_code(&self.resource_result_code);
         // Every string enters through `bounded`; fixed field order makes this deterministic.
         let receipt = format!(
             concat!(
@@ -700,13 +709,35 @@ mod tests {
     }
 
     #[test]
+    fn machine_receipt_rejects_unknown_result_code() {
+        let diagnostics = diagnostics(None);
+        let mut receipt = diagnostics.inner.lock().unwrap().receipt.clone();
+        receipt.result_code = "unknown-result".to_string();
+        assert!(
+            std::panic::catch_unwind(|| receipt.machine_receipt()).is_err(),
+            "unknown result_code was emitted"
+        );
+    }
+
+    #[test]
+    fn machine_receipt_rejects_unknown_resource_result_code() {
+        let diagnostics = diagnostics(None);
+        let mut receipt = diagnostics.inner.lock().unwrap().receipt.clone();
+        receipt.resource_result_code = "unknown-resource-result".to_string();
+        assert!(
+            std::panic::catch_unwind(|| receipt.machine_receipt()).is_err(),
+            "unknown resource_result_code was emitted"
+        );
+    }
+
+    #[test]
     fn receipt_max_values_are_json_safe_and_bounded() {
         let max_id = "x".repeat(MAX_DIAGNOSTIC_ID_BYTES);
         let max_code = "C".repeat(MAX_DIAGNOSTIC_CODE_BYTES);
         let receipt = Receipt {
             journey_code: max_code.clone(),
             event_code: max_code.clone(),
-            result_code: max_code.clone(),
+            result_code: code(RESULT_STORAGE_ERROR),
             active_theme_id: max_id.clone(),
             selected_theme_id: max_id.clone(),
             fallback_theme_id: max_id.clone(),
@@ -721,7 +752,7 @@ mod tests {
             consumer_ack_count: u64::MAX,
             last_ack_generation: u64::MAX,
             elapsed_micros: u64::MAX,
-            resource_result_code: max_code,
+            resource_result_code: code(RESULT_STORAGE_ERROR),
         };
         let encoded = receipt.machine_receipt();
         assert!(encoded.starts_with('{') && encoded.ends_with('}'));
