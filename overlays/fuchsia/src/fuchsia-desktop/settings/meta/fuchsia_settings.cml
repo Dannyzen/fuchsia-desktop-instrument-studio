@@ -14,6 +14,14 @@
     use: [
         { storage: "data", path: "/data" },
         {
+            protocol: "fuchsia.instrumentstudio.theme.NativeTheme",
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.instrumentstudio.theme.NativeThemeSettings",
+            availability: "optional",
+        },
+        {
             protocol: [
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.hwinfo.Product",

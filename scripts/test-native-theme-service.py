@@ -1,0 +1,189 @@
+#!/usr/bin/env python3
+"""Source acceptance contract for P3-S1 NativeTheme read authority."""
+
+from pathlib import Path
+import re
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+SERVICE = ROOT / "overlays/fuchsia/src/fuchsia-desktop/theme_service"
+FIDL = ROOT / "overlays/fuchsia/src/fuchsia-desktop/theme_service/fidl"
+SESSION = ROOT / "overlays/fuchsia/products/workbench/workbench_session"
+FEATURE = ROOT / "features/native-theme-live-journey.feature"
+
+
+class NativeThemeServiceContract(unittest.TestCase):
+    def text(self, path):
+        return path.read_text(encoding="utf-8")
+
+    def test_p3s1_read_only_fidl_surface(self):
+        fidl = self.text(FIDL / "theme.fidl")
+        self.assertTrue(fidl.startswith("// Copyright 2026 The Fuchsia Authors.\n"))
+        self.assertIn("// found in the LICENSE file.", fidl)
+        self.assertIn("@available(added=HEAD)\nlibrary fuchsia.instrumentstudio.theme;", fidl)
+        self.assertIn("closed protocol NativeTheme", fidl)
+        public = fidl.split("closed protocol NativeTheme {", 1)[1].split("};", 1)[0]
+        methods = re.findall(r"strict ([A-Z][A-Za-z0-9]+)\(", public)
+        self.assertEqual(methods, ["ListThemes", "GetTheme", "GetCurrent", "WatchCurrent"])
+        self.assertNotRegex(public, r"(?i)\b(set|select|activate|write|persist|store|save)[A-Za-z]*\s*\(")
+        self.assertIn("vector<uint8>:MAX_SNAPSHOT_BYTES", fidl)
+        self.assertIn("const MAX_SNAPSHOT_BYTES uint32 = 524288;", fidl)
+
+    def test_p3s1_watch_and_generation_model(self):
+        authority = self.text(SERVICE / "src/authority.rs")
+        server = self.text(SERVICE / "src/main.rs")
+        for marker in ["equal_generation_parks_exactly_one_responder",
+                       "duplicate_outstanding_watch_is_bad_state",
+                       "connections_retain_independent_responders",
+                       "unequal_generation_returns_immediately",
+                       "future_generation_drains_once",
+                       "disconnect_drops_only_its_responder"]:
+            self.assertIn(f"fn {marker}", authority)
+        self.assertIn("pub struct ConnectionWatch", authority)
+        self.assertIn("ConnectionWatch::default()", authority)
+        self.assertRegex(authority, r"watch_state\.observe\(")
+        self.assertIn("generation: 0", authority)
+
+    def test_p3s1_codec_fallback_and_diagnostics(self):
+        build = self.text(SERVICE / "BUILD.gn")
+        source = self.text(SERVICE / "src/authority.rs")
+        server = self.text(SERVICE / "src/main.rs")
+        self.assertIn('"//src/fuchsia-desktop/theme_model"', build)
+        self.assertIn('"//sdk/rust/zx-status"', build)
+        self.assertNotIn('"//sdk/rust/zx",', build)
+        self.assertNotIn('"//zircon/system/ulib/zx:zx_rust"', build)
+        self.assertNotIn('"//third_party/rust_crates:serde_json"', build)
+        self.assertIn("inputs = [", build)
+        for package in ["base16", "base24", "dtcg", "omarchy"]:
+            self.assertIn(f'//src/fuchsia-desktop/theme_catalog/catalog/instrument-studio-{package}.package.json', build)
+        self.assertIn("fidl::endpoints::create_proxy_and_stream", source)
+        self.assertIn("use fidl::endpoints::RequestStream;", source)
+        self.assertIn("let mut themes: BTreeMap<String, Snapshot>", source)
+        self.assertIn("zx_status::Status::NOT_FOUND", source)
+        self.assertRegex(source, r"metadata\s*\.as_ref\(\)\s*\.ok_or_else")
+        self.assertIn("zx_status::Status::BAD_STATE", source)
+        self.assertIn("shutdown_with_epitaph(zx_status::Status::BAD_STATE)", source)
+        self.assertNotIn("shutdown_with_epitaph(zx_status::Status::BAD_STATE.into())", source)
+        self.assertIn("#[cfg(test)]\n    pub fn drain_if_changed", source)
+        self.assertNotIn("fuchsia_zircon::", source)
+        self.assertIn("NativeThemeV1::decode_canonical", source)
+        self.assertIn("FALLBACK_THEME_ID", source)
+        self.assertIn("MAX_DIAGNOSTIC_ERROR_BYTES", source)
+        self.assertIn("mixed_valid_invalid_catalog_fails_closed", source)
+        self.assertIn("diagnostic_error_is_bounded", source)
+        self.assertNotRegex(source, r"canonical_bytes\(\).*record|package_path.*record")
+
+    def test_p3s1_fidl_is_repository_local_not_sdk_distributed(self):
+        build = self.text(SERVICE / "BUILD.gn")
+        self.assertNotIn("sdk_category =", build)
+        self.assertNotIn("stable =", build)
+
+
+    def test_p3s1_authority_is_a_host_testable_library(self):
+        build = self.text(SERVICE / "BUILD.gn")
+        server = self.text(SERVICE / "src/main.rs")
+        self.assertIn('import("//build/rust/rustc_library.gni")', build)
+        self.assertIn('rustc_library("theme_service_core")', build)
+        core = build.split('rustc_library("theme_service_core")', 1)[1].split('rustc_binary("bin")', 1)[0]
+        binary = build.split('rustc_binary("bin")', 1)[1].split('fuchsia_component("component")', 1)[0]
+        self.assertIn("with_unit_tests = true", core)
+        self.assertIn('source_root = "src/authority.rs"', core)
+        self.assertNotIn("with_unit_tests = true", binary)
+        self.assertIn('"../theme_model/testdata/native-theme-v1-package.json"', core)
+        self.assertIn('":theme_service_core"', binary)
+        self.assertIn('"//third_party/rust_crates:futures"', binary)
+        self.assertIn('":fuchsia.instrumentstudio.theme_rust"', binary)
+        self.assertIn('"//src/lib/diagnostics/inspect/rust:fuchsia-inspect"', binary)
+        self.assertIn("test_deps = [", core)
+        self.assertIn('"//src/lib/fuchsia"', core.split("test_deps = [", 1)[1])
+        self.assertIn('"//src/lib/fuchsia-async"', core.split("test_deps = [", 1)[1])
+        self.assertIn("use theme_service_core::{", server)
+        self.assertNotIn("mod authority;", server)
+
+    def test_p3s1_production_serve_loop_is_library_owned(self):
+        source = self.text(SERVICE / "src/authority.rs")
+        server = self.text(SERVICE / "src/main.rs")
+        self.assertIn("pub async fn serve_native_theme", source)
+        self.assertIn("serve_native_theme(authority, stream)", server)
+        self.assertNotIn("NativeThemeRequest::", server)
+        self.assertNotIn("ConnectionWatch", server)
+
+    def test_p3s1_all_production_packages_are_core_test_inputs(self):
+        build = self.text(SERVICE / "BUILD.gn")
+        core = build.split('rustc_library("theme_service_core")', 1)[1].split('rustc_binary("bin")', 1)[0]
+        for package in ["base16", "base24", "dtcg", "omarchy"]:
+            self.assertIn(
+                f'"//src/fuchsia-desktop/theme_catalog/catalog/instrument-studio-{package}.package.json"',
+                core,
+            )
+
+    def test_p3s1_duplicate_identity_policy_is_explicit(self):
+        source = self.text(SERVICE / "src/authority.rs")
+        feature = self.text(FEATURE)
+        for marker in [
+            "E_DUPLICATE_THEME_ID",
+            "production_catalog_collapses_equivalent_adapters",
+            "equivalent_duplicates_are_order_independent_and_choose_smallest_bytes",
+            "conflicting_duplicate_theme_id_fails_closed",
+        ]:
+            self.assertIn(marker, source)
+        self.assertIn("embedded theme.id", feature)
+        self.assertIn("semantic SHA-256", feature)
+
+    def test_p3s1_generated_fidl_transport_and_restart_tests_exist(self):
+        source = self.text(SERVICE / "src/authority.rs")
+        for marker in [
+            "proxy_list_get_current_and_not_found",
+            "proxy_unequal_watch_replies_immediately",
+            "proxy_equal_watch_stays_pending_until_disconnect",
+            "proxy_duplicate_watch_closes_with_bad_state",
+            "two_proxies_park_and_disconnect_independently",
+            "restart_reconnect_get_current_then_watch",
+        ]:
+            self.assertIn(f"fn {marker}", source)
+        self.assertIn("create_proxy_and_stream::<ftheme::NativeThemeMarker>", source)
+        self.assertIn("serve_native_theme(authority, stream)", source)
+        fidl = self.text(FIDL / "theme.fidl")
+        self.assertIn("must call GetCurrent first", fidl)
+        self.assertIn("No generation is persisted", fidl)
+
+    def test_p3s1_component_and_routes_are_optional_read_only(self):
+        cml = self.text(SERVICE / "meta/native_theme_service.cml")
+        session = self.text(SESSION / "meta/workbench_session.cml")
+        self.assertIn('protocol: "fuchsia.instrumentstudio.theme.NativeTheme"', cml)
+        self.assertIn('name: "native_theme_service"', session)
+        self.assertRegex(session, r'protocol:\s*"fuchsia\.instrumentstudio\.theme\.NativeTheme"[\s\S]*?availability:\s*"optional"')
+        self.assertNotRegex(session, r"fuchsia\.instrumentstudio\.theme\.(Writer|Manager|Control|Store)")
+        self.assertNotIn('startup: "eager"', session.split('name: "native_theme_service"', 1)[1].split("}", 1)[0])
+
+    def test_p3s1_shell_absence_package_omits_theme_subpackage(self):
+        build = self.text(SESSION / "BUILD.gn")
+        marker = 'fuchsia_package("workbench_session_no_native_theme") {'
+        self.assertIn(marker, build)
+        block = build.split(marker, 1)[1].split("\n}", 1)[0]
+        self.assertIn('package_name = "workbench_session_no_native_theme"', block)
+        self.assertIn('":workbench_element_manager"', block)
+        self.assertIn('"//src/ui/bin/tiling_wm"', block)
+        self.assertNotIn("theme_service", block)
+        self.assertIn('deps = [ ":workbench_session_component" ]', block)
+
+    def test_p3s1_gherkin_mapping_and_scope(self):
+        feature = self.text(FEATURE)
+        tests = self.text(Path(__file__))
+        self.assertEqual(feature.count("@implemented @p3-s1"), 4)
+        for scenario in ["READ-ONLY", "WATCH", "FALLBACK", "OPTIONAL"]:
+            self.assertIn(f"@scenario:P3S1-{scenario}", feature)
+        self.assertIn("@implemented @p3-s2", feature)
+        self.assertIn("@planned @p4", feature)
+        self.assertEqual(feature.count("@planned @p6"), 2)
+        self.assertNotIn("@p3-s3", feature)
+        self.assertNotIn("@p3-s4", feature)
+        self.assertIn("sole writer", feature)
+        self.assertIn("Apply and Restart", feature)
+        self.assertIn("full product restarts", feature)
+        self.assertIn("last-known-good or built-in", feature)
+        self.assertEqual(len(re.findall(r"^    def test_p3s1_", tests, re.MULTILINE)), 12)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
