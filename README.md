@@ -88,6 +88,126 @@ We are building **Instrument Studio** first:
 
 Interactive sketches live under `design/sketches/`.
 
+## Run the desktop
+
+This repository is an overlay package. Cloning it does not boot a desktop. There is no emulator image, SDK, or product bundle in git.
+
+The system this package produces is **Workbench slim on FEMU**. The commands below are the ones the live verifiers actually use. `scripts/start-emulator.sh` is not that path: it only starts QEMU `workbench_eng.x64` or `minimal.x64`.
+
+### What has to exist first
+
+- Linux x86_64 host with KVM (`/dev/kvm`) and rootless Podman
+- A lab workspace that already has the SDK, Fuchsia source at the pin in `versions.env`, overlays applied, and a built slim bundle
+- Container name `fuchsia-desktop-mvp`, isolate dir `/workspace/state/ffx`
+
+On the lab used to develop this package, that workspace is `/srv/bigs-runtime/workspaces/projects/fuchsia-desktop-mvp`. The public clone of this repo is not a substitute for that lab.
+
+Built bundle the guest actually boots:
+
+```text
+/workspace/source/fuchsia/out/workbench_eng.x64-release/obj/products/workbench/workbench_slim.x64/product_bundle
+```
+
+If that directory is missing, do the Local rebuild steps below, then come back here.
+
+### 1. Start the tool container if it is not running
+
+From the lab workspace, not from a docs-only clone:
+
+```bash
+podman compose up -d
+podman ps --filter name=fuchsia-desktop-mvp --format '{{.Names}} {{.Status}}'
+```
+
+Expected: `fuchsia-desktop-mvp` is `Up`.
+
+Helper used in every later command:
+
+```bash
+ffx() {
+  podman exec -e FUCHSIA_NODENAME=fuchsia-workbench-femu fuchsia-desktop-mvp     /workspace/sdk/packages/tools/x64/ffx --isolate-dir /workspace/state/ffx "$@"
+}
+```
+
+### 2. Boot FEMU, or reuse it if it is already running
+
+```bash
+ffx emu list
+```
+
+If the list shows `[running] fuchsia-workbench-femu`, do not start another copy.
+
+If it is not running:
+
+```bash
+ffx emu start   --engine femu --gpu swiftshader_indirect --accel hyper --headless   --net user --smp 8 --name fuchsia-workbench-femu --startup-timeout 180   --log /workspace/artifacts/fuchsia-workbench-femu.log   /workspace/source/fuchsia/out/workbench_eng.x64-release/obj/products/workbench/workbench_slim.x64/product_bundle
+```
+
+The guest is headless. There is no local window and no VNC in this path. You look at it with `ffx target screenshot`.
+
+### 3. Prove the guest is reachable
+
+```bash
+ffx target wait -t 180
+ffx emu list
+ffx target list
+ffx target ssh "echo FUCHSIA_GUEST_OK"
+```
+
+Expected:
+
+- emulator line `[running] fuchsia-workbench-femu`
+- target `fuchsia-workbench-femu` in Product state with RCS `Y`
+- guest prints `FUCHSIA_GUEST_OK`
+
+### 4. Put the desktop on the stage
+
+A fresh slim boot can be an empty tiling WM (`tile_count=0`). Add the apps the current live proof uses:
+
+```bash
+ffx session add fuchsia-pkg://fuchsia.com/fuchsia_settings#meta/fuchsia_settings.cm
+ffx session add fuchsia-pkg://fuchsia.com/fuchsia_terminal#meta/fuchsia_terminal.cm
+ffx session add fuchsia-pkg://fuchsia.com/fuchsia_browser#meta/fuchsia_browser.cm
+```
+
+Files is part of the product, but the current live proof is three tiles because Files PresentView is not restored. Do not treat `Running` as a four-window desktop.
+
+Check the window manager:
+
+```bash
+ffx --machine json inspect show core/session-manager/session:session/tiling_wm
+```
+
+Expected: `tiling_wm.tile_count` is 3 and `fuchsia.inspect.Health.status` is `OK`.
+
+Capture pixels:
+
+```bash
+ffx target screenshot -d /workspace/artifacts/instrument-studio-run
+```
+
+The PNG lands in the lab `artifacts/` directory on the host.
+
+### 5. Use it as an end user inside Terminal
+
+The Terminal is Alpine/Linux through Starnix. After Terminal has focus:
+
+```sh
+fuchsia-studio help
+fuchsia-studio health
+fuchsia-studio man
+```
+
+That is the in-guest help surface. Desktop health still comes from Inspect, not from those Linux commands.
+
+### Stop
+
+```bash
+ffx emu stop fuchsia-workbench-femu
+```
+
+Do not run that if another session is using the same guest.
+
 ## Local rebuild
 
 ### 1. Get public Fuchsia source at the pin
