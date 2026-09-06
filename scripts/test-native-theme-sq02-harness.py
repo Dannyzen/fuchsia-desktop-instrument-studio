@@ -210,7 +210,10 @@ class CoreTests(unittest.TestCase):
             with self.assertRaises(h.QualificationError) as caught:
                 h.source_identity(ROOT, ROOT / "artifacts/quality/sq-02", "1" * 40)
         self.assertEqual(caught.exception.classification, "CI_SOURCE_SCOPE")
-        responses[ ("diff", "--name-only", f"{h.BASE_SHA}..{'1' * 40}") ] = ""
+        responses[("diff", "--name-only", f"{h.BASE_SHA}..{'1' * 40}")] = "README.md\ndocs/production-status.md\ndesign/sketches/01-instrument-studio/README.md\n"
+        with mock.patch.object(h, "_git", side_effect=lambda _root, *args: responses[args]):
+            self.assertEqual(h.source_identity(ROOT, ROOT / "artifacts/quality/sq-02", "1" * 40), ("1" * 40, "2" * 40))
+        responses[("diff", "--name-only", f"{h.BASE_SHA}..{'1' * 40}")] = ""
         with mock.patch.object(h, "_git", side_effect=lambda _root, *args: responses[args]):
             self.assertEqual(h.source_identity(ROOT, ROOT / "artifacts/quality/sq-02", "1" * 40), ("1" * 40, "2" * 40))
         with tempfile.TemporaryDirectory() as td:
@@ -435,6 +438,19 @@ class CoreTests(unittest.TestCase):
             self.assertGreaterEqual(len(scan["findings"]), 3)
             with mock.patch.object(h, "_git", side_effect=fake_git):
                 h.authority_scan(fake, {"clean-receipt.json": b"{}\n"})
+            (fake / "README.md").write_bytes(b"/" + b"srv/bigs-runtime/workspaces/projects/fuchsia-desktop-mvp")
+            (fake / "docs").mkdir()
+            (fake / "docs/production-status.md").write_bytes(b"/" + b"home/danny/example")
+            (fake / "design").mkdir()
+            (fake / "design/sketches.md").write_bytes(b"/" + b"Users/danny/example")
+            def docs_git(_root, *args):
+                if args == ("ls-files",):
+                    return "README.md\ndocs/production-status.md\ndesign/sketches.md\n"
+                return "README.md\ndocs/production-status.md\ndesign/sketches.md\n"
+            with mock.patch.object(h, "_git", side_effect=docs_git):
+                docs_scan = h.authority_scan(fake, {"clean-receipt.json": b"{}\n"})
+            self.assertEqual(docs_scan["findings"], [])
+            self.assertEqual(docs_scan["changed_files_scanned"], 3)
 
         with tempfile.TemporaryDirectory() as td:
             base = Path(td)

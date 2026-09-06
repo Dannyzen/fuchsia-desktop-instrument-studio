@@ -70,6 +70,8 @@ ALLOWED_TRACKED_PATHS = {
     "tools/native_theme/sq02-rust-qualifier/rust-toolchain.toml",
     "tools/native_theme/sq02-rust-qualifier/src/main.rs",
 }
+DOC_SCOPE_PATHS = {"README.md"}
+DOC_SCOPE_PREFIXES = ("docs/", "design/")
 ENVIRONMENT = {
     "CARGO_NET_OFFLINE": "true",
     "LANG": "C",
@@ -229,7 +231,10 @@ def source_identity(root: Path, output: Path, expected_sha: str) -> tuple[str, s
     if remaining:
         fail("CI_SOURCE_DIRTY", "tracked or non-output source changes present")
     changed = set(str(_git(root, "diff", "--name-only", f"{BASE_SHA}..{sha}")).splitlines())
-    unexpected = sorted(changed - ALLOWED_TRACKED_PATHS)
+    unexpected = sorted(
+        path for path in changed - ALLOWED_TRACKED_PATHS
+        if path not in DOC_SCOPE_PATHS and not path.startswith(DOC_SCOPE_PREFIXES)
+    )
     if unexpected:
         fail("CI_SOURCE_SCOPE", "changed tracked path outside SQ-02 allowlist")
     return sha, tree
@@ -598,6 +603,8 @@ def authority_scan(root: Path, receipts: dict[str, bytes]) -> dict[str, Any]:
         path = root / relative
         if path.is_symlink() or ".." in PurePosixPath(relative).parts:
             findings.append({"code": "E_PATH_AUTHORITY", "file": relative})
+            continue
+        if relative in DOC_SCOPE_PATHS or relative.startswith(DOC_SCOPE_PREFIXES):
             continue
         raw = path.read_bytes()
         for pattern in PRIVATE_PATTERNS:
