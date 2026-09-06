@@ -5,22 +5,32 @@
 import("//build/bazel/export_fuchsia_package_to_bazel.gni")
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/rust/rustc_library.gni")
+
+rustc_library("settings_core") {
+  name = "settings_core"
+  edition = "2024"
+  with_unit_tests = true
+  source_root = "src/settings_core.rs"
+  sources = [ "src/settings_core.rs" ]
+}
 
 rustc_binary("bin") {
   name = "fuchsia_settings"
   edition = "2024"
   sources = [
     "src/main.rs",
-    "src/settings_core.rs",
     "src/settings_ui.rs",
     "src/text_surface.rs",
   ]
   inputs = [ "//prebuilt/third_party/fonts/robotoslab/RobotoSlab-Regular.ttf" ]
   deps = [
+    ":settings_core",
     "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_rust",
     "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_rust",
     "//sdk/fidl/fuchsia.images2:fuchsia.images2_rust",
     "//sdk/fidl/fuchsia.intl:fuchsia.intl_rust",
+    "//src/fuchsia-desktop/theme_service:fuchsia.instrumentstudio.theme_rust",
     "//sdk/fidl/fuchsia.math:fuchsia.math_rust",
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust",
     "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_rust",

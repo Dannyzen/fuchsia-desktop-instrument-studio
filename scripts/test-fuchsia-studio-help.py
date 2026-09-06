@@ -148,7 +148,7 @@ require('if narrow { "Address" } else { "Tab 1" }', browser)
 assert 'if narrow { "Browser" } else { "Tab 1" }' not in browser
 
 settings = SETTINGS.read_text()
-require('(AppTheme::Dark, "Dark theme active".to_string())', settings)
+require('(None, "Dark theme active".to_string())', settings)
 assert '(AppTheme::Dark, "Ready".to_string())' not in settings
 
 input_driver = INPUT_DRIVER.read_text()
