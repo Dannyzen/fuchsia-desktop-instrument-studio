@@ -182,7 +182,7 @@ def allowed_subprocess(argv: object, root: Path, *, cargo: Path | None = None,
         return tail == ("--version", "--verbose")
     if Path(argv[0]).resolve() == Path(sys.executable).resolve() and len(tail) >= 3 and tail[:2] == ("-m", "coverage"):
         if tail[2] == "run":
-            return "--branch" in tail and any(item.endswith(("test-native-theme-sq02-harness.py", "test-native-theme-sq02-receipts.py")) for item in tail)
+            return "--branch" in tail and any(item.endswith(("test-native-theme-sq02-harness.py", "test-native-theme-sq02-receipts.py", "test-native-theme-sq02-scope.py")) for item in tail)
         if tail[2] == "json":
             return "-o" in tail
     return False
@@ -634,9 +634,14 @@ def measure_coverage(root: Path, workspace: Path) -> tuple[dict[str, dict[str, i
     data_file = workspace / ".coverage-sq02"
     report_file = workspace / "coverage-machine.json"
     include = ",".join(str(root / name) for name in (
-        "tools/native_theme/sq02_harness.py", "tools/native_theme/sq02_receipt_verifier.py"))
+        "tools/native_theme/sq02_harness.py", "tools/native_theme/sq02_receipt_verifier.py",
+        "tools/native_theme/sq02_scope.py"))
     environment = {**os.environ, **ENVIRONMENT, "COVERAGE_FILE": str(data_file), "PYTHONDONTWRITEBYTECODE": "1"}
-    tests = ("scripts/test-native-theme-sq02-harness.py", "scripts/test-native-theme-sq02-receipts.py")
+    tests = (
+        "scripts/test-native-theme-sq02-harness.py",
+        "scripts/test-native-theme-sq02-receipts.py",
+        "scripts/test-native-theme-sq02-scope.py",
+    )
     for index, test in enumerate(tests):
         command = [str(Path(sys.executable).absolute()), "-m", "coverage", "run"]
         if index:
@@ -652,7 +657,11 @@ def measure_coverage(root: Path, workspace: Path) -> tuple[dict[str, dict[str, i
     machine_raw = report_file.read_bytes()
     machine = json.loads(machine_raw)
     metrics: dict[str, dict[str, int]] = {}
-    for relative in ("tools/native_theme/sq02_harness.py", "tools/native_theme/sq02_receipt_verifier.py"):
+    for relative in (
+        "tools/native_theme/sq02_harness.py",
+        "tools/native_theme/sq02_receipt_verifier.py",
+        "tools/native_theme/sq02_scope.py",
+    ):
         candidates = [row for name, row in machine["files"].items() if name.replace("\\", "/").endswith(relative)]
         if len(candidates) != 1:
             fail("CI_COVERAGE", f"coverage module missing: {relative}")
