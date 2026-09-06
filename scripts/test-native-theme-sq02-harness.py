@@ -210,7 +210,10 @@ class CoreTests(unittest.TestCase):
             with self.assertRaises(h.QualificationError) as caught:
                 h.source_identity(ROOT, ROOT / "artifacts/quality/sq-02", "1" * 40)
         self.assertEqual(caught.exception.classification, "CI_SOURCE_SCOPE")
-        responses[ ("diff", "--name-only", f"{h.BASE_SHA}..{'1' * 40}") ] = ""
+        responses[("diff", "--name-only", f"{h.BASE_SHA}..{'1' * 40}")] = "README.md\ndocs/production-status.md\ndesign/sketches/01-instrument-studio/README.md\n"
+        with mock.patch.object(h, "_git", side_effect=lambda _root, *args: responses[args]):
+            self.assertEqual(h.source_identity(ROOT, ROOT / "artifacts/quality/sq-02", "1" * 40), ("1" * 40, "2" * 40))
+        responses[("diff", "--name-only", f"{h.BASE_SHA}..{'1' * 40}")] = ""
         with mock.patch.object(h, "_git", side_effect=lambda _root, *args: responses[args]):
             self.assertEqual(h.source_identity(ROOT, ROOT / "artifacts/quality/sq-02", "1" * 40), ("1" * 40, "2" * 40))
         with tempfile.TemporaryDirectory() as td:
