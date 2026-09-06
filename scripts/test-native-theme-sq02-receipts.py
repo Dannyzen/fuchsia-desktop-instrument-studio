@@ -46,6 +46,7 @@ def fixture() -> dict[str, dict[str, object]]:
     binary = "0" * 64
     manifest = {
         "authority": "non-authoritative-harness", "base_sha": "036944123fa15d5b5fac5718899b08a44691727c",
+        "comparison_base_sha": "3" * 40,
         "command_schema": "repository command v1", "environment": {"CARGO_NET_OFFLINE": "true", "LANG": "C", "LC_ALL": "C",
         "NATIVE_THEME_SQ02_NETWORK": "deny", "PYTHONHASHSEED": "0", "RUSTUP_NO_UPDATE_CHECK": "1", "TZ": "UTC"},
         "fuchsia_pinned_revision": "7f75b7f6ffdacf5a818dd8d207263edd45126ddd", "os_isolation": isolation,
@@ -93,8 +94,11 @@ def fixture() -> dict[str, dict[str, object]]:
     coverage = {"claim_scope": "Python safety-bearing statement/branch/function execution; Rust requirement completeness only",
                 "machine_artifact_sha256": "6" * 64,
                 "production_modules": {"gate": "established-source-bound", "reported_separately": True},
-                "python_safety_modules": {"tools/native_theme/sq02_harness.py": metric,
-                                          "tools/native_theme/sq02_receipt_verifier.py": copy.deepcopy(metric)},
+                "python_safety_modules": {
+                    "tools/native_theme/sq02_harness.py": metric,
+                    "tools/native_theme/sq02_receipt_verifier.py": copy.deepcopy(metric),
+                    "tools/native_theme/sq02_scope.py": copy.deepcopy(metric),
+                },
                 "rust_claim": "executed-requirement-ID-completeness-not-source-or-function-coverage",
                 "rust_requirement_ids": list(v.REQUIREMENTS), "schema_version": "sq02-coverage-v1", "status": "PASS"}
     reproducible = {"archive_materializations": 2, "cargo_binary_equality_required": False,
@@ -140,7 +144,8 @@ class ReceiptTests(unittest.TestCase):
         sha, tree = git("rev-parse", "HEAD"), git("rev-parse", "HEAD^{tree}")
         mutations = []
         for path, replacement in (
-            (("base_sha",), "0" * 40), (("fuchsia_pinned_revision",), "0" * 40),
+            (("base_sha",), "0" * 40), (("comparison_base_sha",), "not-a-sha"),
+            (("fuchsia_pinned_revision",), "0" * 40),
             (("python_dependencies",), {}), (("environment", "TZ"), "local"),
             (("os_isolation", "namespace_changed"), False), (("os_isolation", "namespace_mode"), "none"),
             (("toolchain", "rust_channel"), "nightly"), (("toolchain", "origin"), "unknown"),
@@ -199,6 +204,7 @@ class ReceiptTests(unittest.TestCase):
         for mutate in (
             lambda x: x.update(status="FAIL"), lambda x: x.update(claim_scope="overclaim"),
             lambda x: x.update(production_modules={}), lambda x: x.update(python_safety_modules={}),
+            lambda x: x["python_safety_modules"].pop("tools/native_theme/sq02_scope.py"),
             lambda x: x["python_safety_modules"]["tools/native_theme/sq02_harness.py"].update(statements_total=0),
             lambda x: x["python_safety_modules"]["tools/native_theme/sq02_harness.py"].update(statements_covered=0),
             lambda x: x.update(rust_claim="line coverage"),

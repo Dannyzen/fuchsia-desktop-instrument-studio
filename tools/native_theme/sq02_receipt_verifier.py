@@ -118,13 +118,15 @@ def git(root: Path, *args: str) -> str:
 
 
 def _manifest(root: Path, value: dict[str, Any], expected_sha: str, expected_tree: str) -> None:
-    exact(value, {"authority", "base_sha", "command_schema", "environment", "fuchsia_pinned_revision",
+    exact(value, {"authority", "base_sha", "comparison_base_sha", "command_schema", "environment", "fuchsia_pinned_revision",
                   "os_isolation", "python_dependencies", "python_version", "qualification_inputs", "source_sha", "source_tree",
                   "toolchain", "tracked_source_hashes"}, "manifest")
     if value["authority"] != "non-authoritative-harness" or value["source_sha"] != expected_sha or value["source_tree"] != expected_tree:
         reject("manifest: authority or source identity mismatch")
     if value["base_sha"] != "036944123fa15d5b5fac5718899b08a44691727c":
         reject("manifest: base SHA drift")
+    if not re.fullmatch(r"[0-9a-f]{40}", value["comparison_base_sha"]):
+        reject("manifest: comparison base SHA invalid")
     if value["fuchsia_pinned_revision"] != "7f75b7f6ffdacf5a818dd8d207263edd45126ddd":
         reject("manifest: Fuchsia revision drift")
     text(value["command_schema"], "command schema")
@@ -294,7 +296,11 @@ def _coverage(value: dict[str, Any]) -> None:
     if value["production_modules"] != {"gate": "established-source-bound", "reported_separately": True}:
         reject("coverage: production source-bound reporting drift")
     modules = value["python_safety_modules"]
-    expected_modules = {"tools/native_theme/sq02_harness.py", "tools/native_theme/sq02_receipt_verifier.py"}
+    expected_modules = {
+        "tools/native_theme/sq02_harness.py",
+        "tools/native_theme/sq02_receipt_verifier.py",
+        "tools/native_theme/sq02_scope.py",
+    }
     if not isinstance(modules, dict) or set(modules) != expected_modules:
         reject("coverage: safety module inventory mismatch")
     fields = {"branches_covered", "branches_total", "functions_with_body_execution", "functions_total",

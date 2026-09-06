@@ -12,6 +12,20 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12.9'
+      - name: Detect NativeThemeV1 sq-02 scope
+        id: sq02-scope
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          base_sha="${PR_BASE_SHA:-${PUSH_BASE_SHA:-}}"
+          python3 scripts/native-theme-sq02-scope.py \
+            --base-sha "$base_sha" --head-sha "$GITHUB_SHA" \
+            --default-ref "origin/$DEFAULT_BRANCH" \
+            --github-output "$GITHUB_OUTPUT"
+      - name: NativeThemeV1 sq-02 scope contract
+        run: PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-native-theme-sq02-scope.py
       - name: Secret and structure scan
         run: bash scripts/secret-scan.sh
       - name: Package structure checks
@@ -108,8 +122,10 @@ jobs:
             artifacts/quality/sq-01/public-boundary-and-license-scan.json
             artifacts/quality/sq-01/verdict.json
       - name: Prepare NativeThemeV1 sq-02 Python dependencies
+        if: steps.sq02-scope.outputs.run == 'true'
         run: python3 -m pip install --requirement tools/native_theme/sq02-requirements.txt
       - name: Prepare NativeThemeV1 sq-02 Rust toolchain
+        if: steps.sq02-scope.outputs.run == 'true'
         run: |
           rustup set profile minimal
           rustup toolchain install nightly-2026-08-13 --profile minimal
@@ -122,20 +138,23 @@ jobs:
           printf 'SQ02_CARGO_HOME=%s\n' "$RUNNER_TEMP/sq02-cargo-home" >> "$GITHUB_ENV"
           printf 'SQ02_TARGET_ROOT=%s\n' "$RUNNER_TEMP/sq02-target" >> "$GITHUB_ENV"
       - name: Prepare NativeThemeV1 sq-02 locked crates
+        if: steps.sq02-scope.outputs.run == 'true'
         run: |
           mkdir -p "$SQ02_CARGO_HOME"
           CARGO_HOME="$SQ02_CARGO_HOME" "$SQ02_CARGO" fetch --locked --manifest-path tools/native_theme/sq02-rust-qualifier/Cargo.toml
       - name: NativeThemeV1 sq-02 native Rust compiler packaging gate
+        if: steps.sq02-scope.outputs.run == 'true'
         run: >-
           python3 scripts/run-native-theme-sq02.py
           --source-sha "$GITHUB_SHA"
+          --comparison-base-sha "${{ steps.sq02-scope.outputs.comparison_base_sha }}"
           --output-dir artifacts/quality/sq-02
           --cargo "$SQ02_CARGO"
           --rustc "$SQ02_RUSTC"
           --cargo-home "$SQ02_CARGO_HOME"
           --target-root "$SQ02_TARGET_ROOT"
       - name: Upload NativeThemeV1 sq-02 receipts
-        if: always()
+        if: always() && steps.sq02-scope.outputs.run == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: native-theme-sq-02-${{ github.sha }}
