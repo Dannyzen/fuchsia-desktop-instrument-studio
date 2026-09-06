@@ -17,13 +17,12 @@ jobs:
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PUSH_BASE_SHA: ${{ github.event.before }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           base_sha="${PR_BASE_SHA:-${PUSH_BASE_SHA:-}}"
-          if [[ -z "$base_sha" || "$base_sha" =~ ^0+$ ]]; then
-            base_sha="$(git rev-parse "$GITHUB_SHA^")"
-          fi
           python3 scripts/native-theme-sq02-scope.py \
             --base-sha "$base_sha" --head-sha "$GITHUB_SHA" \
+            --default-ref "origin/$DEFAULT_BRANCH" \
             --github-output "$GITHUB_OUTPUT"
       - name: NativeThemeV1 sq-02 scope contract
         run: PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-native-theme-sq02-scope.py

@@ -173,11 +173,14 @@ def enter(args: argparse.Namespace) -> NoReturn:
     env_tool = shutil.which("env", path="/usr/bin:/bin")
     if env_tool is None:
         raise RuntimeError("env tool unavailable")
-    forwarded = [
-        "--source-sha", args.source_sha, "--output-dir", args.output_dir,
+    forwarded = ["--source-sha", args.source_sha]
+    if args.comparison_base_sha:
+        forwarded.extend(["--comparison-base-sha", args.comparison_base_sha])
+    forwarded.extend([
+        "--output-dir", args.output_dir,
         "--cargo", str(cargo), "--rustc", str(rustc), "--cargo-home", str(cargo_home),
         "--target-root", str(target_root), "--inside",
-    ]
+    ])
     assignments = [f"{key}={value}" for key, value in sorted(FIXED.items())] + [
         f"NATIVE_THEME_SQ02_PARENT_NETNS={parent}", f"NATIVE_THEME_SQ02_NAMESPACE_MODE={mode}",
         "NATIVE_THEME_SQ02_TOOLCHAIN_ORIGIN=" + ("hosted-official-nightly" if os.environ.get("GITHUB_ACTIONS") == "true" else "project-fuchsia-prebuilt"),

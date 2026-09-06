@@ -283,6 +283,8 @@ class CoreTests(unittest.TestCase):
         self.assertLess(rust_prepare, fetch)
         self.assertLess(fetch, gate)
         self.assertLess(gate, upload)
+        self.assertIn('--default-ref "origin/$DEFAULT_BRANCH"', workflow)
+        self.assertNotIn('git rev-parse "$GITHUB_SHA^"', workflow)
         self.assertNotIn("self-hosted", workflow)
         upload_block = workflow[upload:workflow.index("Instrument Studio desktop_ui host contract")]
         self.assertEqual(sum(f"artifacts/quality/sq-02/{name}" in upload_block for name in h.RECEIPTS), 8)
@@ -525,7 +527,11 @@ class CoreTests(unittest.TestCase):
         first = payload_fixture(); second = json.loads(json.dumps(first)); second["catalog"] = {}
         metric = {name: {"branches_covered": 1, "branches_total": 1, "functions_with_body_execution": 1,
                          "functions_total": 1, "statements_covered": 1, "statements_total": 1}
-                  for name in ("tools/native_theme/sq02_harness.py", "tools/native_theme/sq02_receipt_verifier.py")}
+                  for name in (
+                      "tools/native_theme/sq02_harness.py",
+                      "tools/native_theme/sq02_receipt_verifier.py",
+                      "tools/native_theme/sq02_scope.py",
+                  )}
         common = (mock.patch.object(h.importlib.metadata, "version", side_effect=lambda name: h.PINNED[name]),
                   mock.patch.object(h, "_binary_record", return_value={"binary_sha256": "0" * 64, "name": "cargo", "version": "1.99.0-nightly"}),
                   mock.patch.object(h, "_tracked_hashes", return_value={}))
@@ -614,6 +620,28 @@ class LauncherTests(unittest.TestCase):
             [sys.executable, "-I", "-S", "-c", self.launcher.PROBE], phase="socket-probe"))
         for command in (["curl", "example"], [sys.executable, "-c", "pass"]):
             self.assertFalse(self.launcher.allowed_launcher_command(command, phase="socket-probe"))
+
+    def test_enter_forwards_comparison_base_across_namespace_exec(self):
+        args = __import__("argparse").Namespace(
+            source_sha="1" * 40, comparison_base_sha="3" * 40,
+            output_dir="artifacts/quality/sq-02", cargo=None, rustc=None,
+            cargo_home=None, target_root=None, inside=False,
+        )
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            tools = (Path("/bin/cargo"), Path("/bin/rustc"), base / "home", base / "target")
+            with mock.patch.object(self.launcher, "root", return_value=ROOT), \
+                 mock.patch.object(self.launcher, "static_scan"), \
+                 mock.patch.object(self.launcher, "resolved_tools", return_value=tools), \
+                 mock.patch.object(self.launcher, "choose_namespace", return_value=("unprivileged-user-network", ["/usr/bin/unshare", "-Urn", "--"])), \
+                 mock.patch.object(self.launcher, "namespace_identity", return_value="net:[123]"), \
+                 mock.patch.object(self.launcher.shutil, "which", return_value="/usr/bin/env"), \
+                 mock.patch.object(self.launcher.os, "execve", side_effect=RuntimeError("captured")) as execute:
+                with self.assertRaisesRegex(RuntimeError, "captured"):
+                    self.launcher.enter(args)
+            command = execute.call_args.args[1]
+            index = command.index("--comparison-base-sha")
+            self.assertEqual(command[index + 1], "3" * 40)
 
     def test_unprivileged_selection_precedes_ci_sudo(self):
         success = __import__("subprocess").CompletedProcess([], 0)
