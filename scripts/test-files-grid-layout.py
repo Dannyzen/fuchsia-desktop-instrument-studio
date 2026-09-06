@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Host contract: narrow Files tile uses a 2x3 icon grid."""
+"""Host contract: Files grid geometry and startup Present budget."""
+
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+FILES_MAIN = ROOT / "overlays/fuchsia/src/fuchsia-desktop/files/src/main.rs"
 
 GRID_TOP = 200
 GRID_PAD = 10
@@ -26,6 +31,13 @@ def main() -> int:
     assert y2 > y0 + h
     assert y0 == 200
     assert x0 == 10
+
+    source = FILES_MAIN.read_text()
+    create_view = source[source.index("async fn create_files_view"):source.index("async fn serve_view_provider")]
+    assert create_view.count("flatland.present(flatland::PresentArgs::default())") == 2, (
+        "Files startup must stay within two initial Flatland Present credits"
+    )
+    assert "Files toolbar present failed" not in create_view
     print("files_grid_layout_ok")
     return 0
 
