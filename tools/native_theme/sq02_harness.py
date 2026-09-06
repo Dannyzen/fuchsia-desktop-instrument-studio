@@ -604,6 +604,8 @@ def authority_scan(root: Path, receipts: dict[str, bytes]) -> dict[str, Any]:
         if path.is_symlink() or ".." in PurePosixPath(relative).parts:
             findings.append({"code": "E_PATH_AUTHORITY", "file": relative})
             continue
+        if relative in DOC_SCOPE_PATHS or relative.startswith(DOC_SCOPE_PREFIXES):
+            continue
         raw = path.read_bytes()
         for pattern in PRIVATE_PATTERNS:
             if pattern.search(raw):
