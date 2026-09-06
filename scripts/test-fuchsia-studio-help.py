@@ -167,10 +167,33 @@ require("terminal", live_verifier)
 
 readme = README.read_text()
 require("Latest Live 22:", readme)
-require("three visible tiles. Files is absent.", readme)
+require("historical run had three visible tiles; Files was absent", readme)
+require("Current runbook verification (2026-09-06):", readme)
+require("health `OK` and `tile_count=4`", readme)
 require("Historical Live 4:", readme)
 require("proves four tiles", readme)
 assert "- Live Inspect: 4 tiles" not in readme
 assert "Remaining gap: Instrument Studio chrome" not in readme
+
+runbook = readme.split("## Run the desktop", 1)[1].split("## Production status", 1)[0]
+for phrase in (
+    "ffx session add --name instrument-studio-settings fuchsia-pkg://fuchsia.com/fuchsia_settings#meta/fuchsia_settings.cm",
+    "ffx session add --name instrument-studio-terminal fuchsia-pkg://fuchsia.com/fuchsia_terminal#meta/fuchsia_terminal.cm",
+    "ffx session add --name instrument-studio-browser fuchsia-pkg://fuchsia.com/fuchsia_browser#meta/fuchsia_browser.cm",
+    "ffx session add --name instrument-studio-files fuchsia-pkg://fuchsia.com/fuchsia_files#meta/fuchsia_files.cm",
+    'case "$tile_count" in',
+    "0)",
+    "4)",
+    "unexpected existing tile_count",
+    "mkdir -p artifacts/instrument-studio-run",
+    "Expected: `tiling_wm.tile_count` is 4",
+):
+    require(phrase, runbook)
+for stale in (
+    "Files PresentView is not restored",
+    "current live proof is three tiles",
+    "`tiling_wm.tile_count` is 3",
+):
+    assert stale not in runbook, f"README runbook retains stale claim: {stale}"
 
 print("fuchsia_studio_help_contract_ok")
