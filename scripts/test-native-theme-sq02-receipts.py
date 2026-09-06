@@ -94,8 +94,11 @@ def fixture() -> dict[str, dict[str, object]]:
     coverage = {"claim_scope": "Python safety-bearing statement/branch/function execution; Rust requirement completeness only",
                 "machine_artifact_sha256": "6" * 64,
                 "production_modules": {"gate": "established-source-bound", "reported_separately": True},
-                "python_safety_modules": {"tools/native_theme/sq02_harness.py": metric,
-                                          "tools/native_theme/sq02_receipt_verifier.py": copy.deepcopy(metric)},
+                "python_safety_modules": {
+                    "tools/native_theme/sq02_harness.py": metric,
+                    "tools/native_theme/sq02_receipt_verifier.py": copy.deepcopy(metric),
+                    "tools/native_theme/sq02_scope.py": copy.deepcopy(metric),
+                },
                 "rust_claim": "executed-requirement-ID-completeness-not-source-or-function-coverage",
                 "rust_requirement_ids": list(v.REQUIREMENTS), "schema_version": "sq02-coverage-v1", "status": "PASS"}
     reproducible = {"archive_materializations": 2, "cargo_binary_equality_required": False,
@@ -201,6 +204,7 @@ class ReceiptTests(unittest.TestCase):
         for mutate in (
             lambda x: x.update(status="FAIL"), lambda x: x.update(claim_scope="overclaim"),
             lambda x: x.update(production_modules={}), lambda x: x.update(python_safety_modules={}),
+            lambda x: x["python_safety_modules"].pop("tools/native_theme/sq02_scope.py"),
             lambda x: x["python_safety_modules"]["tools/native_theme/sq02_harness.py"].update(statements_total=0),
             lambda x: x["python_safety_modules"]["tools/native_theme/sq02_harness.py"].update(statements_covered=0),
             lambda x: x.update(rust_claim="line coverage"),

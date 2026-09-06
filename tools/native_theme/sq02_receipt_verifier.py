@@ -296,7 +296,11 @@ def _coverage(value: dict[str, Any]) -> None:
     if value["production_modules"] != {"gate": "established-source-bound", "reported_separately": True}:
         reject("coverage: production source-bound reporting drift")
     modules = value["python_safety_modules"]
-    expected_modules = {"tools/native_theme/sq02_harness.py", "tools/native_theme/sq02_receipt_verifier.py"}
+    expected_modules = {
+        "tools/native_theme/sq02_harness.py",
+        "tools/native_theme/sq02_receipt_verifier.py",
+        "tools/native_theme/sq02_scope.py",
+    }
     if not isinstance(modules, dict) or set(modules) != expected_modules:
         reject("coverage: safety module inventory mismatch")
     fields = {"branches_covered", "branches_total", "functions_with_body_execution", "functions_total",
