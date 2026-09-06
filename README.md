@@ -160,33 +160,77 @@ Expected:
 - target `fuchsia-workbench-femu` in Product state with RCS `Y`
 - guest prints `FUCHSIA_GUEST_OK`
 
-### 4. Put the desktop on the stage
+### 4. Put the desktop on the stage without duplicates
 
-A fresh slim boot can be an empty tiling WM (`tile_count=0`). Add the apps the current live proof uses:
+A fresh slim boot can be an empty tiling WM (`tile_count=0`). A reused guest can already have the complete four-app stage. Read Inspect first so rerunning this runbook does not add duplicate windows:
 
 ```bash
-ffx session add fuchsia-pkg://fuchsia.com/fuchsia_settings#meta/fuchsia_settings.cm
-ffx session add fuchsia-pkg://fuchsia.com/fuchsia_terminal#meta/fuchsia_terminal.cm
-ffx session add fuchsia-pkg://fuchsia.com/fuchsia_browser#meta/fuchsia_browser.cm
+wm_tile_count() {
+  ffx --machine json inspect show core/session-manager/session:session/tiling_wm |
+    python3 -c 'import json, sys
+
+def find(value):
+    if isinstance(value, dict):
+        if "tile_count" in value:
+            return value["tile_count"]
+        for child in value.values():
+            result = find(child)
+            if result is not None:
+                return result
+    elif isinstance(value, list):
+        for child in value:
+            result = find(child)
+            if result is not None:
+                return result
+    return None
+
+result = find(json.load(sys.stdin))
+if not isinstance(result, int):
+    raise SystemExit("tiling_wm tile_count is unavailable")
+print(result)'
+}
+
+tile_count="$(wm_tile_count)"
+case "$tile_count" in
+  0)
+    ffx session add --name instrument-studio-settings fuchsia-pkg://fuchsia.com/fuchsia_settings#meta/fuchsia_settings.cm
+    ffx session add --name instrument-studio-terminal fuchsia-pkg://fuchsia.com/fuchsia_terminal#meta/fuchsia_terminal.cm
+    ffx session add --name instrument-studio-browser fuchsia-pkg://fuchsia.com/fuchsia_browser#meta/fuchsia_browser.cm
+    ffx session add --name instrument-studio-files fuchsia-pkg://fuchsia.com/fuchsia_files#meta/fuchsia_files.cm
+    ;;
+  4)
+    echo "four-app stage already present; not adding duplicates"
+    ;;
+  *)
+    echo "unexpected existing tile_count=$tile_count; stop instead of creating a mixed or duplicate stage" >&2
+    exit 1
+    ;;
+esac
+
+for attempt in $(seq 1 30); do
+  tile_count="$(wm_tile_count)"
+  [ "$tile_count" -eq 4 ] && break
+  sleep 2
+done
+test "$tile_count" -eq 4
 ```
 
-Files is part of the product, but the current live proof is three tiles because Files PresentView is not restored. Do not treat `Running` as a four-window desktop.
-
-Check the window manager:
+Check the complete window-manager state:
 
 ```bash
 ffx --machine json inspect show core/session-manager/session:session/tiling_wm
 ```
 
-Expected: `tiling_wm.tile_count` is 3 and `fuchsia.inspect.Health.status` is `OK`.
+Expected: `tiling_wm.tile_count` is 4, `fuchsia.inspect.Health.status` is `OK`, and the order contains Browser, Terminal, Settings, and Files instances. A component merely reporting `Running` is not enough.
 
-Capture pixels:
+Capture pixels. `-d` requires an existing directory inside the tool container, so create its host-mounted counterpart first:
 
 ```bash
+mkdir -p artifacts/instrument-studio-run
 ffx target screenshot -d /workspace/artifacts/instrument-studio-run
 ```
 
-The PNG lands in the lab `artifacts/` directory on the host.
+The PNG lands in the lab `artifacts/instrument-studio-run/` directory on the host. Inspect it and confirm four non-empty application tiles before calling the run complete.
 
 ### 5. Use it as an end user inside Terminal
 
@@ -310,11 +354,15 @@ Rebuild proof + vision notes:
 
 - Latest Live 22: `docs/evidence/instrument-studio-help-20260827T062745Z/`
   proves the new chrome, built-in help, Inspect health, confirmed Terminal focus,
-  and three visible tiles. Files is absent.
+  and records that its historical run had three visible tiles; Files was absent.
+- Current runbook verification (2026-09-06): the documented reuse path reached
+  `workbench_slim.x64` with RCS, guest SSH, four running app components, Inspect
+  health `OK` and `tile_count=4`, plus fresh pixels showing non-empty Files,
+  Browser, Terminal, and Settings tiles. The procedure below is the reproduction path.
 - Historical Live 4: `docs/evidence/instrument-studio-20260818T220823Z/`
   proves four tiles, confirmed focus, and gap/border configuration before the
   current typography and help changes.
 
 ## Status
 
-The interactive tiling WM, Instrument Studio shell chrome, readable typography, semantic icons, and Linux help surface are proven on their cited source identities. The next proof is to restore Files and re-establish an exact-current four-tile stage before release-polish claims.
+The interactive tiling WM, Instrument Studio shell chrome, readable typography, semantic icons, Linux help surface, and four-app stage are proven on their cited source identities. The remaining release work is the restart-only NativeTheme control plane, which is still a separate draft change and is not implied by this runbook proof.
