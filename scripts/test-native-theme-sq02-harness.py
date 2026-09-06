@@ -35,8 +35,10 @@ def launcher_module():
 
 def copy_static_root(destination: Path) -> None:
     for relative in (
-        "scripts/run-native-theme-sq02.py", "scripts/test-native-theme-sq02.py",
+        "scripts/native-theme-sq02-scope.py", "scripts/run-native-theme-sq02.py",
+        "scripts/test-native-theme-sq02-scope.py", "scripts/test-native-theme-sq02.py",
         "tools/native_theme/sq02_harness.py", "tools/native_theme/sq02_receipt_verifier.py",
+        "tools/native_theme/sq02_scope.py",
         "tools/native_theme/sq02-rust-qualifier/Cargo.toml", "tools/native_theme/sq02-rust-qualifier/Cargo.lock",
         "tools/native_theme/sq02-rust-qualifier/rust-toolchain.toml", "tools/native_theme/sq02-rust-qualifier/src/main.rs",
     ):
@@ -221,6 +223,26 @@ class CoreTests(unittest.TestCase):
             (fake_root / "artifacts/quality/sq-02").symlink_to(fake_root / "elsewhere")
             with self.assertRaises(h.QualificationError):
                 h.validate_output(fake_root, fake_root / "artifacts/quality/sq-02")
+
+    def test_source_identity_uses_event_comparison_base(self):
+        sha = "1" * 40
+        base = "3" * 40
+        responses = {
+            ("rev-parse", "HEAD"): sha + "\n",
+            ("rev-parse", "HEAD^{tree}"): "2" * 40 + "\n",
+            ("status", "--porcelain=v1", "--untracked-files=all"): "",
+            ("diff", "--name-only", f"{base}..{sha}"): "README.md\n",
+        }
+        calls = []
+        def fake_git(_root, *args):
+            calls.append(args)
+            return responses[args]
+        with mock.patch.object(h, "_git", side_effect=fake_git):
+            self.assertEqual(
+                h.source_identity(ROOT, ROOT / "artifacts/quality/sq-02", sha, base),
+                (sha, "2" * 40),
+            )
+        self.assertIn(("diff", "--name-only", f"{base}..{sha}"), calls)
 
     def test_two_git_archive_materializations_have_exact_tracked_bytes(self):
         with tempfile.TemporaryDirectory() as td:

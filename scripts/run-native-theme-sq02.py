@@ -21,8 +21,10 @@ FIXED = {
     "RUSTUP_NO_UPDATE_CHECK": "1", "TZ": "UTC",
 }
 STATIC_FILES = (
-    "scripts/run-native-theme-sq02.py", "scripts/test-native-theme-sq02.py",
+    "scripts/native-theme-sq02-scope.py", "scripts/run-native-theme-sq02.py",
+    "scripts/test-native-theme-sq02-scope.py", "scripts/test-native-theme-sq02.py",
     "tools/native_theme/sq02_harness.py", "tools/native_theme/sq02_receipt_verifier.py",
+    "tools/native_theme/sq02_scope.py",
     "tools/native_theme/sq02-rust-qualifier/Cargo.toml",
     "tools/native_theme/sq02-rust-qualifier/Cargo.lock",
     "tools/native_theme/sq02-rust-qualifier/rust-toolchain.toml",
@@ -42,6 +44,7 @@ finally:
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     result.add_argument("--source-sha", required=True)
+    result.add_argument("--comparison-base-sha")
     result.add_argument("--output-dir", default="artifacts/quality/sq-02")
     result.add_argument("--cargo")
     result.add_argument("--rustc")
