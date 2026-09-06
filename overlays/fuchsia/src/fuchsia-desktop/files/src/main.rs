@@ -285,10 +285,6 @@ async fn create_files_view(root_token: views::ViewCreationToken) -> Result<(), E
             Err(error) => warn!("Files toolbar label {label} skipped: {error}"),
         }
     }
-    if let Err(error) = flatland.present(flatland::PresentArgs::default()) {
-        warn!("Files toolbar present failed: {error:?}");
-    }
-
     let cell_w = if narrow {
         size.width.saturating_sub((GRID_PAD * 2.0 + GRID_GAP) as u32) / GRID_COLS as u32
     } else {
