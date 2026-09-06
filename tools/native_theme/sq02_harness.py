@@ -54,24 +54,14 @@ REQUIREMENT_IDS = (
     "SQ02-RETAINED-BYTES",
     "SQ02-SEMANTIC-HASH",
 )
-ALLOWED_TRACKED_PATHS = {
-    ".github/workflows/ci.yml",
-    "overlays/fuchsia/src/fuchsia-desktop/theme_model/BUILD.gn",
-    "overlays/fuchsia/src/fuchsia-desktop/theme_model/src/qualification.rs",
-    "scripts/run-native-theme-sq02.py",
-    "scripts/test-native-theme-sq02-harness.py",
-    "scripts/test-native-theme-sq02-receipts.py",
-    "scripts/test-native-theme-sq02.py",
-    "tools/native_theme/sq02-requirements.txt",
-    "tools/native_theme/sq02_harness.py",
-    "tools/native_theme/sq02_receipt_verifier.py",
-    "tools/native_theme/sq02-rust-qualifier/Cargo.lock",
-    "tools/native_theme/sq02-rust-qualifier/Cargo.toml",
-    "tools/native_theme/sq02-rust-qualifier/rust-toolchain.toml",
-    "tools/native_theme/sq02-rust-qualifier/src/main.rs",
-}
-DOC_SCOPE_PATHS = {"README.md"}
-DOC_SCOPE_PREFIXES = ("docs/", "design/")
+from sq02_scope import (
+    DOC_SCOPE_PATHS,
+    DOC_SCOPE_PREFIXES,
+    SQ02_TRACKED_PATHS,
+    unexpected_scope_paths,
+)
+
+ALLOWED_TRACKED_PATHS = SQ02_TRACKED_PATHS
 ENVIRONMENT = {
     "CARGO_NET_OFFLINE": "true",
     "LANG": "C",
@@ -192,7 +182,7 @@ def allowed_subprocess(argv: object, root: Path, *, cargo: Path | None = None,
         return tail == ("--version", "--verbose")
     if Path(argv[0]).resolve() == Path(sys.executable).resolve() and len(tail) >= 3 and tail[:2] == ("-m", "coverage"):
         if tail[2] == "run":
-            return "--branch" in tail and any(item.endswith(("test-native-theme-sq02-harness.py", "test-native-theme-sq02-receipts.py")) for item in tail)
+            return "--branch" in tail and any(item.endswith(("test-native-theme-sq02-harness.py", "test-native-theme-sq02-receipts.py", "test-native-theme-sq02-scope.py")) for item in tail)
         if tail[2] == "json":
             return "-o" in tail
     return False
@@ -217,7 +207,7 @@ def _git(root: Path, *args: str, binary: bool = False) -> str | bytes:
     return result.stdout
 
 
-def source_identity(root: Path, output: Path, expected_sha: str) -> tuple[str, str]:
+def source_identity(root: Path, output: Path, expected_sha: str, comparison_base_sha: str = BASE_SHA) -> tuple[str, str]:
     sha = str(_git(root, "rev-parse", "HEAD")).strip()
     tree = str(_git(root, "rev-parse", "HEAD^{tree}")).strip()
     if sha != expected_sha or not re.fullmatch(r"[0-9a-f]{40}", sha):
@@ -230,11 +220,10 @@ def source_identity(root: Path, output: Path, expected_sha: str) -> tuple[str, s
     remaining = [row for row in dirty if not (excluded and row[3:].startswith(excluded))]
     if remaining:
         fail("CI_SOURCE_DIRTY", "tracked or non-output source changes present")
-    changed = set(str(_git(root, "diff", "--name-only", f"{BASE_SHA}..{sha}")).splitlines())
-    unexpected = sorted(
-        path for path in changed - ALLOWED_TRACKED_PATHS
-        if path not in DOC_SCOPE_PATHS and not path.startswith(DOC_SCOPE_PREFIXES)
-    )
+    if not re.fullmatch(r"[0-9a-f]{40}", comparison_base_sha):
+        fail("CI_SOURCE_IDENTITY", "comparison base SHA is invalid")
+    changed = set(str(_git(root, "diff", "--name-only", f"{comparison_base_sha}..{sha}")).splitlines())
+    unexpected = unexpected_scope_paths(changed)
     if unexpected:
         fail("CI_SOURCE_SCOPE", "changed tracked path outside SQ-02 allowlist")
     return sha, tree
@@ -252,8 +241,10 @@ def validate_output(root: Path, output: Path) -> Path:
 
 def static_scan(root: Path) -> dict[str, Any]:
     scan_paths = [
-        "scripts/run-native-theme-sq02.py", "scripts/test-native-theme-sq02.py",
+        "scripts/native-theme-sq02-scope.py", "scripts/run-native-theme-sq02.py",
+        "scripts/test-native-theme-sq02-scope.py", "scripts/test-native-theme-sq02.py",
         "tools/native_theme/sq02_harness.py", "tools/native_theme/sq02_receipt_verifier.py",
+        "tools/native_theme/sq02_scope.py",
         "tools/native_theme/sq02-rust-qualifier/Cargo.toml",
         "tools/native_theme/sq02-rust-qualifier/Cargo.lock",
         "tools/native_theme/sq02-rust-qualifier/rust-toolchain.toml",
@@ -595,9 +586,9 @@ def payload(root: Path, workspace: Path, cargo: Path, rustc: Path, cargo_home: P
     }
 
 
-def authority_scan(root: Path, receipts: dict[str, bytes]) -> dict[str, Any]:
+def authority_scan(root: Path, receipts: dict[str, bytes], comparison_base_sha: str = BASE_SHA) -> dict[str, Any]:
     tracked = str(_git(root, "ls-files")).splitlines()
-    changed = set(str(_git(root, "diff", "--name-only", f"{BASE_SHA}..HEAD")).splitlines())
+    changed = set(str(_git(root, "diff", "--name-only", f"{comparison_base_sha}..HEAD")).splitlines())
     findings: list[dict[str, str]] = []
     for relative in sorted(changed):
         path = root / relative
@@ -643,9 +634,14 @@ def measure_coverage(root: Path, workspace: Path) -> tuple[dict[str, dict[str, i
     data_file = workspace / ".coverage-sq02"
     report_file = workspace / "coverage-machine.json"
     include = ",".join(str(root / name) for name in (
-        "tools/native_theme/sq02_harness.py", "tools/native_theme/sq02_receipt_verifier.py"))
+        "tools/native_theme/sq02_harness.py", "tools/native_theme/sq02_receipt_verifier.py",
+        "tools/native_theme/sq02_scope.py"))
     environment = {**os.environ, **ENVIRONMENT, "COVERAGE_FILE": str(data_file), "PYTHONDONTWRITEBYTECODE": "1"}
-    tests = ("scripts/test-native-theme-sq02-harness.py", "scripts/test-native-theme-sq02-receipts.py")
+    tests = (
+        "scripts/test-native-theme-sq02-harness.py",
+        "scripts/test-native-theme-sq02-receipts.py",
+        "scripts/test-native-theme-sq02-scope.py",
+    )
     for index, test in enumerate(tests):
         command = [str(Path(sys.executable).absolute()), "-m", "coverage", "run"]
         if index:
@@ -661,7 +657,11 @@ def measure_coverage(root: Path, workspace: Path) -> tuple[dict[str, dict[str, i
     machine_raw = report_file.read_bytes()
     machine = json.loads(machine_raw)
     metrics: dict[str, dict[str, int]] = {}
-    for relative in ("tools/native_theme/sq02_harness.py", "tools/native_theme/sq02_receipt_verifier.py"):
+    for relative in (
+        "tools/native_theme/sq02_harness.py",
+        "tools/native_theme/sq02_receipt_verifier.py",
+        "tools/native_theme/sq02_scope.py",
+    ):
         candidates = [row for name, row in machine["files"].items() if name.replace("\\", "/").endswith(relative)]
         if len(candidates) != 1:
             fail("CI_COVERAGE", f"coverage module missing: {relative}")
@@ -694,7 +694,7 @@ def _tracked_hashes(root: Path) -> dict[str, str]:
 def write_receipts(root: Path, output: Path, source_sha: str, source_tree: str,
                    isolation: dict[str, Any], cargo: Path, rustc: Path, first: dict[str, Any],
                    second: dict[str, Any], coverage_metrics: dict[str, dict[str, int]],
-                   coverage_artifact_sha256: str) -> dict[str, bytes]:
+                   coverage_artifact_sha256: str, comparison_base_sha: str = BASE_SHA) -> dict[str, bytes]:
     runtime = {name: importlib.metadata.version(name) for name in sorted(PINNED)}
     if runtime != PINNED:
         fail("CI_TOOLCHAIN_INFRASTRUCTURE", "Python dependency version drift")
@@ -703,8 +703,8 @@ def write_receipts(root: Path, output: Path, source_sha: str, source_tree: str,
     rustc_record = _binary_record(rustc, "rustc")
     receipts: dict[str, bytes] = {}
     manifest = {
-        "authority": "non-authoritative-harness", "base_sha": BASE_SHA,
-        "command_schema": "scripts/run-native-theme-sq02.py --source-sha SHA --output-dir artifacts/quality/sq-02 --cargo PATH --rustc PATH --cargo-home PATH --target-root PATH",
+        "authority": "non-authoritative-harness", "base_sha": BASE_SHA, "comparison_base_sha": comparison_base_sha,
+        "command_schema": "scripts/run-native-theme-sq02.py --source-sha SHA --comparison-base-sha SHA --output-dir artifacts/quality/sq-02 --cargo PATH --rustc PATH --cargo-home PATH --target-root PATH",
         "environment": ENVIRONMENT, "fuchsia_pinned_revision": FUCHSIA_REVISION,
         "os_isolation": isolation, "python_dependencies": runtime, "python_version": python_version,
         "qualification_inputs": {"catalog": first["catalog"], "corpus_bytes_sha256": first["corpus_bytes_sha256"],
@@ -767,7 +767,7 @@ def write_receipts(root: Path, output: Path, source_sha: str, source_tree: str,
     reproducible = {"archive_materializations": 2, "cargo_binary_equality_required": False,
                     "comparisons": comparisons, "schema_version": "sq02-reproducible-builds-v1", "status": "PASS"}
     receipts[RECEIPTS[5]] = canonical_json_bytes(reproducible)
-    scan = authority_scan(root, receipts)
+    scan = authority_scan(root, receipts, comparison_base_sha)
     if scan["findings"] or scan["fuchsia_forbidden_edges"] or not scan["qualification_testonly"]:
         fail("CI_AUTHORITY_SCAN", "authority scan failed")
     scan.update({"schema_version": "sq02-package-catalog-scan-v1", "status": "PASS"})
@@ -809,14 +809,15 @@ def materialize(root: Path, sha: str, destination: Path) -> None:
 
 
 def run(root: Path, source_sha: str, output: Path, cargo: Path, rustc: Path,
-        cargo_home: Path, target_root: Path, isolation: dict[str, Any]) -> dict[str, bytes]:
+        cargo_home: Path, target_root: Path, isolation: dict[str, Any],
+        comparison_base_sha: str = BASE_SHA) -> dict[str, bytes]:
     if os.environ.get("NATIVE_THEME_SQ02_NAMESPACE_PROVED") != "true":
         fail("CI_TOOLCHAIN_INFRASTRUCTURE", "OS network namespace proof is absent")
     for key, value in ENVIRONMENT.items():
         if os.environ.get(key) != value:
             fail("CI_TOOLCHAIN_INFRASTRUCTURE", f"fixed environment drift: {key}")
     output = validate_output(root, output)
-    sha, tree = source_identity(root, output, source_sha)
+    sha, tree = source_identity(root, output, source_sha, comparison_base_sha)
     static_scan(root)
     undo = install_python_network_denial()
     temp_parent = Path(tempfile.mkdtemp(prefix="sq02-authoritative-", dir=str(target_root.parent)))
@@ -830,10 +831,10 @@ def run(root: Path, source_sha: str, output: Path, cargo: Path, rustc: Path,
                          cargo_home, target_root / "archive-b")
         coverage_metrics, coverage_artifact = measure_coverage(root, temp_parent / "coverage")
         receipts = write_receipts(root, output, sha, tree, isolation, cargo, rustc, first, second,
-                                  coverage_metrics, coverage_artifact)
+                                  coverage_metrics, coverage_artifact, comparison_base_sha)
         from sq02_receipt_verifier import verify_directory
         verify_directory(root, output, expected_sha=sha, expected_tree=tree)
-        after_sha, after_tree = source_identity(root, output, source_sha)
+        after_sha, after_tree = source_identity(root, output, source_sha, comparison_base_sha)
         if (after_sha, after_tree) != (sha, tree):
             fail("CI_SOURCE_DRIFT", "source moved during qualification")
         return receipts

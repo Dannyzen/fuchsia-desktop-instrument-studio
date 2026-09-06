@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT / "tools/native_theme"))
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-sha", required=True)
+    parser.add_argument("--comparison-base-sha")
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--cargo", required=True)
     parser.add_argument("--rustc", required=True)
@@ -25,9 +26,9 @@ def main() -> int:
     args = parser.parse_args()
     try:
         isolation = json.loads(os.environ["NATIVE_THEME_SQ02_ISOLATION_JSON"])
-        from sq02_harness import QualificationError, run
+        from sq02_harness import BASE_SHA, QualificationError, run
         receipts = run(ROOT, args.source_sha, ROOT / args.output_dir, Path(args.cargo), Path(args.rustc),
-                       Path(args.cargo_home), Path(args.target_root), isolation)
+                       Path(args.cargo_home), Path(args.target_root), isolation, args.comparison_base_sha or BASE_SHA)
     except (KeyError, json.JSONDecodeError) as exc:
         print(f"CI_TOOLCHAIN_INFRASTRUCTURE: isolation proof unavailable ({type(exc).__name__})", file=sys.stderr)
         return 2

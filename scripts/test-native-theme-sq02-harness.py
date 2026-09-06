@@ -35,8 +35,10 @@ def launcher_module():
 
 def copy_static_root(destination: Path) -> None:
     for relative in (
-        "scripts/run-native-theme-sq02.py", "scripts/test-native-theme-sq02.py",
+        "scripts/native-theme-sq02-scope.py", "scripts/run-native-theme-sq02.py",
+        "scripts/test-native-theme-sq02-scope.py", "scripts/test-native-theme-sq02.py",
         "tools/native_theme/sq02_harness.py", "tools/native_theme/sq02_receipt_verifier.py",
+        "tools/native_theme/sq02_scope.py",
         "tools/native_theme/sq02-rust-qualifier/Cargo.toml", "tools/native_theme/sq02-rust-qualifier/Cargo.lock",
         "tools/native_theme/sq02-rust-qualifier/rust-toolchain.toml", "tools/native_theme/sq02-rust-qualifier/src/main.rs",
     ):
@@ -114,8 +116,10 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(h.allowed_subprocess([str(cargo), "--version", "--verbose"], ROOT, cargo=cargo))
         self.assertTrue(h.allowed_subprocess(["/bin/rustc", "--version", "--verbose"], ROOT, rustc=Path("/bin/rustc")))
         coverage_run = [sys.executable, "-m", "coverage", "run", "--branch", "scripts/test-native-theme-sq02-harness.py"]
+        coverage_scope = [sys.executable, "-m", "coverage", "run", "--append", "--branch", "scripts/test-native-theme-sq02-scope.py"]
         coverage_json = [sys.executable, "-m", "coverage", "json", "-o", "report.json"]
         self.assertTrue(h.allowed_subprocess(coverage_run, ROOT))
+        self.assertTrue(h.allowed_subprocess(coverage_scope, ROOT))
         self.assertTrue(h.allowed_subprocess(coverage_json, ROOT))
         self.assertFalse(h.allowed_subprocess([sys.executable, "-m", "coverage", "erase"], ROOT))
         with self.assertRaises(h.QualificationError):
@@ -222,6 +226,28 @@ class CoreTests(unittest.TestCase):
             with self.assertRaises(h.QualificationError):
                 h.validate_output(fake_root, fake_root / "artifacts/quality/sq-02")
 
+    def test_source_identity_uses_event_comparison_base(self):
+        sha = "1" * 40
+        base = "3" * 40
+        responses = {
+            ("rev-parse", "HEAD"): sha + "\n",
+            ("rev-parse", "HEAD^{tree}"): "2" * 40 + "\n",
+            ("status", "--porcelain=v1", "--untracked-files=all"): "",
+            ("diff", "--name-only", f"{base}..{sha}"): "README.md\n",
+        }
+        calls = []
+        def fake_git(_root, *args):
+            calls.append(args)
+            return responses[args]
+        with mock.patch.object(h, "_git", side_effect=fake_git):
+            self.assertEqual(
+                h.source_identity(ROOT, ROOT / "artifacts/quality/sq-02", sha, base),
+                (sha, "2" * 40),
+            )
+        self.assertIn(("diff", "--name-only", f"{base}..{sha}"), calls)
+        with mock.patch.object(h, "_git", side_effect=fake_git), self.assertRaises(h.QualificationError):
+            h.source_identity(ROOT, ROOT / "artifacts/quality/sq-02", sha, "not-a-sha")
+
     def test_two_git_archive_materializations_have_exact_tracked_bytes(self):
         with tempfile.TemporaryDirectory() as td:
             base = Path(td)
@@ -257,6 +283,8 @@ class CoreTests(unittest.TestCase):
         self.assertLess(rust_prepare, fetch)
         self.assertLess(fetch, gate)
         self.assertLess(gate, upload)
+        self.assertIn('--default-ref "origin/$DEFAULT_BRANCH"', workflow)
+        self.assertNotIn('git rev-parse "$GITHUB_SHA^"', workflow)
         self.assertNotIn("self-hosted", workflow)
         upload_block = workflow[upload:workflow.index("Instrument Studio desktop_ui host contract")]
         self.assertEqual(sum(f"artifacts/quality/sq-02/{name}" in upload_block for name in h.RECEIPTS), 8)
@@ -326,19 +354,23 @@ class CoreTests(unittest.TestCase):
             base = Path(td); workspace = base / "coverage"
             source_rows = {}
             import ast
-            for relative in ("tools/native_theme/sq02_harness.py", "tools/native_theme/sq02_receipt_verifier.py"):
+            for relative in (
+                "tools/native_theme/sq02_harness.py",
+                "tools/native_theme/sq02_receipt_verifier.py",
+                "tools/native_theme/sq02_scope.py",
+            ):
                 tree = ast.parse((ROOT / relative).read_bytes()); lines = list(range(1, 2000))
                 source_rows[str(ROOT / relative)] = {"executed_lines": lines, "summary": {"covered_branches": 1,
                     "num_branches": 1, "covered_lines": 1, "num_statements": 1}}
             calls = {"count": 0}
             def coverage_run(_argv, _root, **_kwargs):
                 calls["count"] += 1
-                if calls["count"] == 3:
+                if calls["count"] == 4:
                     (workspace / "coverage-machine.json").write_text(json.dumps({"files": source_rows}))
                 return __import__("subprocess").CompletedProcess([], 0, stdout="", stderr="")
             with mock.patch.object(h, "run_allowed", side_effect=coverage_run):
                 metrics, artifact = h.measure_coverage(ROOT, workspace)
-            self.assertEqual(len(metrics), 2); self.assertEqual(len(artifact), 64)
+            self.assertEqual(len(metrics), 3); self.assertEqual(len(artifact), 64)
             machine_a = {"meta": {"timestamp": "2026-08-28T00:00:00", "version": "7.6.12"}, "files": source_rows}
             machine_b = {"meta": {"timestamp": "2026-08-28T01:00:00", "version": "7.6.12"}, "files": source_rows}
             self.assertEqual(h.coverage_machine_sha256(machine_a), h.coverage_machine_sha256(machine_b))
@@ -348,7 +380,11 @@ class CoreTests(unittest.TestCase):
         first = payload_fixture(); second = copy = json.loads(json.dumps(first))
         metric = {name: {"branches_covered": 1, "branches_total": 1, "functions_with_body_execution": 1,
                          "functions_total": 1, "statements_covered": 1, "statements_total": 1}
-                  for name in ("tools/native_theme/sq02_harness.py", "tools/native_theme/sq02_receipt_verifier.py")}
+                  for name in (
+                      "tools/native_theme/sq02_harness.py",
+                      "tools/native_theme/sq02_receipt_verifier.py",
+                      "tools/native_theme/sq02_scope.py",
+                  )}
         scan = {"audited_authority_files": [], "bounded_lexical_scan": True, "catalog_copy_only": True,
                 "catalog_entry_count": 4, "changed_files_scanned": 1, "findings": [], "fuchsia_forbidden_edges": [],
                 "qualification_testonly": True, "receipts_scanned": 8, "tracked_files_considered": 1}
@@ -457,23 +493,32 @@ class CoreTests(unittest.TestCase):
             failure = __import__("subprocess").CompletedProcess([], 1, stdout="", stderr="")
             with mock.patch.object(h, "run_allowed", return_value=failure):
                 with self.assertRaises(h.QualificationError): h.measure_coverage(ROOT, base / "one")
-            calls = iter([__import__("subprocess").CompletedProcess([], 0), __import__("subprocess").CompletedProcess([], 0), failure])
+            calls = iter([
+                __import__("subprocess").CompletedProcess([], 0),
+                __import__("subprocess").CompletedProcess([], 0),
+                __import__("subprocess").CompletedProcess([], 0),
+                failure,
+            ])
             with mock.patch.object(h, "run_allowed", side_effect=lambda *_a, **_k: next(calls)):
                 with self.assertRaises(h.QualificationError): h.measure_coverage(ROOT, base / "two")
             calls_count = {"n": 0}
             def missing_report(_argv, _root, **_kwargs):
                 calls_count["n"] += 1
-                if calls_count["n"] == 3: (base / "three/coverage-machine.json").write_text('{"files":{}}')
+                if calls_count["n"] == 4: (base / "three/coverage-machine.json").write_text('{"files":{}}')
                 return __import__("subprocess").CompletedProcess([], 0)
             with mock.patch.object(h, "run_allowed", side_effect=missing_report):
                 with self.assertRaises(h.QualificationError): h.measure_coverage(ROOT, base / "three")
             gap_workspace = base / "four"; gap_calls = {"n": 0}
             gap_files = {str(ROOT / relative): {"executed_lines": [], "summary": {"covered_branches": 0,
                 "num_branches": 1, "covered_lines": 0, "num_statements": 1}}
-                for relative in ("tools/native_theme/sq02_harness.py", "tools/native_theme/sq02_receipt_verifier.py")}
+                for relative in (
+                    "tools/native_theme/sq02_harness.py",
+                    "tools/native_theme/sq02_receipt_verifier.py",
+                    "tools/native_theme/sq02_scope.py",
+                )}
             def gap_report(_argv, _root, **_kwargs):
                 gap_calls["n"] += 1
-                if gap_calls["n"] == 3: (gap_workspace / "coverage-machine.json").write_text(json.dumps({"files": gap_files}))
+                if gap_calls["n"] == 4: (gap_workspace / "coverage-machine.json").write_text(json.dumps({"files": gap_files}))
                 return __import__("subprocess").CompletedProcess([], 0)
             with mock.patch.object(h, "run_allowed", side_effect=gap_report):
                 with self.assertRaises(h.QualificationError): h.measure_coverage(ROOT, gap_workspace)
@@ -482,7 +527,11 @@ class CoreTests(unittest.TestCase):
         first = payload_fixture(); second = json.loads(json.dumps(first)); second["catalog"] = {}
         metric = {name: {"branches_covered": 1, "branches_total": 1, "functions_with_body_execution": 1,
                          "functions_total": 1, "statements_covered": 1, "statements_total": 1}
-                  for name in ("tools/native_theme/sq02_harness.py", "tools/native_theme/sq02_receipt_verifier.py")}
+                  for name in (
+                      "tools/native_theme/sq02_harness.py",
+                      "tools/native_theme/sq02_receipt_verifier.py",
+                      "tools/native_theme/sq02_scope.py",
+                  )}
         common = (mock.patch.object(h.importlib.metadata, "version", side_effect=lambda name: h.PINNED[name]),
                   mock.patch.object(h, "_binary_record", return_value={"binary_sha256": "0" * 64, "name": "cargo", "version": "1.99.0-nightly"}),
                   mock.patch.object(h, "_tracked_hashes", return_value={}))
@@ -571,6 +620,28 @@ class LauncherTests(unittest.TestCase):
             [sys.executable, "-I", "-S", "-c", self.launcher.PROBE], phase="socket-probe"))
         for command in (["curl", "example"], [sys.executable, "-c", "pass"]):
             self.assertFalse(self.launcher.allowed_launcher_command(command, phase="socket-probe"))
+
+    def test_enter_forwards_comparison_base_across_namespace_exec(self):
+        args = __import__("argparse").Namespace(
+            source_sha="1" * 40, comparison_base_sha="3" * 40,
+            output_dir="artifacts/quality/sq-02", cargo=None, rustc=None,
+            cargo_home=None, target_root=None, inside=False,
+        )
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            tools = (Path("/bin/cargo"), Path("/bin/rustc"), base / "home", base / "target")
+            with mock.patch.object(self.launcher, "root", return_value=ROOT), \
+                 mock.patch.object(self.launcher, "static_scan"), \
+                 mock.patch.object(self.launcher, "resolved_tools", return_value=tools), \
+                 mock.patch.object(self.launcher, "choose_namespace", return_value=("unprivileged-user-network", ["/usr/bin/unshare", "-Urn", "--"])), \
+                 mock.patch.object(self.launcher, "namespace_identity", return_value="net:[123]"), \
+                 mock.patch.object(self.launcher.shutil, "which", return_value="/usr/bin/env"), \
+                 mock.patch.object(self.launcher.os, "execve", side_effect=RuntimeError("captured")) as execute:
+                with self.assertRaisesRegex(RuntimeError, "captured"):
+                    self.launcher.enter(args)
+            command = execute.call_args.args[1]
+            index = command.index("--comparison-base-sha")
+            self.assertEqual(command[index + 1], "3" * 40)
 
     def test_unprivileged_selection_precedes_ci_sudo(self):
         success = __import__("subprocess").CompletedProcess([], 0)

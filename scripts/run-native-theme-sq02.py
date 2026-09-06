@@ -21,8 +21,10 @@ FIXED = {
     "RUSTUP_NO_UPDATE_CHECK": "1", "TZ": "UTC",
 }
 STATIC_FILES = (
-    "scripts/run-native-theme-sq02.py", "scripts/test-native-theme-sq02.py",
+    "scripts/native-theme-sq02-scope.py", "scripts/run-native-theme-sq02.py",
+    "scripts/test-native-theme-sq02-scope.py", "scripts/test-native-theme-sq02.py",
     "tools/native_theme/sq02_harness.py", "tools/native_theme/sq02_receipt_verifier.py",
+    "tools/native_theme/sq02_scope.py",
     "tools/native_theme/sq02-rust-qualifier/Cargo.toml",
     "tools/native_theme/sq02-rust-qualifier/Cargo.lock",
     "tools/native_theme/sq02-rust-qualifier/rust-toolchain.toml",
@@ -42,6 +44,7 @@ finally:
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     result.add_argument("--source-sha", required=True)
+    result.add_argument("--comparison-base-sha")
     result.add_argument("--output-dir", default="artifacts/quality/sq-02")
     result.add_argument("--cargo")
     result.add_argument("--rustc")
@@ -170,11 +173,14 @@ def enter(args: argparse.Namespace) -> NoReturn:
     env_tool = shutil.which("env", path="/usr/bin:/bin")
     if env_tool is None:
         raise RuntimeError("env tool unavailable")
-    forwarded = [
-        "--source-sha", args.source_sha, "--output-dir", args.output_dir,
+    forwarded = ["--source-sha", args.source_sha]
+    if args.comparison_base_sha:
+        forwarded.extend(["--comparison-base-sha", args.comparison_base_sha])
+    forwarded.extend([
+        "--output-dir", args.output_dir,
         "--cargo", str(cargo), "--rustc", str(rustc), "--cargo-home", str(cargo_home),
         "--target-root", str(target_root), "--inside",
-    ]
+    ])
     assignments = [f"{key}={value}" for key, value in sorted(FIXED.items())] + [
         f"NATIVE_THEME_SQ02_PARENT_NETNS={parent}", f"NATIVE_THEME_SQ02_NAMESPACE_MODE={mode}",
         "NATIVE_THEME_SQ02_TOOLCHAIN_ORIGIN=" + ("hosted-official-nightly" if os.environ.get("GITHUB_ACTIONS") == "true" else "project-fuchsia-prebuilt"),
