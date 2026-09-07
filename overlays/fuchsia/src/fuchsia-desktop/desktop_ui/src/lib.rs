@@ -12,4 +12,6 @@ pub mod chrome;
 pub mod tokens;
 
 pub use chrome::{ChromeRegion, InstrumentStudioLayout, WorkspaceId};
-pub use tokens::{ColorRgba, ThemeTokens, INSTRUMENT_STUDIO_THEME};
+pub use tokens::{
+    ColorRgba, ResolvedThemeSnapshot, ThemeAdapterError, ThemeTokens, INSTRUMENT_STUDIO_THEME,
+};

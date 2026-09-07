@@ -142,6 +142,7 @@ jobs:
         run: |
           mkdir -p "$SQ02_CARGO_HOME"
           CARGO_HOME="$SQ02_CARGO_HOME" "$SQ02_CARGO" fetch --locked --manifest-path tools/native_theme/sq02-rust-qualifier/Cargo.toml
+          CARGO_HOME="$SQ02_CARGO_HOME" CARGO_TARGET_DIR="$RUNNER_TEMP/desktop-ui-host-target" RUSTC="$SQ02_RUSTC" "$SQ02_CARGO" fetch --locked --manifest-path tools/native_theme/desktop-ui-host-qualifier/Cargo.toml
       - name: NativeThemeV1 sq-02 native Rust compiler packaging gate
         if: steps.sq02-scope.outputs.run == 'true'
         run: >-
@@ -153,6 +154,9 @@ jobs:
           --rustc "$SQ02_RUSTC"
           --cargo-home "$SQ02_CARGO_HOME"
           --target-root "$SQ02_TARGET_ROOT"
+      - name: NativeTheme desktop_ui production Rust qualification
+        if: steps.sq02-scope.outputs.run == 'true'
+        run: CARGO_HOME="$SQ02_CARGO_HOME" CARGO_TARGET_DIR="$RUNNER_TEMP/desktop-ui-host-target" CARGO_NET_OFFLINE=true RUSTC="$SQ02_RUSTC" "$SQ02_CARGO" test --locked --manifest-path tools/native_theme/desktop-ui-host-qualifier/Cargo.toml -- --test-threads=1
       - name: Upload NativeThemeV1 sq-02 receipts
         if: always() && steps.sq02-scope.outputs.run == 'true'
         uses: actions/upload-artifact@v4
@@ -168,7 +172,9 @@ jobs:
             artifacts/quality/sq-02/package-and-catalog-scan.json
             artifacts/quality/sq-02/verdict.json
       - name: Instrument Studio desktop_ui host contract
-        run: python3 scripts/test-desktop-ui-host.py
+        run: |
+          python3 scripts/test-desktop-ui-host.py
+          PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-native-theme-p4-u1.py
       - name: Design feedback empty fixture
         run: |
           mkdir -p /tmp/df-empty

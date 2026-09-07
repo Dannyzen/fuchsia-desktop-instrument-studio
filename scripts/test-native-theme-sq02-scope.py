@@ -34,7 +34,14 @@ class ScopeTests(unittest.TestCase):
     def test_sq02_inputs_and_workflow_run_sq02(self):
         self.assertTrue(sq02_changed(["tools/native_theme/sq02_harness.py"]))
         self.assertTrue(sq02_changed([".github/workflows/ci.yml"]))
+        self.assertTrue(sq02_changed([".gitignore"]))
         self.assertTrue(sq02_changed(["scripts/native-theme-sq02-scope.py"]))
+        self.assertTrue(sq02_changed([
+            "overlays/fuchsia/src/fuchsia-desktop/desktop_ui/src/tokens.rs"
+        ]))
+        self.assertTrue(sq02_changed([
+            "overlays/fuchsia/src/ui/bin/tiling_wm/src/main.rs"
+        ]))
 
     def test_initial_multicommit_push_uses_default_branch_merge_base(self):
         cli = cli_module()
