@@ -18,7 +18,40 @@ HOST_LOCK = ROOT / "tools/native_theme/desktop-ui-host-qualifier/Cargo.lock"
 CI_WORKFLOW = ROOT / ".github/workflows/ci.yml"
 
 
+def production_rust_ci_is_bound(workflow: str) -> bool:
+    fetch = (
+        'CARGO_HOME="$SQ02_CARGO_HOME" '
+        'CARGO_TARGET_DIR="$RUNNER_TEMP/desktop-ui-host-target" '
+        'RUSTC="$SQ02_RUSTC" "$SQ02_CARGO" fetch --locked '
+        '--manifest-path tools/native_theme/desktop-ui-host-qualifier/Cargo.toml'
+    )
+    test = (
+        'CARGO_HOME="$SQ02_CARGO_HOME" '
+        'CARGO_TARGET_DIR="$RUNNER_TEMP/desktop-ui-host-target" '
+        'CARGO_NET_OFFLINE=true RUSTC="$SQ02_RUSTC" '
+        '"$SQ02_CARGO" test --locked '
+        '--manifest-path tools/native_theme/desktop-ui-host-qualifier/Cargo.toml'
+    )
+    return fetch in workflow and test in workflow
+
+
 class NativeThemeP4U1Contract(unittest.TestCase):
+    def test_ci_binding_contract_rejects_each_missing_rustc_binding(self) -> None:
+        workflow = CI_WORKFLOW.read_text()
+        self.assertTrue(production_rust_ci_is_bound(workflow))
+        fetch_without_rustc = workflow.replace(
+            ' RUSTC="$SQ02_RUSTC" "$SQ02_CARGO" fetch --locked',
+            ' "$SQ02_CARGO" fetch --locked',
+            1,
+        )
+        test_without_rustc = workflow.replace(
+            ' RUSTC="$SQ02_RUSTC" "$SQ02_CARGO" test --locked',
+            ' "$SQ02_CARGO" test --locked',
+            1,
+        )
+        self.assertFalse(production_rust_ci_is_bound(fetch_without_rustc))
+        self.assertFalse(production_rust_ci_is_bound(test_without_rustc))
+
     def test_tiling_wm_has_optional_read_only_route_only(self) -> None:
         session = SESSION.read_text()
         tiling = TILING_CML.read_text()
@@ -107,8 +140,7 @@ class NativeThemeP4U1Contract(unittest.TestCase):
         manifest = HOST_MANIFEST.read_text()
         self.assertIn('path = "../../../overlays/fuchsia/src/fuchsia-desktop/desktop_ui/src/lib.rs"', manifest)
         self.assertIn('path = "../../../overlays/fuchsia/src/fuchsia-desktop/desktop_ui/src/qualification.rs"', manifest)
-        self.assertIn('CARGO_TARGET_DIR="$RUNNER_TEMP/desktop-ui-host-target"', workflow)
-        self.assertIn('"$SQ02_CARGO" test --locked --manifest-path tools/native_theme/desktop-ui-host-qualifier/Cargo.toml', workflow)
+        self.assertTrue(production_rust_ci_is_bound(workflow))
         self.assertIn("python3 scripts/test-native-theme-p4-u1.py", workflow)
         self.assertIn("tools/native_theme/desktop-ui-host-qualifier/target/", (ROOT / ".gitignore").read_text())
 
