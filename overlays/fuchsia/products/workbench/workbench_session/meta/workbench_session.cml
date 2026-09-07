@@ -27,6 +27,11 @@
             url: "tiling_wm_driver#meta/tiling_wm_driver.cm",
         },
         {
+            // Lazy and optional: consumers keep their built-in fallback if unavailable.
+            name: "native_theme_service",
+            url: "native_theme_service#meta/native_theme_service.cm",
+        },
+        {
             name: "gui_input_driver",
             url: "fuchsia-pkg://fuchsia.com/fuchsia_agent_linux_gui#meta/gui_input_driver.cm",
         },
@@ -81,6 +86,24 @@
         },
     ],
     offer: [
+        {
+            protocol: "fuchsia.instrumentstudio.theme.NativeTheme",
+            from: "#native_theme_service",
+            to: [
+                "#browser_elements",
+                "#elements",
+                "#files_elements",
+                "#settings_elements",
+                "#terminal_elements",
+            ],
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.instrumentstudio.theme.NativeThemeSettings",
+            from: "#native_theme_service",
+            to: "#settings_elements",
+            availability: "optional",
+        },
         // Dependencies for elements
         {
             protocol: [ "fuchsia.element.GraphicalPresenter" ],
@@ -202,6 +225,7 @@
                 "#element_manager",
                 "#elements",
                 "#files_elements",
+                "#native_theme_service",
                 "#settings_elements",
             ],
         },
