@@ -12,7 +12,10 @@ pub use diagnostics::Diagnostics;
 // P3-S2 Inspect keys "selection_source" and "selection_error_code" are now
 // owned, retained, and updated by the first-class diagnostics module.
 
-pub const FALLBACK_THEME_ID: &str = "instrument-studio-builtin";
+pub const FALLBACK_THEME_ID: &str = "instrument-studio";
+const BUILTIN_PACKAGE: &[u8] = include_bytes!(
+    "../../theme_catalog/catalog/instrument-studio-dtcg.package.json"
+);
 pub const MAX_DIAGNOSTIC_ERROR_BYTES: usize = 96;
 pub const E_DUPLICATE_THEME_ID: &str = "E_DUPLICATE_THEME_ID";
 pub const E_SELECTED_IDENTITY_INVALID: &str = "E_SELECTED_IDENTITY_INVALID";
@@ -86,14 +89,17 @@ pub struct Snapshot {
 
 impl Snapshot {
     fn fallback() -> Self {
+        let theme = NativeThemeV1::decode_canonical(BUILTIN_PACKAGE)
+            .expect("repository-owned built-in NativeThemeV1 must remain canonical");
+        assert_eq!(theme.theme_id(), FALLBACK_THEME_ID);
         Self {
             generation: 0,
-            id: FALLBACK_THEME_ID.into(),
-            display_name: "Built-in".into(),
-            revision: 0,
-            semantic_sha256: [0; 32],
+            id: theme.theme_id().into(),
+            display_name: theme.display_name().into(),
+            revision: theme.revision(),
+            semantic_sha256: theme.semantic_sha256(),
             variant: persistence::Variant::Dark,
-            canonical_package: Arc::from([]),
+            canonical_package: Arc::from(BUILTIN_PACKAGE),
         }
     }
 }
@@ -811,6 +817,18 @@ mod tests {
         drop(second);
         assert_eq!(drops.load(Ordering::SeqCst), 2);
     }
+    #[test]
+    fn builtin_fallback_is_a_real_canonical_theme() {
+        let fallback = Snapshot::fallback();
+        let decoded = NativeThemeV1::decode_canonical(&fallback.canonical_package)
+            .expect("built-in fallback decodes");
+        assert_eq!(fallback.id, FALLBACK_THEME_ID);
+        assert_eq!(fallback.id, decoded.theme_id());
+        assert_eq!(fallback.semantic_sha256, decoded.semantic_sha256());
+        assert_ne!(fallback.semantic_sha256, [0; 32]);
+        assert!(!fallback.canonical_package.is_empty());
+    }
+
     #[test]
     fn invalid_package_falls_back() {
         assert_eq!(
