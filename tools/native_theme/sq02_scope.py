@@ -5,6 +5,21 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 SQ02_TRACKED_PATHS = frozenset({
+    ".gitignore",
+    "tools/native_theme/desktop-ui-host-qualifier/rust-toolchain.toml",
+    "tools/native_theme/desktop-ui-host-qualifier/Cargo.toml",
+    "tools/native_theme/desktop-ui-host-qualifier/Cargo.lock",
+    "scripts/test-native-theme-p4-u1.py",
+    "overlays/fuchsia/src/ui/bin/tiling_wm/src/observability.rs",
+    "overlays/fuchsia/src/ui/bin/tiling_wm/src/main.rs",
+    "overlays/fuchsia/src/ui/bin/tiling_wm/meta/tiling_wm.cml",
+    "overlays/fuchsia/src/ui/bin/tiling_wm/BUILD.gn",
+    "overlays/fuchsia/src/fuchsia-desktop/desktop_ui/src/tokens.rs",
+    "overlays/fuchsia/src/fuchsia-desktop/desktop_ui/src/qualification.rs",
+    "overlays/fuchsia/src/fuchsia-desktop/desktop_ui/src/lib.rs",
+    "overlays/fuchsia/src/fuchsia-desktop/desktop_ui/src/chrome.rs",
+    "overlays/fuchsia/src/fuchsia-desktop/desktop_ui/BUILD.gn",
+    "overlays/fuchsia/products/workbench/workbench_session/meta/workbench_session.cml",
     ".github/workflows/ci.yml",
     "overlays/fuchsia/src/fuchsia-desktop/theme_model/BUILD.gn",
     "overlays/fuchsia/src/fuchsia-desktop/theme_model/src/qualification.rs",

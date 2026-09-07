@@ -18,12 +18,18 @@ pub struct WmObservability {
     _root: Node,
     _config: Node,
     _focus: Node,
+    _theme: Node,
     tile_count: UintProperty,
     gap_px: UintProperty,
     active_border_px: UintProperty,
     wrap_focus: BoolProperty,
     selected_focus: StringProperty,
     confirmed_focus: StringProperty,
+    _theme_source: StringProperty,
+    _theme_id: StringProperty,
+    _theme_variant: StringProperty,
+    _theme_semantic_sha256: StringProperty,
+    _theme_generation: UintProperty,
     order: StringProperty,
     present_count: UintProperty,
     last_present_context: StringProperty,
@@ -32,10 +38,19 @@ pub struct WmObservability {
 
 impl WmObservability {
     /// Attach properties under `root` (typically `component::inspector().root()`).
-    pub fn attach(root: &Node, config: &LayoutConfig) -> Self {
+    pub fn attach(
+        root: &Node,
+        config: &LayoutConfig,
+        source: &str,
+        theme_id_value: &str,
+        variant: &str,
+        semantic_sha256: &str,
+        generation: u64,
+    ) -> Self {
         let wm = root.create_child("tiling_wm");
         let config_node = wm.create_child("config");
         let focus = wm.create_child("focus");
+        let theme = wm.create_child("theme");
 
         let gap_px = config_node.create_uint("gap_px", config.gap_px as u64);
         let active_border_px =
@@ -44,6 +59,11 @@ impl WmObservability {
 
         let selected_focus = focus.create_string("selected", "");
         let confirmed_focus = focus.create_string("confirmed", "");
+        let theme_source = theme.create_string("source", source);
+        let theme_id = theme.create_string("theme_id", theme_id_value);
+        let theme_variant = theme.create_string("variant", variant);
+        let theme_semantic_sha256 = theme.create_string("semantic_sha256", semantic_sha256);
+        let theme_generation = theme.create_uint("generation", generation);
 
         let tile_count = wm.create_uint("tile_count", 0);
         let order = wm.create_string("order", "");
@@ -54,12 +74,18 @@ impl WmObservability {
             _root: wm,
             _config: config_node,
             _focus: focus,
+            _theme: theme,
             tile_count,
             gap_px,
             active_border_px,
             wrap_focus,
             selected_focus,
             confirmed_focus,
+            _theme_source: theme_source,
+            _theme_id: theme_id,
+            _theme_variant: theme_variant,
+            _theme_semantic_sha256: theme_semantic_sha256,
+            _theme_generation: theme_generation,
             order,
             present_count,
             last_present_context,
@@ -97,7 +123,15 @@ mod tests {
     fn publish_state_records_selected_and_confirmed_focus() {
         let inspector = Inspector::default();
         let config = LayoutConfig::default();
-        let mut obs = WmObservability::attach(inspector.root(), &config);
+        let mut obs = WmObservability::attach(
+            inspector.root(),
+            &config,
+            "service",
+            "instrument-studio",
+            "dark",
+            "0123456789abcdef",
+            1,
+        );
         let mut policy = WindowPolicy::new(config).unwrap();
         policy.add_front("settings".into());
         policy.add_front("browser".into());

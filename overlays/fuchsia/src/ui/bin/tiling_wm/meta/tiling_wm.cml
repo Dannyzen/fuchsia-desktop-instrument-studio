@@ -21,6 +21,10 @@
     ],
     use: [
         {
+            protocol: "fuchsia.instrumentstudio.theme.NativeTheme",
+            availability: "optional",
+        },
+        {
             protocol: [
                 "fuchsia.session.scene.Manager",
                 "fuchsia.sysmem2.Allocator",

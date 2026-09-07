@@ -95,6 +95,7 @@
                 "#files_elements",
                 "#settings_elements",
                 "#terminal_elements",
+                "#tiling_wm",
             ],
             availability: "optional",
         },

@@ -20,6 +20,9 @@ out/
 .fx/
 .jiri_root/
 
+# Rust host qualification output
+tools/native_theme/desktop-ui-host-qualifier/target/
+
 # OS/editor
 .DS_Store
 __pycache__/

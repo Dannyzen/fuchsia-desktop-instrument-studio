@@ -1,0 +1,18 @@
+[package]
+name = "desktop-ui-host-qualifier"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "desktop_ui"
+path = "../../../overlays/fuchsia/src/fuchsia-desktop/desktop_ui/src/lib.rs"
+doctest = false
+
+[[test]]
+name = "desktop_ui_qualification"
+path = "../../../overlays/fuchsia/src/fuchsia-desktop/desktop_ui/src/qualification.rs"
+
+[dependencies]
+serde_json = "=1.0.149"
+theme_model = { package = "sq02-rust-qualifier", path = "../sq02-rust-qualifier" }

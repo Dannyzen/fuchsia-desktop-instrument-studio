@@ -5,6 +5,7 @@
 use anyhow::{Context, Error};
 use fidl::endpoints::{Proxy, RequestStream, create_proxy};
 use fidl_fuchsia_element as element;
+use fidl_fuchsia_instrumentstudio_theme as ftheme;
 use fidl_fuchsia_session_scene as scene;
 use fidl_fuchsia_session_window as window;
 use fidl_fuchsia_ui_composition as ui_comp;
@@ -12,6 +13,7 @@ use fidl_fuchsia_ui_focus as ui_focus;
 use fidl_fuchsia_ui_views as ui_views;
 use fidl_fuchsia_ui_views_ext::ViewRefExt as _;
 use fuchsia_async as fasync;
+use fasync::TimeoutExt as _;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::{ServiceFs, ServiceObj};
 use fuchsia_scenic::ViewRefPair;
@@ -31,12 +33,109 @@ mod observability;
 mod policy;
 
 use chrome::{ChromeState, ShellChrome};
-use desktop_ui::{ChromeRegion, InstrumentStudioLayout};
+use desktop_ui::{
+    ChromeRegion, ColorRgba, InstrumentStudioLayout, ResolvedThemeSnapshot, ThemeTokens,
+};
 use observability::WmObservability;
 use policy::{LayoutConfig, Size, WindowPolicy, compute_layout};
 
 // The maximum number of concurrent services to serve.
 const NUM_CONCURRENT_REQUESTS: usize = 5;
+const THEME_SNAPSHOT_TIMEOUT_SECONDS: i64 = 2;
+
+#[derive(Clone, Debug)]
+struct StartupTheme {
+    tokens: ThemeTokens,
+    source: &'static str,
+    theme_id: String,
+    variant: &'static str,
+    semantic_sha256: String,
+    generation: u64,
+}
+
+impl StartupTheme {
+    fn built_in() -> Self {
+        let resolved = ResolvedThemeSnapshot::built_in();
+        Self {
+            tokens: resolved.tokens,
+            source: "built-in",
+            theme_id: resolved.theme_id,
+            variant: "dark",
+            semantic_sha256: semantic_hash_hex(&resolved.semantic_sha256),
+            generation: 0,
+        }
+    }
+}
+
+fn semantic_hash_hex(hash: &[u8; 32]) -> String {
+    hash.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+async fn resolve_startup_theme() -> StartupTheme {
+    let proxy = match connect_to_protocol::<ftheme::NativeThemeMarker>() {
+        Ok(proxy) => proxy,
+        Err(error) => {
+            warn!("NATIVE_THEME_APPLIED source=built-in reason=connect-unavailable error={error}");
+            return StartupTheme::built_in();
+        }
+    };
+    let deadline = fasync::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(
+        THEME_SNAPSHOT_TIMEOUT_SECONDS,
+    ));
+    let snapshot_result = async { Some(proxy.get_current().await) }
+        .on_timeout(deadline, || None)
+        .await;
+    let snapshot = match snapshot_result {
+        Some(Ok(snapshot)) => snapshot,
+        Some(Err(error)) => {
+            warn!("NATIVE_THEME_APPLIED source=built-in reason=get-current-failed error={error}");
+            return StartupTheme::built_in();
+        }
+        None => {
+            warn!("NATIVE_THEME_APPLIED source=built-in reason=get-current-timeout");
+            return StartupTheme::built_in();
+        }
+    };
+    let variant = match snapshot.identity.variant {
+        ftheme::ThemeVariant::Light => "light",
+        ftheme::ThemeVariant::Dark => "dark",
+        ftheme::ThemeVariant::HighContrast => "high-contrast",
+    };
+    match ResolvedThemeSnapshot::from_canonical_snapshot(
+        &snapshot.canonical_package,
+        &snapshot.identity.theme_id,
+        variant,
+        snapshot.identity.semantic_sha256,
+    ) {
+        Ok(resolved) => {
+            info!(
+                "NATIVE_THEME_APPLIED source=service theme_id={} variant={} generation={}",
+                snapshot.identity.theme_id, variant, snapshot.generation
+            );
+            StartupTheme {
+                tokens: resolved.tokens,
+                source: "service",
+                theme_id: resolved.theme_id,
+                variant,
+                semantic_sha256: semantic_hash_hex(&resolved.semantic_sha256),
+                generation: snapshot.generation,
+            }
+        }
+        Err(error) => {
+            warn!("NATIVE_THEME_APPLIED source=built-in reason=invalid-snapshot error={error}");
+            StartupTheme::built_in()
+        }
+    }
+}
+
+fn flatland_color(color: ColorRgba) -> ui_comp::ColorRgba {
+    ui_comp::ColorRgba {
+        red: color.red,
+        green: color.green,
+        blue: color.blue,
+        alpha: color.alpha,
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TileId(pub String);
@@ -176,6 +275,7 @@ pub struct TilingWm {
     policy: WindowPolicy,
     observability: WmObservability,
     chrome: ShellChrome,
+    theme_tokens: ThemeTokens,
 }
 
 impl Drop for TilingWm {
@@ -406,9 +506,10 @@ impl TilingWm {
         }
     }
 
-    pub async fn new(
+    async fn new(
         internal_sender: UnboundedSender<MessageInternal>,
         layout_config: LayoutConfig,
+        startup_theme: StartupTheme,
     ) -> Result<TilingWm, Error> {
         // TODO(https://fxbug.dev/42169911): do something like this to instantiate the library component that knows
         // how to generate a Flatland scene to lay views out on a tiled grid.  It will be used in the
@@ -430,7 +531,13 @@ impl TilingWm {
         let ViewCreationTokenPair { view_creation_token, viewport_creation_token } =
             ViewCreationTokenPair::new()?;
         let fut = scene_manager.present_root_view(viewport_creation_token);
-        let wm = Self::create_wm(view_creation_token, internal_sender, layout_config).await?;
+        let wm = Self::create_wm(
+            view_creation_token,
+            internal_sender,
+            layout_config,
+            startup_theme,
+        )
+        .await?;
         let _ = fut.await?;
         Ok(wm)
     }
@@ -566,6 +673,7 @@ impl TilingWm {
         view_creation_token: ui_views::ViewCreationToken,
         internal_sender: UnboundedSender<MessageInternal>,
         layout_config: LayoutConfig,
+        startup_theme: StartupTheme,
     ) -> Result<TilingWm, Error> {
         let flatland = connect_to_protocol::<ui_comp::FlatlandMarker>()
             .expect("failed to connect to fuchsia.ui.flatland.Flatland");
@@ -607,8 +715,12 @@ impl TilingWm {
         Self::watch_layout(parent_viewport_watcher, internal_sender.clone());
 
         let logical_size = layout_info.logical_size.context("missing initial root logical size")?;
-        let shell = InstrumentStudioLayout::new(logical_size.width, logical_size.height)
-            .map_err(anyhow::Error::msg)?;
+        let shell = InstrumentStudioLayout::with_theme(
+            logical_size.width,
+            logical_size.height,
+            startup_theme.tokens,
+        )
+        .map_err(anyhow::Error::msg)?;
         let chrome =
             ShellChrome::create(&flatland, &mut id_generator, &root_transform_id, &shell).await?;
         Ok(TilingWm {
@@ -621,8 +733,17 @@ impl TilingWm {
             layout_config,
             tiles: HashMap::new(),
             policy: WindowPolicy::new(layout_config).map_err(anyhow::Error::msg)?,
-            observability: WmObservability::attach(component::inspector().root(), &layout_config),
+            observability: WmObservability::attach(
+                component::inspector().root(),
+                &layout_config,
+                startup_theme.source,
+                &startup_theme.theme_id,
+                startup_theme.variant,
+                &startup_theme.semantic_sha256,
+                startup_theme.generation,
+            ),
             chrome,
+            theme_tokens: startup_theme.tokens,
         })
     }
 
@@ -653,8 +774,12 @@ impl TilingWm {
 
     fn layout_tiles(&mut self) -> Result<(), Error> {
         let logical_size = self.layout_info.logical_size.context("missing root logical size")?;
-        let shell = InstrumentStudioLayout::new(logical_size.width, logical_size.height)
-            .map_err(anyhow::Error::msg)?;
+        let shell = InstrumentStudioLayout::with_theme(
+            logical_size.width,
+            logical_size.height,
+            self.theme_tokens,
+        )
+        .map_err(anyhow::Error::msg)?;
         let stage = shell.region_rect(ChromeRegion::TiledStage);
         let order: Vec<String> = self.policy.order().into_iter().map(str::to_string).collect();
         let slots = compute_layout(
@@ -688,9 +813,9 @@ impl TilingWm {
                 .with_context(|| format!("policy references missing tile {tile_id}"))?;
             let border_size = fidl_fuchsia_math::SizeU { width: slot.width, height: slot.height };
             let color = if active_id.as_deref() == Some(id.as_str()) {
-                ui_comp::ColorRgba { red: 0.0, green: 0.82, blue: 1.0, alpha: 1.0 }
+                flatland_color(self.theme_tokens.confirmed_focus)
             } else {
-                ui_comp::ColorRgba { red: 0.10, green: 0.12, blue: 0.16, alpha: 1.0 }
+                flatland_color(self.theme_tokens.panel_elevated)
             };
             self.flatland
                 .set_solid_fill(&view.border_content_id, &color, &border_size)
@@ -1059,8 +1184,16 @@ async fn main() -> Result<(), Error> {
     let fs = expose_services()?;
     watch_focus_chain(internal_sender.clone())?;
 
+    let startup_theme = resolve_startup_theme().await;
+    info!(
+        "NATIVE_THEME_SOURCE source={} theme_id={} variant={}",
+        startup_theme.source, startup_theme.theme_id, startup_theme.variant
+    );
+
     // Connect to the scene owner and attach our tiles view to it.
-    let mut wm = Box::new(TilingWm::new(internal_sender.clone(), layout_config).await?);
+    let mut wm = Box::new(
+        Box::pin(TilingWm::new(internal_sender.clone(), layout_config, startup_theme)).await?,
+    );
 
     // Serve the FIDL services on the message loop, proxying them into internal messages.
     run_services(fs, internal_sender.clone());
