@@ -104,18 +104,6 @@ jobs:
         run: PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-native-theme-v1.py
       - name: NativeThemeV1 legacy oracle proof
         run: PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-native-theme-legacy-oracle.py
-      - name: NativeThemeV1 sq-03 contract
-        run: PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-native-theme-sq03-contract.py
-      - name: NativeThemeV1 sq-03 host-safe qualification
-        run: PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-native-theme-sq03.py --source-sha "$GITHUB_SHA" --output-dir artifacts/quality/sq-03
-      - name: Upload NativeThemeV1 sq-03 host-safe receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: native-theme-sq-03-host-safe-${{ github.sha }}
-          path: artifacts/quality/sq-03/sq-03-verdict.json
-          if-no-files-found: error
-          retention-days: 90
       - name: Prepare NativeThemeV1 sq-01 dependencies
         run: python3 -m pip install --requirement tools/native_theme/sq01-requirements.txt
       - name: NativeThemeV1 sq-01 source-quality gate

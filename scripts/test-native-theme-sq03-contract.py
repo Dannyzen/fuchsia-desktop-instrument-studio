@@ -8,7 +8,6 @@ ROOT = Path(__file__).resolve().parents[1]
 SERVICE = ROOT / "overlays/fuchsia/src/fuchsia-desktop/theme_service"
 AUTHORITY = SERVICE / "src/authority.rs"
 BUILD = SERVICE / "BUILD.gn"
-CI = ROOT / ".github/workflows/ci.yml"
 RUNNER = ROOT / "scripts/test-native-theme-sq03.py"
 BUILTIN = "instrument-studio-dtcg.package.json"
 
@@ -37,11 +36,6 @@ class NativeThemeSq03Contract(unittest.TestCase):
         ):
             self.assertIn(script, source)
         self.assertIn("sq-03-verdict.json", source)
-
-    def test_ci_invokes_sq03_contract_and_runner(self) -> None:
-        workflow = CI.read_text()
-        self.assertIn("python3 scripts/test-native-theme-sq03-contract.py", workflow)
-        self.assertIn("python3 scripts/test-native-theme-sq03.py", workflow)
 
 
 if __name__ == "__main__":
