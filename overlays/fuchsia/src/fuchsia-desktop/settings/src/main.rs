@@ -20,11 +20,10 @@ use futures::channel::mpsc::{UnboundedSender, unbounded};
 use futures::{StreamExt as _, TryStreamExt as _};
 use log::{info, warn};
 
-mod settings_ui;
 mod text_surface;
 
-use settings_core::{AppTheme, SettingsController, SettingsOwners, TemperatureUnit};
-use settings_ui::{UiAction, action_for_point};
+use settings_core::{AppTheme, ControlId, SettingsController, SettingsOwners, TemperatureUnit};
+use settings_core::settings_ui::{UiAction, action_for_point};
 use text_surface::{TextStyle, TextSurface};
 
 const BACKGROUND: flatland::ColorRgba = flatland::ColorRgba {
@@ -258,7 +257,7 @@ async fn request_theme(
 }
 
 struct DynamicSurfaces {
-    theme_value: TextSurface,
+    theme_value: Option<TextSurface>,
     temperature_value: Option<TextSurface>,
     status: TextSurface,
 }
@@ -277,13 +276,14 @@ async fn refresh_ui(
     surfaces: &mut DynamicSurfaces,
     metrics: LayoutMetrics,
 ) -> Result<(), Error> {
-    surfaces
-        .theme_value
-        .update(
-            flatland,
-            &format!("Current: {}", controller.theme().label()),
-        )
-        .await?;
+    if let Some(surface) = surfaces.theme_value.as_mut() {
+        surface
+            .update(
+                flatland,
+                &format!("Current: {}", controller.theme().label()),
+            )
+            .await?;
+    }
     if let Some(surface) = surfaces.temperature_value.as_mut() {
         surface
             .update(
@@ -300,24 +300,26 @@ async fn refresh_ui(
         width: metrics.btn_w,
         height: metrics.btn_h,
     };
-    flatland.set_solid_fill(
-        &flatland::ContentId { value: 21 },
-        if controller.theme() == AppTheme::Dark {
-            &SELECTED
-        } else {
-            &SURFACE
-        },
-        &btn,
-    )?;
-    flatland.set_solid_fill(
-        &flatland::ContentId { value: 23 },
-        if controller.theme() == AppTheme::Contrast {
-            &CONTRAST
-        } else {
-            &SURFACE
-        },
-        &btn,
-    )?;
+    if surfaces.theme_value.is_some() {
+        flatland.set_solid_fill(
+            &flatland::ContentId { value: 21 },
+            if controller.theme() == AppTheme::Dark {
+                &SELECTED
+            } else {
+                &SURFACE
+            },
+            &btn,
+        )?;
+        flatland.set_solid_fill(
+            &flatland::ContentId { value: 23 },
+            if controller.theme() == AppTheme::Contrast {
+                &CONTRAST
+            } else {
+                &SURFACE
+            },
+            &btn,
+        )?;
+    }
     flatland.set_solid_fill(
         &flatland::ContentId { value: 25 },
         if controller.temperature() == TemperatureUnit::Celsius {
@@ -506,6 +508,8 @@ async fn create_settings_view(root_token: views::ViewCreationToken) -> Result<()
             .record_temperature_result(target, Err("injected Intl apply failure".to_string()));
     }
 
+    let visible_controls = controller.visible_controls();
+    let theme_visible = visible_controls.contains(&ControlId::Theme);
     let narrow = size.width < 520 || (size.height > size.width && size.width < 800);
     let sidebar_w = if narrow { 56 } else { 140 };
     let card_x = sidebar_w + 8;
@@ -573,6 +577,9 @@ async fn create_settings_view(root_token: views::ViewCreationToken) -> Result<()
         ]
     };
     for (transform, content, color, width, height, x, y) in rects {
+        if !theme_visible && matches!(content, 19 | 21 | 23) {
+            continue;
+        }
         create_rect(
             &flatland,
             &root,
@@ -587,7 +594,7 @@ async fn create_settings_view(root_token: views::ViewCreationToken) -> Result<()
     flatland.present(flatland::PresentArgs::default())?;
 
     let mut static_text = Vec::new();
-    let text_specs: Vec<(u64, u64, u32, u32, i32, i32, &str, TextStyle)> = if narrow {
+    let mut text_specs: Vec<(u64, u64, u32, u32, i32, i32, &str, TextStyle)> = if narrow {
         vec![
             (
                 110,
@@ -902,6 +909,9 @@ async fn create_settings_view(root_token: views::ViewCreationToken) -> Result<()
             ),
         ]
     };
+    if !theme_visible {
+        text_specs.retain(|(_, content, ..)| !matches!(*content, 109 | 111 | 113 | 117));
+    }
     for (transform, content, width, height, x, y, text, style) in text_specs {
         match TextSurface::new_with_style(
             &flatland,
@@ -920,27 +930,33 @@ async fn create_settings_view(root_token: views::ViewCreationToken) -> Result<()
         }
     }
 
-    let theme_value = TextSurface::new_with_style(
-        &flatland,
-        &root,
-        flatland::TransformId { value: 200 },
-        flatland::ContentId { value: 201 },
-        fmath::SizeU {
-            width: if narrow { 32 } else { 320 },
-            height: if narrow { 16 } else { 40 },
-        },
-        fmath::Vec_ {
-            x: if narrow { -80 } else { 352 },
-            y: if narrow { -80 } else { 124 },
-        },
-        &format!("Current: {}", controller.theme().label()),
-        TextStyle {
-            font_size: 16.0,
-            left_padding: 8,
-            top_padding: 8,
-        },
-    )
-    .await?;
+    let theme_value = if theme_visible {
+        Some(
+            TextSurface::new_with_style(
+                &flatland,
+                &root,
+                flatland::TransformId { value: 200 },
+                flatland::ContentId { value: 201 },
+                fmath::SizeU {
+                    width: if narrow { 32 } else { 320 },
+                    height: if narrow { 16 } else { 40 },
+                },
+                fmath::Vec_ {
+                    x: if narrow { -80 } else { 352 },
+                    y: if narrow { -80 } else { 124 },
+                },
+                &format!("Current: {}", controller.theme().label()),
+                TextStyle {
+                    font_size: 16.0,
+                    left_padding: 8,
+                    top_padding: 8,
+                },
+            )
+            .await?,
+        )
+    } else {
+        None
+    };
     let temperature_value = if intl_proxy.is_some() {
         Some(
             TextSurface::new_with_style(
@@ -1020,7 +1036,7 @@ async fn create_settings_view(root_token: views::ViewCreationToken) -> Result<()
         futures::select! {
             position = touch_events.next() => {
                 let Some([x, y]) = position else { break };
-                let Some(action) = action_for_point(x, y, size.width as f32) else { continue };
+                let Some(action) = action_for_point(x, y, size.width as f32, &visible_controls) else { continue };
                 let action_name = format!("{action:?}");
                 match action {
                     UiAction::ThemeDark => {

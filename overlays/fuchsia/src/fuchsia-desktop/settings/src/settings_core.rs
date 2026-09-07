@@ -5,6 +5,8 @@
 use std::fs;
 use std::path::Path;
 
+pub mod settings_ui;
+
 pub type SettingsResult<T> = Result<T, String>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

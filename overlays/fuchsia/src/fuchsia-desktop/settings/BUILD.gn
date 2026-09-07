@@ -12,7 +12,10 @@ rustc_library("settings_core") {
   edition = "2024"
   with_unit_tests = true
   source_root = "src/settings_core.rs"
-  sources = [ "src/settings_core.rs" ]
+  sources = [
+    "src/settings_core.rs",
+    "src/settings_ui.rs",
+  ]
 }
 
 rustc_binary("bin") {

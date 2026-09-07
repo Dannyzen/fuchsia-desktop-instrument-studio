@@ -147,5 +147,23 @@ class P3S2Contract(unittest.TestCase):
         self.assertIn("@planned @p4", feature)
 
 
+    def test_10_partial_handshake_hides_theme_before_dispatch(self) -> None:
+        main = self.text(ROOT / "overlays/fuchsia/src/fuchsia-desktop/settings/src/main.rs")
+        ui = self.text(ROOT / "overlays/fuchsia/src/fuchsia-desktop/settings/src/settings_ui.rs")
+        self.assertIn("let visible_controls = controller.visible_controls();", main)
+        self.assertIn("action_for_point(x, y, size.width as f32, &visible_controls)", main)
+        self.assertIn("visible_controls: &[ControlId]", ui)
+        self.assertIn("hidden_theme_control_yields_no_action", ui)
+        self.assertNotIn("use settings_core::ControlId;", ui)
+        self.assertIn("theme_visible", main)
+        self.assertIn("Option<TextSurface>", main)
+        core = self.text(ROOT / "overlays/fuchsia/src/fuchsia-desktop/settings/src/settings_core.rs")
+        build = self.text(ROOT / "overlays/fuchsia/src/fuchsia-desktop/settings/BUILD.gn")
+        self.assertIn("pub mod settings_ui;", core)
+        self.assertIn('"src/settings_ui.rs"', build)
+        self.assertIn("use settings_core::settings_ui::{UiAction, action_for_point};", main)
+        self.assertNotIn("mod settings_ui;", main)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
