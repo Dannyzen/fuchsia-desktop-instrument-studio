@@ -88,5 +88,22 @@ class ScopeTests(unittest.TestCase):
         )
 
 
+    def test_pin_companions_are_not_unexpected_scope(self):
+        changed = [
+            "tools/native_theme/sq02_harness.py",
+            "versions.env",
+            "PACKAGE.json",
+            "overlays/fuchsia/products/workbench/BUILD.bazel",
+            "overlays/fuchsia/products/workbench/workbench_session/meta/workbench_session.cml",
+            "README.md",
+        ]
+        self.assertTrue(sq02_changed(changed))
+        self.assertEqual(unexpected_scope_paths(changed), [])
+        self.assertEqual(
+            unexpected_scope_paths(changed + ["overlays/fuchsia/src/fuchsia-desktop/files/src/main.rs"]),
+            ["overlays/fuchsia/src/fuchsia-desktop/files/src/main.rs"],
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

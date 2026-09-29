@@ -29,7 +29,7 @@ If you find credential-like material, open an issue and rotate immediately.
 
 See `versions.env`:
 
-- Fuchsia source: `7f75b7f6ffdacf5a818dd8d207263edd45126ddd`
+- Fuchsia source: `85d1818a43cb152bf09a0a58ac571012f6ead5e7`
 - Product target: `//products/workbench:workbench_slim.x64`
 
 ## Design direction

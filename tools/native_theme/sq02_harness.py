@@ -29,7 +29,7 @@ import urllib.request
 
 
 BASE_SHA = "036944123fa15d5b5fac5718899b08a44691727c"
-FUCHSIA_REVISION = "7f75b7f6ffdacf5a818dd8d207263edd45126ddd"
+FUCHSIA_REVISION = "85d1818a43cb152bf09a0a58ac571012f6ead5e7"
 PINNED = {"coverage": "7.6.12", "jsonschema": "4.25.1"}
 RUST_PIN = "nightly-2026-08-13"
 RECEIPTS = (

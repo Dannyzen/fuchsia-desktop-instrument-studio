@@ -127,7 +127,7 @@ def _manifest(root: Path, value: dict[str, Any], expected_sha: str, expected_tre
         reject("manifest: base SHA drift")
     if not re.fullmatch(r"[0-9a-f]{40}", value["comparison_base_sha"]):
         reject("manifest: comparison base SHA invalid")
-    if value["fuchsia_pinned_revision"] != "7f75b7f6ffdacf5a818dd8d207263edd45126ddd":
+    if value["fuchsia_pinned_revision"] != "85d1818a43cb152bf09a0a58ac571012f6ead5e7":
         reject("manifest: Fuchsia revision drift")
     text(value["command_schema"], "command schema")
     text(value["python_version"], "Python version")
