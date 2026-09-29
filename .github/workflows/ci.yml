@@ -34,7 +34,6 @@ jobs:
           test -d overlays/fuchsia/src/ui/bin/tiling_wm
           test -d overlays/fuchsia/src/fuchsia-desktop
           test -f design/screenshots/01-instrument-studio.png
-          test -f design/screenshots/current-femu-run.png
           test -f design/screenshots/04-emulator-four-app-live.png
           test -f design/screenshots/05-emulator-chrome-live.png
           test -f design/screenshots/06-emulator-density-live.png

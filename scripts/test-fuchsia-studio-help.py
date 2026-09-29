@@ -192,6 +192,10 @@ for phrase in (
     "mkdir -p artifacts/instrument-studio-run",
     "Expected from the 2026-09-29 run of this procedure: `tiling_wm.tile_count` is 3",
     "It shows three tiles, not four.",
+    "The wait does not stop at the first count of 3.",
+    'test "$order" = "instrument-studio-browser,instrument-studio-terminal,instrument-studio-settings"',
+    "refusing to inspect or screenshot an incomplete stage",
+    'test "$stable_three" -ge 3',
 ):
     require(phrase, runbook)
 for stale in (

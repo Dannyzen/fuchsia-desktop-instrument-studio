@@ -174,14 +174,60 @@ case "$tile_count" in
     ;;
 esac
 
+stable_three=0
 for attempt in $(seq 1 30); do
   tile_count="$(wm_tile_count)"
-  case "$tile_count" in
-    3|4) break ;;
-  esac
+  if [ "$tile_count" -eq 4 ]; then
+    break
+  fi
+  if [ "$tile_count" -eq 3 ]; then
+    stable_three=$((stable_three + 1))
+  else
+    stable_three=0
+  fi
   sleep 2
 done
-echo "tile_count=$tile_count"
+
+wm_tile_order() {
+  ffx --machine json inspect show core/session-manager/session:session/tiling_wm |
+    python3 -c 'import json, sys
+
+def find(value):
+    if isinstance(value, dict):
+        if "order" in value and isinstance(value["order"], str):
+            return value["order"]
+        for child in value.values():
+            result = find(child)
+            if result is not None:
+                return result
+    elif isinstance(value, list):
+        for child in value:
+            result = find(child)
+            if result is not None:
+                return result
+    return None
+
+result = find(json.load(sys.stdin))
+if not isinstance(result, str):
+    raise SystemExit("tiling_wm order is unavailable")
+print(result)'
+}
+
+order="$(wm_tile_order)"
+case "$tile_count" in
+  4)
+    echo "tile_count=4"
+    ;;
+  3)
+    test "$stable_three" -ge 3
+    test "$order" = "instrument-studio-browser,instrument-studio-terminal,instrument-studio-settings"
+    echo "tile_count=3 order=$order"
+    ;;
+  *)
+    echo "tile wait ended at tile_count=$tile_count; refusing to inspect or screenshot an incomplete stage" >&2
+    exit 1
+    ;;
+esac
 ```
 
 Check the complete window-manager state:
@@ -191,6 +237,7 @@ ffx --machine json inspect show core/session-manager/session:session/tiling_wm
 ```
 
 Expected from the 2026-09-29 run of this procedure: `tiling_wm.tile_count` is 3, `fuchsia.inspect.Health.status` is `OK`, order is `instrument-studio-browser,instrument-studio-terminal,instrument-studio-settings`, and `last_present_context` is `RemoveTile`. The Files component was Running and was not in that order. A component reporting `Running` is not a tile.
+The wait does not stop at the first count of 3. It continues until the count is 4 or 30 attempts end. It then fails unless the count is 4, or the count is 3, that 3 held for at least three consecutive polls, and the order is exactly `instrument-studio-browser,instrument-studio-terminal,instrument-studio-settings`. A count of 0, 1, or 2 exits before Inspect or screenshot.
 
 Capture pixels. `-d` requires an existing directory inside the tool container, so create its host-mounted counterpart first:
 
