@@ -18,7 +18,7 @@ The sequence is risk ordered:
 ## Proven runtime baseline
 
 - Core SDK: `33.20260816.0.1`
-- Fuchsia source: `7f75b7f6ffdacf5a818dd8d207263edd45126ddd`
+- Fuchsia source: `85d1818a43cb152bf09a0a58ac571012f6ead5e7`
 - Emulator: SDK-embedded QEMU `11.0.2`
 - Products booted: `minimal.x64`, `workbench_eng.x64`
 - Acceleration: KVM, observed as `-enable-kvm` and `-cpu host`

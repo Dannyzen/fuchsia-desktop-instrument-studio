@@ -49,7 +49,7 @@ def fixture() -> dict[str, dict[str, object]]:
         "comparison_base_sha": "3" * 40,
         "command_schema": "repository command v1", "environment": {"CARGO_NET_OFFLINE": "true", "LANG": "C", "LC_ALL": "C",
         "NATIVE_THEME_SQ02_NETWORK": "deny", "PYTHONHASHSEED": "0", "RUSTUP_NO_UPDATE_CHECK": "1", "TZ": "UTC"},
-        "fuchsia_pinned_revision": "7f75b7f6ffdacf5a818dd8d207263edd45126ddd", "os_isolation": isolation,
+        "fuchsia_pinned_revision": "85d1818a43cb152bf09a0a58ac571012f6ead5e7", "os_isolation": isolation,
         "python_dependencies": {"coverage": "7.6.12", "jsonschema": "4.25.1"}, "python_version": "3.12.9",
         "source_sha": sha, "source_tree": tree,
         "toolchain": {"cargo": {"binary_sha256": binary, "name": "cargo", "version": "cargo 1.99.0-nightly"},

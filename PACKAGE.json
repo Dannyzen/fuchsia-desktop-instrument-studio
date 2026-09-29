@@ -1,6 +1,6 @@
 {
   "name": "fuchsia-desktop-instrument-studio",
-  "fuchsia_source_git_revision": "7f75b7f6ffdacf5a818dd8d207263edd45126ddd",
+  "fuchsia_source_git_revision": "85d1818a43cb152bf09a0a58ac571012f6ead5e7",
   "excludes": [
     "full fuchsia tree",
     "sdk",

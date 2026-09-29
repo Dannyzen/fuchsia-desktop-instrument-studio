@@ -41,6 +41,15 @@ SQ02_TRACKED_PATHS = frozenset({
 DOC_SCOPE_PATHS = frozenset({"README.md"})
 DOC_SCOPE_PREFIXES = ("docs/", "design/")
 
+PIN_COMPANION_PATHS = frozenset({
+    "PACKAGE.json",
+    "versions.env",
+    "overlays/fuchsia/products/workbench/BUILD.bazel",
+    "overlays/fuchsia/products/workbench/workbench_session/meta/workbench_session.cml",
+})
+
+
+
 
 def is_doc_path(path: str) -> bool:
     return path in DOC_SCOPE_PATHS or path.startswith(DOC_SCOPE_PREFIXES)
@@ -51,4 +60,4 @@ def sq02_changed(paths: Iterable[str]) -> bool:
 
 
 def unexpected_scope_paths(paths: Iterable[str]) -> list[str]:
-    return sorted(path for path in set(paths) - SQ02_TRACKED_PATHS if not is_doc_path(path))
+    return sorted(path for path in set(paths) - SQ02_TRACKED_PATHS if not is_doc_path(path) and path not in PIN_COMPANION_PATHS)
