@@ -166,14 +166,18 @@ require("confirmed", live_verifier)
 require("terminal", live_verifier)
 
 readme = README.read_text()
-require("Latest Live 22:", readme)
-require("historical run had three visible tiles; Files was absent", readme)
-require("Current runbook verification (2026-09-06):", readme)
-require("health `OK` and `tile_count=4`", readme)
-require("Historical Live 4:", readme)
-require("proves four tiles", readme)
+require("design/screenshots/current-femu-run.png", readme)
+require("health `OK`, `tile_count=3`", readme)
+require("instrument-studio-browser,instrument-studio-terminal,instrument-studio-settings", readme)
+require("last_present_context=RemoveTile", readme)
+require("This is not a four-app stage.", readme)
 assert "- Live Inspect: 4 tiles" not in readme
 assert "Remaining gap: Instrument Studio chrome" not in readme
+assert "Current runbook verification (2026-09-06):" not in readme
+assert "health `OK` and `tile_count=4`" not in readme
+images = [line for line in readme.splitlines() if line.startswith("![")]
+assert images == ["![Current FEMU run](design/screenshots/current-femu-run.png)"], images
+assert (ROOT / "design/screenshots/current-femu-run.png").is_file()
 
 runbook = readme.split("## Run the desktop", 1)[1].split("## Production status", 1)[0]
 for phrase in (
@@ -186,13 +190,13 @@ for phrase in (
     "4)",
     "unexpected existing tile_count",
     "mkdir -p artifacts/instrument-studio-run",
-    "Expected: `tiling_wm.tile_count` is 4",
+    "Expected from the 2026-09-29 run of this procedure: `tiling_wm.tile_count` is 3",
+    "It shows three tiles, not four.",
 ):
     require(phrase, runbook)
 for stale in (
-    "Files PresentView is not restored",
-    "current live proof is three tiles",
-    "`tiling_wm.tile_count` is 3",
+    "Expected: `tiling_wm.tile_count` is 4",
+    "confirm four non-empty application tiles",
 ):
     assert stale not in runbook, f"README runbook retains stale claim: {stale}"
 
