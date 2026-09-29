@@ -19,4 +19,5 @@ Inspect in `inspect.json`:
 The Files component was Running. It was not in the tile order.
 
 Visible pixels: three tiles. Headers read Files, Terminal, and Settings. The Files body is empty. Terminal shows the studio help lines. Settings shows Appearance and Temperature. There is no fourth tile and no Browser page. The painted Files header and the Inspect order do not name the same first tile.
+
 The runbook wait does not stop at the first count of 3. It accepts 3 only after at least three consecutive polls with that exact order. Any other incomplete count exits before Inspect or screenshot.
