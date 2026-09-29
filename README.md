@@ -20,7 +20,8 @@ If you find credential-like material, open an issue and rotate immediately.
   - Workbench session product wiring
 - `scripts/**`: bootstrap, overlay apply, verification helpers
 - `design/sketches/**`: interactive HTML directions for richer UI
-- `design/screenshots/**`: Instrument Studio / palette / overview captures
+- `design/screenshots/current-femu-run.png`: the screenshot from the documented FEMU run
+- `design/screenshots/**`: older captures kept on disk, not embedded below
 - `docs/donor-roadmap.md`: native-only roadmap adapted from mature Rust WMs
 - GitHub Actions CI for public-readiness gates
 
@@ -42,49 +43,15 @@ We are building **Instrument Studio** first:
 
 ### Screenshots
 
-![Instrument Studio](design/screenshots/01-instrument-studio.png)
+The image below is the screenshot from running the documented FEMU path on 2026-09-29. It is the only run screenshot embedded here.
 
-![Command Palette First](design/screenshots/02-command-palette-first.png)
+![Current FEMU run](design/screenshots/current-femu-run.png)
 
-![Spatial Overview](design/screenshots/03-spatial-overview.png)
+Visible pixels: Workbench Studio chrome with Build selected, and three tiles. Headers read Files, Terminal, and Settings. The Files body is empty. Terminal shows the studio help lines. Settings shows Appearance and Temperature. There is no fourth tile and no Browser page.
 
-![Spatial Overview open](design/screenshots/03-spatial-overview-open.png)
+Inspect for that same run: health `OK`, `tile_count=3`, order `instrument-studio-browser,instrument-studio-terminal,instrument-studio-settings`, `last_present_context=RemoveTile`. The Files component was Running and was not in the tile order. The painted Files header and the Inspect order do not name the same first tile. This is not a four-app stage.
 
-![Live emulator four-app stage](design/screenshots/04-emulator-four-app-live.png)
-
-![Live emulator with Instrument Studio chrome](design/screenshots/05-emulator-chrome-live.png)
-
-![Live emulator density pass](design/screenshots/06-emulator-density-live.png)
-
-![Live emulator iconography pass](design/screenshots/07-emulator-icons-live.png)
-
-![Linux terminal wiring](design/screenshots/08-emulator-linux-terminal.png)
-
-![Live emulator labels pass](design/screenshots/09-emulator-labels-live.png)
-
-![Live emulator readable-labels attempt](design/screenshots/10-emulator-readable-labels-live.png)
-
-![Live emulator OCR-readable labels](design/screenshots/11-emulator-ocr-labels-live.png)
-
-![Live emulator responsive tiles](design/screenshots/12-emulator-responsive-live.png)
-
-![Live emulator design-parity loop](design/screenshots/13-emulator-parity-live.png)
-
-![Live emulator tile identity](design/screenshots/14-emulator-tile-identity-live.png)
-
-![Live emulator Instrument Studio cards](design/screenshots/16-emulator-looks-cards-live.png)
-
-![Live emulator tile header names](design/screenshots/17-emulator-tile-names-live.png)
-
-![Live emulator Settings restore](design/screenshots/18-emulator-set-restore-live.png)
-
-![Live emulator Settings cards](design/screenshots/19-emulator-settings-cards-live.png)
-
-![Live emulator clean menu text](design/screenshots/20-emulator-menu-text-live.png)
-
-![Live emulator native fonts and Material icons](design/screenshots/21-emulator-font-icons-live.png)
-
-![Live emulator built-in help and readable headers](design/screenshots/22-emulator-studio-help-live.png)
+Older captures remain on disk under `design/screenshots/` and `docs/evidence/`. They are not this run, so they are not shown above.
 
 Interactive sketches live under `design/sketches/`.
 
@@ -207,12 +174,60 @@ case "$tile_count" in
     ;;
 esac
 
+stable_three=0
 for attempt in $(seq 1 30); do
   tile_count="$(wm_tile_count)"
-  [ "$tile_count" -eq 4 ] && break
+  if [ "$tile_count" -eq 4 ]; then
+    break
+  fi
+  if [ "$tile_count" -eq 3 ]; then
+    stable_three=$((stable_three + 1))
+  else
+    stable_three=0
+  fi
   sleep 2
 done
-test "$tile_count" -eq 4
+
+wm_tile_order() {
+  ffx --machine json inspect show core/session-manager/session:session/tiling_wm |
+    python3 -c 'import json, sys
+
+def find(value):
+    if isinstance(value, dict):
+        if "order" in value and isinstance(value["order"], str):
+            return value["order"]
+        for child in value.values():
+            result = find(child)
+            if result is not None:
+                return result
+    elif isinstance(value, list):
+        for child in value:
+            result = find(child)
+            if result is not None:
+                return result
+    return None
+
+result = find(json.load(sys.stdin))
+if not isinstance(result, str):
+    raise SystemExit("tiling_wm order is unavailable")
+print(result)'
+}
+
+order="$(wm_tile_order)"
+case "$tile_count" in
+  4)
+    echo "tile_count=4"
+    ;;
+  3)
+    test "$stable_three" -ge 3
+    test "$order" = "instrument-studio-browser,instrument-studio-terminal,instrument-studio-settings"
+    echo "tile_count=3 order=$order"
+    ;;
+  *)
+    echo "tile wait ended at tile_count=$tile_count; refusing to inspect or screenshot an incomplete stage" >&2
+    exit 1
+    ;;
+esac
 ```
 
 Check the complete window-manager state:
@@ -221,7 +236,8 @@ Check the complete window-manager state:
 ffx --machine json inspect show core/session-manager/session:session/tiling_wm
 ```
 
-Expected: `tiling_wm.tile_count` is 4, `fuchsia.inspect.Health.status` is `OK`, and the order contains Browser, Terminal, Settings, and Files instances. A component merely reporting `Running` is not enough.
+Expected from the 2026-09-29 run of this procedure: `tiling_wm.tile_count` is 3, `fuchsia.inspect.Health.status` is `OK`, order is `instrument-studio-browser,instrument-studio-terminal,instrument-studio-settings`, and `last_present_context` is `RemoveTile`. The Files component was Running and was not in that order. A component reporting `Running` is not a tile.
+The wait does not stop at the first count of 3. It continues until the count is 4 or 30 attempts end. It then fails unless the count is 4, or the count is 3, that 3 held for at least three consecutive polls, and the order is exactly `instrument-studio-browser,instrument-studio-terminal,instrument-studio-settings`. A count of 0, 1, or 2 exits before Inspect or screenshot.
 
 Capture pixels. `-d` requires an existing directory inside the tool container, so create its host-mounted counterpart first:
 
@@ -230,7 +246,7 @@ mkdir -p artifacts/instrument-studio-run
 ffx target screenshot -d /workspace/artifacts/instrument-studio-run
 ```
 
-The PNG lands in the lab `artifacts/instrument-studio-run/` directory on the host. Inspect it and confirm four non-empty application tiles before calling the run complete.
+The PNG lands in the lab `artifacts/instrument-studio-run/` directory on the host. The 2026-09-29 capture committed from that command is `design/screenshots/current-femu-run.png`. It shows three tiles, not four.
 
 ### 5. Use it as an end user inside Terminal
 
@@ -312,7 +328,7 @@ Never commit those files.
 overlays/fuchsia/     # files to copy onto a Fuchsia checkout
 scripts/              # fetch/apply/verify/secret-scan helpers
 design/sketches/      # HTML UI directions
-design/screenshots/   # PNG captures referenced by README
+design/screenshots/   # current run PNG plus older captures not embedded above
 docs/                 # architecture + donor roadmap
 .github/workflows/    # CI
 versions.env          # pins
@@ -350,19 +366,15 @@ See `docs/production-status.md` for an honest done/not-done gate.
 
 ## Live demo evidence
 
-Rebuild proof + vision notes:
+Current run, 2026-09-29, guest `fuchsia-workbench-femu`, product `workbench_slim.x64`:
 
-- Latest Live 22: `docs/evidence/instrument-studio-help-20260827T062745Z/`
-  proves the new chrome, built-in help, Inspect health, confirmed Terminal focus,
-  and records that its historical run had three visible tiles; Files was absent.
-- Current runbook verification (2026-09-06): the documented reuse path reached
-  `workbench_slim.x64` with RCS, guest SSH, four running app components, Inspect
-  health `OK` and `tile_count=4`, plus fresh pixels showing non-empty Files,
-  Browser, Terminal, and Settings tiles. The procedure below is the reproduction path.
-- Historical Live 4: `docs/evidence/instrument-studio-20260818T220823Z/`
-  proves four tiles, confirmed focus, and gap/border configuration before the
-  current typography and help changes.
+- Reachable: RCS `Y`, guest printed `FUCHSIA_GUEST_OK`.
+- Inspect: health `OK`, `tile_count=3`, order `instrument-studio-browser,instrument-studio-terminal,instrument-studio-settings`, `last_present_context=RemoveTile`.
+- Files component was `Running` and was not in the tile order.
+- Screenshot: `design/screenshots/current-femu-run.png`. Proof: `docs/evidence/instrument-studio-run-20260929T122200Z/`.
+
+Older directories under `docs/evidence/` are historical. They are not this run.
 
 ## Status
 
-The interactive tiling WM, Instrument Studio shell chrome, readable typography, semantic icons, Linux help surface, and four-app stage are proven on their cited source identities. The remaining release work is the restart-only NativeTheme control plane, which is still a separate draft change and is not implied by this runbook proof.
+The interactive tiling WM, Instrument Studio shell chrome, readable typography, semantic icons, and Linux help surface are visible in the current FEMU screenshot. That screenshot is not a four-app stage. The remaining release work includes a presented Files tile that matches Inspect, and the restart-only NativeTheme control plane, which is still a separate draft change and is not implied by this run.
