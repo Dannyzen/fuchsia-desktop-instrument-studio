@@ -1,0 +1,17 @@
+diff --git a/src/session/bin/session_manager/meta/session_manager.cml.golden b/src/session/bin/session_manager/meta/session_manager.cml.golden
+--- a/src/session/bin/session_manager/meta/session_manager.cml.golden
++++ b/src/session/bin/session_manager/meta/session_manager.cml.golden
+@@ -480,6 +480,13 @@
+             from: "parent",
+             to: "#session",
+             availability: "same_as_target",
+         },
++        {
++            // Expose the optional PTY system capability to the active session.
++            protocol: "fuchsia.hardware.pty.Device",
++            from: "parent",
++            to: "#session",
++            availability: "optional",
++        },
+         {
+             service: "fuchsia.power.broker.ElementInfoProviderService",
