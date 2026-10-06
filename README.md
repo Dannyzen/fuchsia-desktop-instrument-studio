@@ -43,15 +43,15 @@ We are building **Instrument Studio** first:
 
 ### Screenshots
 
-The image below is the screenshot from running the documented FEMU path on 2026-09-29. It is the only run screenshot embedded here.
+The image below is the direct headless FEMU capture from the verified three-app run on 2026-09-30. It is the only current run screenshot embedded here.
 
 ![Current FEMU run](design/screenshots/current-femu-run.png)
 
-Visible pixels: Workbench Studio chrome with Build selected, and three tiles. Headers read Files, Terminal, and Settings. The Files body is empty. Terminal shows the studio help lines. Settings shows Appearance and Temperature. There is no fourth tile and no Browser page.
+The pixels show Browser with its local documentation example, Terminal with a Linux prompt and `fuchsia-studio` help text, and Settings with Appearance and Temperature controls. The Browser example is local content; this screenshot does not prove external network access. The UI displays `2026-09-29`; this on-screen value differs from the capture date and is not used as the screenshot timestamp. Files was not launched or shown.
 
-Inspect for that same run: health `OK`, `tile_count=3`, order `instrument-studio-browser,instrument-studio-terminal,instrument-studio-settings`, `last_present_context=RemoveTile`. The Files component was Running and was not in the tile order. The painted Files header and the Inspect order do not name the same first tile. This is not a four-app stage.
+Inspect for the same run: health `OK`, `tile_count=3`, order `instrument-studio-browser,instrument-studio-terminal,instrument-studio-settings`. The embedded PNG is pixel-identical to the guest capture.
 
-Older captures remain on disk under `design/screenshots/` and `docs/evidence/`. They are not this run, so they are not shown above.
+The previous capture is preserved as `design/screenshots/previous-femu-run-2026-09-29.png`; it is not embedded because its Files header disagreed with its Inspect order. Older evidence remains historical and does not describe this run.
 
 Interactive sketches live under `design/sketches/`.
 
@@ -129,7 +129,7 @@ Expected:
 
 ### 4. Put the desktop on the stage without duplicates
 
-A fresh slim boot can be an empty tiling WM (`tile_count=0`). A reused guest can already have the complete four-app stage. Read Inspect first so rerunning this runbook does not add duplicate windows:
+A fresh slim boot can be an empty tiling WM (`tile_count=0`). A reused guest can already have the verified three-app stage. Read Inspect first so rerunning this runbook does not add duplicate windows. This procedure covers exactly three visible apps; a count of 4 is outside this proof:
 
 ```bash
 wm_tile_count() {
@@ -163,10 +163,9 @@ case "$tile_count" in
     ffx session add --name instrument-studio-settings fuchsia-pkg://fuchsia.com/fuchsia_settings#meta/fuchsia_settings.cm
     ffx session add --name instrument-studio-terminal fuchsia-pkg://fuchsia.com/fuchsia_terminal#meta/fuchsia_terminal.cm
     ffx session add --name instrument-studio-browser fuchsia-pkg://fuchsia.com/fuchsia_browser#meta/fuchsia_browser.cm
-    ffx session add --name instrument-studio-files fuchsia-pkg://fuchsia.com/fuchsia_files#meta/fuchsia_files.cm
     ;;
-  4)
-    echo "four-app stage already present; not adding duplicates"
+  3)
+    echo "three-app stage already present; not adding duplicates"
     ;;
   *)
     echo "unexpected existing tile_count=$tile_count; stop instead of creating a mixed or duplicate stage" >&2
@@ -177,13 +176,13 @@ esac
 stable_three=0
 for attempt in $(seq 1 30); do
   tile_count="$(wm_tile_count)"
-  if [ "$tile_count" -eq 4 ]; then
-    break
-  fi
   if [ "$tile_count" -eq 3 ]; then
     stable_three=$((stable_three + 1))
   else
     stable_three=0
+  fi
+  if [ "$stable_three" -ge 3 ]; then
+    break
   fi
   sleep 2
 done
@@ -214,20 +213,10 @@ print(result)'
 }
 
 order="$(wm_tile_order)"
-case "$tile_count" in
-  4)
-    echo "tile_count=4"
-    ;;
-  3)
-    test "$stable_three" -ge 3
-    test "$order" = "instrument-studio-browser,instrument-studio-terminal,instrument-studio-settings"
-    echo "tile_count=3 order=$order"
-    ;;
-  *)
-    echo "tile wait ended at tile_count=$tile_count; refusing to inspect or screenshot an incomplete stage" >&2
-    exit 1
-    ;;
-esac
+test "$tile_count" -eq 3
+test "$stable_three" -ge 3
+test "$order" = "instrument-studio-browser,instrument-studio-terminal,instrument-studio-settings"
+echo "tile_count=3 order=$order"
 ```
 
 Check the complete window-manager state:
@@ -236,17 +225,17 @@ Check the complete window-manager state:
 ffx --machine json inspect show core/session-manager/session:session/tiling_wm
 ```
 
-Expected from the 2026-09-29 run of this procedure: `tiling_wm.tile_count` is 3, `fuchsia.inspect.Health.status` is `OK`, order is `instrument-studio-browser,instrument-studio-terminal,instrument-studio-settings`, and `last_present_context` is `RemoveTile`. The Files component was Running and was not in that order. A component reporting `Running` is not a tile.
-The wait does not stop at the first count of 3. It continues until the count is 4 or 30 attempts end. It then fails unless the count is 4, or the count is 3, that 3 held for at least three consecutive polls, and the order is exactly `instrument-studio-browser,instrument-studio-terminal,instrument-studio-settings`. A count of 0, 1, or 2 exits before Inspect or screenshot.
+Expected from the 2026-09-30 run: `tiling_wm.tile_count` is 3, `fuchsia.inspect.Health.status` is `OK`, and order is `instrument-studio-browser,instrument-studio-terminal,instrument-studio-settings`. Files was not launched and is not represented in this screenshot. A component reporting `Running` is not a tile.
+The wait requires three consecutive polls at count 3 and the exact order before it proceeds to Inspect or screenshot. Counts 0, 1, 2, or 4 fail this three-app procedure.
 
 Capture pixels. `-d` requires an existing directory inside the tool container, so create its host-mounted counterpart first:
 
 ```bash
 mkdir -p artifacts/instrument-studio-run
-ffx target screenshot -d /workspace/artifacts/instrument-studio-run
+ffx target screenshot -d /workspace/artifacts/instrument-studio-run --format png
 ```
 
-The PNG lands in the lab `artifacts/instrument-studio-run/` directory on the host. The 2026-09-29 capture committed from that command is `design/screenshots/current-femu-run.png`. It shows three tiles, not four.
+FFX writes `screenshot.png` in the lab `artifacts/instrument-studio-run/` directory on the host. The current `design/screenshots/current-femu-run.png` is a pixel-identical copy of the verified three-app capture.
 
 ### 5. Use it as an end user inside Terminal
 
@@ -328,7 +317,7 @@ Never commit those files.
 overlays/fuchsia/     # files to copy onto a Fuchsia checkout
 scripts/              # fetch/apply/verify/secret-scan helpers
 design/sketches/      # HTML UI directions
-design/screenshots/   # current run PNG plus older captures not embedded above
+design/screenshots/   # current verified three-app PNG plus archived captures
 docs/                 # architecture + donor roadmap
 .github/workflows/    # CI
 versions.env          # pins
@@ -358,7 +347,7 @@ See `docs/observability-feedback-loop.md` for the Inspect tree and design checks
 
 ## Linux terminal
 
-Workbench terminal bridges to Alpine/Linux via Starnix and installs a bounded `fuchsia-studio` help, health, and manual command inside the Linux console. See `docs/linux-terminal.md`.
+Workbench terminal bridges to Alpine/Linux via Starnix and installs a bounded `fuchsia-studio` help, health, and manual command inside the Linux console. Its optional PTY use matches the Fuchsia session-manager route availability. The Workbench session routes `FlatlandFactory` only to `terminal_elements`. `scripts/apply-overlays.sh` applies the source-pinned session-manager PTY offer and matching CML golden update. The 2026-09-30 live run above exercised these routes. See `docs/linux-terminal.md`.
 
 ## Production status
 
@@ -366,15 +355,19 @@ See `docs/production-status.md` for an honest done/not-done gate.
 
 ## Live demo evidence
 
-Current run, 2026-09-29, guest `fuchsia-workbench-femu`, product `workbench_slim.x64`:
+Current run, 2026-09-30, guest `fuchsia-workbench-femu`, product `workbench_slim.x64`:
 
-- Reachable: RCS `Y`, guest printed `FUCHSIA_GUEST_OK`.
-- Inspect: health `OK`, `tile_count=3`, order `instrument-studio-browser,instrument-studio-terminal,instrument-studio-settings`, `last_present_context=RemoveTile`.
-- Files component was `Running` and was not in the tile order.
-- Screenshot: `design/screenshots/current-femu-run.png`. Proof: `docs/evidence/instrument-studio-run-20260929T122200Z/`.
+- Source: Fuchsia pin `85d1818a43cb152bf09a0a58ac571012f6ead5e7`; SDK `33.20260816.0.1`.
+- Product bundle manifest SHA-256: `d4eef69025cec87e66e321c252269b3db77a6f7e581d17b3beaa6279ece0ea6a`.
+- Reachable: Product state, RCS `Y`, guest printed `FUCHSIA_GUEST_OK`.
+- Packages resolved from the embedded bundle; no development repository was registered on the final guest.
+- Visible apps: Settings, Terminal, and Browser. Files was not launched or shown.
+- Inspect: Health `OK`, `tile_count=3`, order `instrument-studio-browser,instrument-studio-terminal,instrument-studio-settings`.
+- Screenshot: `design/screenshots/current-femu-run.png`, 720×1200, SHA-256 `e754988a7eeec4cd29015be03569faabe7afbcb48d10fe9ec91fffed392911b7`.
+- Provenance limit: the Fuchsia checkout contained local overlay changes, and the earlier build receipt reported `input_unchanged=false`. This run makes no clean-tree provenance claim.
 
-Older directories under `docs/evidence/` are historical. They are not this run.
+The prior 2026-09-29 screenshot is archived as `design/screenshots/previous-femu-run-2026-09-29.png`; it is historical, not proof for this run.
 
 ## Status
 
-The interactive tiling WM, Instrument Studio shell chrome, readable typography, semantic icons, and Linux help surface are visible in the current FEMU screenshot. That screenshot is not a four-app stage. The remaining release work includes a presented Files tile that matches Inspect, and the restart-only NativeTheme control plane, which is still a separate draft change and is not implied by this run.
+This is not a four-app stage. The current FEMU screenshot proves three visible app surfaces and the Linux help surface. It does not prove a fourth tile, Files presentation, or external Browser connectivity. The restart-only NativeTheme control plane remains a separate draft change and is not implied by this run.
