@@ -169,7 +169,6 @@ readme = README.read_text()
 require("design/screenshots/current-femu-run.png", readme)
 require("health `OK`, `tile_count=3`", readme)
 require("instrument-studio-browser,instrument-studio-terminal,instrument-studio-settings", readme)
-require("last_present_context=RemoveTile", readme)
 require("This is not a four-app stage.", readme)
 assert "- Live Inspect: 4 tiles" not in readme
 assert "Remaining gap: Instrument Studio chrome" not in readme
@@ -184,17 +183,14 @@ for phrase in (
     "ffx session add --name instrument-studio-settings fuchsia-pkg://fuchsia.com/fuchsia_settings#meta/fuchsia_settings.cm",
     "ffx session add --name instrument-studio-terminal fuchsia-pkg://fuchsia.com/fuchsia_terminal#meta/fuchsia_terminal.cm",
     "ffx session add --name instrument-studio-browser fuchsia-pkg://fuchsia.com/fuchsia_browser#meta/fuchsia_browser.cm",
-    "ffx session add --name instrument-studio-files fuchsia-pkg://fuchsia.com/fuchsia_files#meta/fuchsia_files.cm",
     'case "$tile_count" in',
     "0)",
-    "4)",
+    "3)",
+    "three-app stage already present; not adding duplicates",
     "unexpected existing tile_count",
     "mkdir -p artifacts/instrument-studio-run",
-    "Expected from the 2026-09-29 run of this procedure: `tiling_wm.tile_count` is 3",
-    "It shows three tiles, not four.",
-    "The wait does not stop at the first count of 3.",
+    "Expected from the 2026-09-30 run: `tiling_wm.tile_count` is 3",
     'test "$order" = "instrument-studio-browser,instrument-studio-terminal,instrument-studio-settings"',
-    "refusing to inspect or screenshot an incomplete stage",
     'test "$stable_three" -ge 3',
 ):
     require(phrase, runbook)

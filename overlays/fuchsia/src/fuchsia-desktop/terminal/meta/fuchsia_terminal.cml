@@ -20,8 +20,11 @@
     ],
     use: [
         {
+            protocol: "fuchsia.hardware.pty.Device",
+            availability: "optional",
+        },
+        {
             protocol: [
-                "fuchsia.hardware.pty.Device",
                 "fuchsia.process.Launcher",
                 "fuchsia.starnix.container.Controller",
                 "fuchsia.sysmem.Allocator",
@@ -29,6 +32,7 @@
                 "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.composition.FlatlandFactory",
                 "fuchsia.ui.input.ImeService",
                 "fuchsia.ui.input3.Keyboard",
             ],

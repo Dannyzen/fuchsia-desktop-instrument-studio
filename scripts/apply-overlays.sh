@@ -19,4 +19,20 @@ while IFS= read -r -d '' file; do
   cp -a "$file" "$dest"
   echo "applied $rel"
 done < <(find "$OVERLAY" -type f -print0)
+PATCH_DIR="$ROOT/overlays/patches"
+if [[ -d "$PATCH_DIR" ]]; then
+  for patch in "$PATCH_DIR"/*.patch; do
+    [[ -f "$patch" ]] || continue
+    name=${patch#"$ROOT/"}
+    if git -C "$FUCHSIA_ROOT" apply --check "$patch" >/dev/null 2>&1; then
+      git -C "$FUCHSIA_ROOT" apply "$patch"
+      echo "applied $name"
+    elif git -C "$FUCHSIA_ROOT" apply --reverse --check "$patch" >/dev/null 2>&1; then
+      echo "already applied $name"
+    else
+      echo "cannot apply patch cleanly: $name" >&2
+      exit 1
+    fi
+  done
+fi
 echo "Overlays applied to $FUCHSIA_ROOT"
